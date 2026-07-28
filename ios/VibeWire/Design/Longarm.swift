@@ -117,9 +117,20 @@ enum LG {
         /// — it is a value nobody can read.
         static let floor: CGFloat = 9
 
-        private static func scaled(_ size: CGFloat) -> CGFloat {
+        /// The point size a call will actually render at, after the reader's
+        /// text setting and the floor. Exposed because a monospaced layout can
+        /// compute its own width from it — see `DiffView`.
+        static func scaledSize(_ size: CGFloat) -> CGFloat {
             max(floor, metrics(for: size).scaledValue(for: size))
         }
+
+        /// SF Mono and IBM Plex Mono both advance 0.6em per character, which is
+        /// what makes a monospaced column measurable without laying it out.
+        static func monoAdvance(_ size: CGFloat) -> CGFloat {
+            scaledSize(size) * 0.6
+        }
+
+        private static func scaled(_ size: CGFloat) -> CGFloat { scaledSize(size) }
 
         /// IBM Plex Mono if bundled, otherwise the system monospace. Every
         /// readout, label and key uses this.

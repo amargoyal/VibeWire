@@ -373,10 +373,17 @@ struct ClaudePanelView: View {
         }
     }
 
-    private func timeLabel(_ date: Date) -> String {
+    /// Built once. `DateFormatter` init is one of the more expensive things in
+    /// Foundation, and this was allocating a fresh one per turn per render of
+    /// the transcript.
+    private static let clock: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return formatter
+    }()
+
+    private func timeLabel(_ date: Date) -> String {
+        Self.clock.string(from: date)
     }
 
     // MARK: Suggestions and composer
@@ -490,10 +497,15 @@ struct ClaudePanelView: View {
         return !draft.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// A permission request is the only thing that shows this, and one is
+    /// pending for a few seconds of a long session. Assigning it regardless
+    /// rebuilt the transcript — the tallest view in the app — every second for
+    /// the whole time the panel was open.
     private func ageTicker() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(1))
-            permissionAge = model.permission?.waitedSeconds ?? 0
+            let age = model.permission?.waitedSeconds ?? 0
+            if age != permissionAge { permissionAge = age }
         }
     }
 }

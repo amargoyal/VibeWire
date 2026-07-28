@@ -233,14 +233,18 @@ struct Sparkline: View {
     var height: CGFloat = 22
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 2) {
-            ForEach(Array(values.suffix(20).enumerated()), id: \.offset) { index, value in
-                let peak = max(values.max() ?? 1, 1)
+        // Both of these were inside the loop, so a 60-sample history scanned
+        // itself twenty times to draw twenty bars — on the home screen, once a
+        // second, for as long as it is open.
+        let recent = Array(values.suffix(20))
+        let peak = max(values.max() ?? 1, 1)
+        let brightFrom = max(0, recent.count - 5)
+
+        return HStack(alignment: .bottom, spacing: 2) {
+            ForEach(Array(recent.enumerated()), id: \.offset) { index, value in
                 let scaled = max(6, CGFloat(value / peak) * height)
                 Rectangle()
-                    .fill(index >= max(0, min(20, values.count) - 5)
-                          ? color
-                          : color.opacity(0.42))
+                    .fill(index >= brightFrom ? color : color.opacity(0.42))
                     .frame(width: 4, height: scaled)
             }
         }

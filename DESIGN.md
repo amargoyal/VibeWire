@@ -364,7 +364,7 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 
 **Exchange steps** — four named rows with real detail values (`ED25519`, `STORED`) and per-step markers, instead of one indeterminate spinner. A failure lands on a specific step.
 
-**Diff** — mono 11 pt on `#0B0E12`, jade on 8% jade for additions, clay on 8% clay for removals, cyan for hunk headers, Text Tertiary for metadata. Scrolls in both axes; the leading `+`/`−` is preserved so a copied diff is still a diff.
+**Diff** — mono 11 pt on `#0B0E12`, jade on 8% jade for additions, clay on 8% clay for removals, cyan for hunk headers, Text Tertiary for metadata. Scrolls in both axes; the leading `+`/`−` is preserved so a copied diff is still a diff. The column's width is computed from the longest line rather than measured (`LG.Font.monoAdvance` — monospaced text advances 0.6 em per character), so the added and removed tints run the full width of the column instead of stopping raggedly at each line's own last character.
 
 **`VideoCaption` / `.videoChip()`** — the ground any mark needs when it sits on the picture: 6 pt horizontal, 3 pt vertical, Deep Ground at 92%. Solid text on top. Defined once so a caption, the INPUT HERE badge, and the landscape live readout cannot drift apart, and so the contrast holds over a white document as well as a black one.
 

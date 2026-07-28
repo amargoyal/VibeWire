@@ -152,10 +152,15 @@ struct SettingsView: View {
         return "\(whole) \(noun)\(whole == 1 ? "" : "S")"
     }
 
-    private func shortDate(_ date: Date) -> String {
+    /// Built once, not per paired device per render.
+    private static let day: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "d MMM"
-        return formatter.string(from: date).uppercased()
+        return formatter
+    }()
+
+    private func shortDate(_ date: Date) -> String {
+        Self.day.string(from: date).uppercased()
     }
 
     // MARK: Video

@@ -928,18 +928,41 @@ struct RemoteView: View {
         return CGFloat(display.width) / CGFloat(display.height)
     }
 
+    /// Every write here invalidates the whole remote screen, so every write has
+    /// to be worth a rebuild.
+    ///
+    /// It used to assign both values unconditionally once a second, which meant
+    /// that while a 60fps stream was running — the most timing-sensitive state
+    /// this app has — SwiftUI rebuilt the picture, the overlays, the zoom rail
+    /// and the bottom bar every second to set two numbers that had not changed.
+    /// It also awaited the socket actor for a queue depth that is only ever
+    /// shown inside the reconnecting overlay.
     private func stallTicker() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(1))
+
+            let seconds: Int
+            let stalling: Bool
             switch model.streamState {
             case .stalled(let millis):
-                stallSeconds = millis / 1000
+                seconds = millis / 1000
+                stalling = true
             case .reconnecting:
-                stallSeconds += 1
+                seconds = stallSeconds + 1
+                stalling = true
             default:
-                stallSeconds = 0
+                seconds = 0
+                stalling = false
             }
-            queuedCount = await model.queuedInputCount
+            if seconds != stallSeconds { stallSeconds = seconds }
+
+            // Only ask, and only redraw, when there is somewhere to show it.
+            if stalling {
+                let queued = await model.queuedInputCount
+                if queued != queuedCount { queuedCount = queued }
+            } else if queuedCount != 0 {
+                queuedCount = 0
+            }
         }
     }
 }

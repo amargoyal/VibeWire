@@ -553,17 +553,21 @@ struct HomeView: View {
         }
     }
 
+    /// The countdown only exists on the unreachable screen, but this used to
+    /// re-assign it every second on every other one — rebuilding the condition
+    /// card, the display list and the footer once a second to write the number
+    /// 22 over the number 22.
     private func countdownLoop() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(1))
-            if posture == .unreachable {
-                retryCountdown -= 1
-                if retryCountdown <= 0 {
-                    retryCountdown = 22
-                    model.retry()
-                }
-            } else {
+            guard posture == .unreachable else {
+                if retryCountdown != 22 { retryCountdown = 22 }
+                continue
+            }
+            retryCountdown -= 1
+            if retryCountdown <= 0 {
                 retryCountdown = 22
+                model.retry()
             }
         }
     }

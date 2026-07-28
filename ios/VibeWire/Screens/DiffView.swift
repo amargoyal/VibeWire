@@ -12,7 +12,12 @@ struct DiffView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ScreenBody {
+        // Parsed once per body pass. As four separate computed properties this
+        // split the whole patch four times per render — for the rows, the
+        // width, and each of the two counts in the footer.
+        let patch = Patch(model.diffPatch)
+
+        return ScreenBody {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
@@ -22,12 +27,23 @@ struct DiffView: View {
                     ScrollView {
                         // Sideways too: wrapped code lies about indentation,
                         // and a diff is mostly indentation.
+                        //
+                        // The width is computed rather than measured, and that
+                        // is the whole optimisation. A horizontal scroll view
+                        // sizes itself to its content, so with an unmeasured
+                        // column it had to lay out every line of the patch to
+                        // find the longest — which made the `LazyVStack` below
+                        // eager no matter what, on a view the host re-sends
+                        // after every tool result while Claude is editing.
+                        // Monospaced text advances a known amount per
+                        // character, so the longest line is arithmetic.
                         ScrollView(.horizontal, showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(patch.lines.enumerated()), id: \.offset) { _, line in
                                     row(line)
                                 }
                             }
+                            .frame(width: patch.width, alignment: .leading)
                             .padding(.vertical, 10)
                         }
                     }
@@ -41,8 +57,42 @@ struct DiffView: View {
                     .padding(.top, 14)
                 }
 
-                footer
+                footer(patch)
             }
+        }
+    }
+
+    /// One pass over the patch: the rows, the width the column needs, and the
+    /// two counts the footer states.
+    private struct Patch {
+        let lines: [String]
+        let width: CGFloat
+        let added: Int
+        let removed: Int
+
+        init(_ text: String) {
+            var lines: [String] = []
+            var longest = 0
+            var added = 0
+            var removed = 0
+
+            for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                longest = max(longest, line.count)
+                if line.hasPrefix("+"), !line.hasPrefix("+++") {
+                    added += 1
+                } else if line.hasPrefix("-"), !line.hasPrefix("---") {
+                    removed += 1
+                }
+                lines.append(String(line))
+            }
+
+            self.lines = lines
+            self.added = added
+            self.removed = removed
+            // Wide enough for the longest line, so the added and removed tints
+            // run the full width of the column instead of stopping raggedly at
+            // each line's own last character.
+            self.width = CGFloat(longest) * LG.Font.monoAdvance(DiffView.codeSize) + 20
         }
     }
 
@@ -75,10 +125,10 @@ struct DiffView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var footer: some View {
+    private func footer(_ patch: Patch) -> some View {
         HStack(spacing: 14) {
-            MonoCaps("+\(addedCount)", size: 10, color: LG.Color.green, tracking: 1.2)
-            MonoCaps("−\(removedCount)", size: 10, color: LG.Color.red, tracking: 1.2)
+            MonoCaps("+\(patch.added)", size: 10, color: LG.Color.green, tracking: 1.2)
+            MonoCaps("−\(patch.removed)", size: 10, color: LG.Color.red, tracking: 1.2)
             Spacer()
             MonoCaps("UPDATES AS CLAUDE EDITS", size: 9, tracking: 1.4)
         }
@@ -88,7 +138,7 @@ struct DiffView: View {
     private func row(_ line: String) -> some View {
         let kind = DiffLineKind(line)
         return Text(line.isEmpty ? " " : line)
-            .font(LG.Font.mono(11))
+            .font(LG.Font.mono(Self.codeSize))
             .foregroundStyle(kind.foreground)
             .padding(.horizontal, 10)
             .padding(.vertical, 1)
@@ -96,17 +146,7 @@ struct DiffView: View {
             .background(kind.background)
     }
 
-    private var lines: [String] {
-        model.diffPatch.components(separatedBy: .newlines)
-    }
-
-    private var addedCount: Int {
-        lines.filter { $0.hasPrefix("+") && !$0.hasPrefix("+++") }.count
-    }
-
-    private var removedCount: Int {
-        lines.filter { $0.hasPrefix("-") && !$0.hasPrefix("---") }.count
-    }
+    fileprivate static let codeSize: CGFloat = 11
 }
 
 /// Colour carries the meaning; the leading +/− stays so a copied diff is still

@@ -402,11 +402,20 @@ struct PairingView: View {
         }
     }
 
+    /// Discovery is worth a request every two seconds while someone is looking
+    /// at the address field. It is not worth one during the handshake, where
+    /// the same host is already answering on the same socket, and a probe
+    /// landing mid-exchange only competes with it.
     private func probeLoop() async {
         while !Task.isCancelled {
+            if isExchanging {
+                try? await Task.sleep(for: .seconds(2))
+                continue
+            }
             if !address.isEmpty, let portValue = Int(port) {
-                probeMillis = await model.probe(host: address, port: portValue)
-            } else {
+                let millis = await model.probe(host: address, port: portValue)
+                if millis != probeMillis { probeMillis = millis }
+            } else if probeMillis != nil {
                 probeMillis = nil
             }
             try? await Task.sleep(for: .seconds(2))
