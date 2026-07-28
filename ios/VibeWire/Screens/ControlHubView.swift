@@ -187,33 +187,40 @@ struct ControlHubView: View {
                 )
             }
 
+            // Four fixed 62pt caps plus a flexible fifth control left that
+            // control 27pt wide on an iPhone SE and 54pt on a 17 Pro — a
+            // two-line label in a target too narrow to read, for the one action
+            // that undoes a latch. The caps now share the row and take whatever
+            // the device gives them, and releasing everything is its own
+            // full-width row: a different kind of act from pressing a key, and
+            // the app already separates those elsewhere.
             HStack(spacing: 8) {
                 ForEach(ModifierSpec.all, id: \.name) { spec in
                     KeyCap(
                         glyph: spec.glyph,
                         caption: spec.caption,
-                        width: 62,
                         height: 52,
                         isHeld: model.heldModifiers.contains(spec.name)
                     ) {
                         model.toggleModifier(spec.name)
                     }
                 }
-
-                Button {
-                    model.releaseModifiers()
-                } label: {
-                    MonoCaps("RELEASE\nALL", size: 9, color: LG.Color.textSecondary, tracking: 1)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.chrome))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairline, lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
             }
+
+            Button {
+                model.releaseModifiers()
+            } label: {
+                MonoCaps("RELEASE ALL", size: 10, color: LG.Color.textSecondary, tracking: 1.4)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: LG.Metric.minimumTarget)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.chrome))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairline, lineWidth: 1)
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
             .padding(.top, 12)
 
             Text("Latched keys survive taps, drags and the keyboard. Two lit caps means the next touch is a \(model.heldModifiers.sorted().map(glyph(for:)).joined()) touch.")

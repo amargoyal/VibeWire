@@ -168,6 +168,18 @@ enum LG {
         static let hairline: CGFloat = 1
         static let gutter: CGFloat = 24
 
+        /// The widest a column of readings is allowed to get.
+        ///
+        /// Every screen but the remote view is a single column of rows, and a
+        /// row is a label on the left and a value on the right. Run that to the
+        /// glass on an iPad and the two ends stop being readable as one line —
+        /// the eye loses which value belongs to which label. Bounded and
+        /// centred, the same column reads as a deliberate panel at any width.
+        ///
+        /// On a phone the cap never binds: 402pt of glass minus two gutters is
+        /// 354pt of content, well inside it.
+        static let measure: CGFloat = 560
+
         /// Tracking on all-caps mono, per the spec sheet.
         static let capsTracking: CGFloat = 1.4
     }

@@ -20,7 +20,7 @@ struct PairingView: View {
     @FocusState private var codeFieldFocused: Bool
 
     var body: some View {
-        ScreenBody {
+        ScreenBody(scrolls: true) {
             if isExchanging {
                 exchangingBody
             } else {
@@ -127,9 +127,15 @@ struct PairingView: View {
     private func codeBox(index: Int) -> some View {
         let isActive = index == focusedIndex && codeFieldFocused
         let value = digits[index]
+        // A maximum, not a fixed width. Six 48pt boxes and five 9pt gaps need
+        // 333pt; an iPhone SE offers 327pt inside the gutter, so the row
+        // overflowed the app's very first screen by 6pt. Letting the boxes take
+        // an equal share of whatever is there costs nothing on a wider phone
+        // and fits on a narrow one.
         return RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
             .fill(isActive ? LG.Color.cyan.opacity(0.08) : LG.Color.panel)
-            .frame(width: 48, height: 64)
+            .frame(maxWidth: 48)
+            .frame(height: 64)
             .overlay(
                 RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
                     .stroke(isActive ? LG.Color.cyan : LG.Color.hairline, lineWidth: 1)
@@ -260,7 +266,10 @@ struct PairingView: View {
                 ForEach(0..<6, id: \.self) { index in
                     RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
                         .fill(LG.Color.chrome)
-                        .frame(width: 48, height: 64)
+                        // Same share-the-width rule as the entry boxes, so the
+                        // digits do not jump when the screen swaps to this one.
+                        .frame(maxWidth: 48)
+                        .frame(height: 64)
                         .overlay(
                             RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
                                 .stroke(LG.Color.stroke, lineWidth: 1)

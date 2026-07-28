@@ -39,7 +39,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        ScreenBody {
+        ScreenBody(scrolls: true) {
             VStack(alignment: .leading, spacing: 0) {
                 ScreenHeader { model.route = .settings }
 

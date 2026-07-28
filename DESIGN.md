@@ -258,6 +258,10 @@ Vertical rhythm runs on a coarse scale rather than a strict grid: 12 pt between 
 
 Fixed control sizes are load-bearing, not incidental: 44 pt is the floor for anything tappable, 76 pt for the single primary action on a screen, 56 pt for a hub spoke and for the composer's send and stop, 46 pt for a key cap, 50–62 pt for list rows. The control hub is laid out on measured thumb geometry — a 210 pt arc of six 56 pt targets on a 66 pt pitch, positioned by explicit offsets from the bottom-trailing corner, ending at the two easiest positions for a right thumb.
 
+**Every screen but the remote view is one column, bounded at 560 pt (`LG.Metric.measure`) and centred in whatever is left.** A row here is a label on the left and a value on the right; run that to the glass on an iPad and the two ends stop reading as one line. Bounded, the same column reads as a deliberate panel at any width. On a phone the cap never binds — 402 pt of glass minus two gutters is 354 pt — so this is invisible until the window gets wide. It also covers landscape, iPad Split View, and a phone-width window on a tablet without a single device check.
+
+**Screens that are one column ending in a primary action set `ScreenBody(scrolls: true)`** — Home, Pairing, the combo editor. They fill the viewport when there is room, so their spacers still push the footer to the bottom edge, and scroll only once the content genuinely does not fit. Without it, landscape and the larger text sizes both push the only way forward off the screen.
+
 **Portrait** is the instrument: status strip, optional display tabs, picture, pad-mode control, then a 96 pt bottom bar holding stop and hub. **Landscape** is a different instrument rather than a stretched one — the picture takes the left, and a 231 pt right-hand dock carries controls, a modifier row, and live RTT/rate readouts, separated by a single 1 pt chrome rule.
 
 On the remote screen, the letterbox bands left by a 16:10 desktop inside a 19.5:9 phone are treated as usable surface: the trackpad is the entire glass, not just the picture, so the first accidental swipe into the dark area still moves the cursor. The picture keeps every pixel it has; the chrome lives in the bands.
@@ -267,6 +271,8 @@ On the remote screen, the letterbox bands left by a 16:10 desktop inside a 19.5:
 **The Held Space Rule.** A layout does not move when a value arrives. Pending values are drawn as a dashed rule or an em dash occupying the final geometry, so filling in is a substitution rather than a reflow.
 
 **The Whole Glass Rule.** On the remote screen the input surface is the full frame, including the bands. Anything drawn over the picture is `.allowsHitTesting(false)` unless it is itself a control.
+
+**The Bounded Column Rule.** Layout is driven by available width, never by device model. A column caps at `measure` and centres; a row of equal controls shares the width it is given rather than claiming a fixed one. The six pairing boxes are the case that proves it — at a fixed 48 pt they needed 333 pt inside 327 pt of iPhone SE, and overflowed the app's first screen.
 
 ## Elevation & Depth
 

@@ -257,7 +257,7 @@ struct ComboEditor: View {
     @State private var letter = ""
 
     var body: some View {
-        ScreenBody {
+        ScreenBody(scrolls: true) {
             VStack(alignment: .leading, spacing: 20) {
                 MonoCaps("NEW COMBO", size: 10, tracking: 2).padding(.top, 24)
 

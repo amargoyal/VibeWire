@@ -471,14 +471,47 @@ struct ScreenHeader: View {
 /// Wraps a screen in the app's ground colour and edge insets.
 struct ScreenBody<Content: View>: View {
     var background: Color = LG.Color.screenGround
+    /// Set on screens that are one fixed column ending in a primary action.
+    ///
+    /// Those screens were laid out for a portrait phone and nothing else, so in
+    /// landscape — or at a large text size — the footer holding the only way
+    /// forward simply left the screen. `false` is right for a screen that owns
+    /// a scroll view of its own; two nested ones fight.
+    var scrolls: Bool = false
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ZStack {
             background.ignoresSafeArea()
-            content()
-                .padding(.horizontal, LG.Metric.gutter)
+
+            if scrolls {
+                GeometryReader { proxy in
+                    ScrollView {
+                        // Fill the viewport when there is room, so the spacers
+                        // inside still push the footer to the bottom edge, and
+                        // scroll only once the content genuinely does not fit.
+                        // Without the minimum, every one of these screens
+                        // collapses to its natural height and floats.
+                        column.frame(minHeight: proxy.size.height, alignment: .top)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                }
+            } else {
+                column
+            }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var column: some View {
+        content()
+            .padding(.horizontal, LG.Metric.gutter)
+            // Bounded, then centred in whatever is left. This is the whole of
+            // the iPad story: the layout does not stretch, it stays a column
+            // and moves to the middle — which also covers landscape, Split
+            // View, and a phone-width window on a tablet, without once asking
+            // what device it is running on.
+            .frame(maxWidth: LG.Metric.measure)
+            .frame(maxWidth: .infinity)
     }
 }

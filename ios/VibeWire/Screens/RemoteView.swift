@@ -10,7 +10,6 @@ import SwiftUI
 /// teaches it.
 struct RemoteView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var pointerOrigin: CGPoint?
     @State private var isDragging = false
