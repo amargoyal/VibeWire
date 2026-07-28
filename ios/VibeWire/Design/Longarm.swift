@@ -64,8 +64,71 @@ enum LG {
     // MARK: Type
 
     enum Font {
+        /// Every size in this app is a designed value — 9pt units, a 19pt
+        /// readout, a 30pt machine name — so none of them can be handed to a
+        /// system text style wholesale without losing the scale the instrument
+        /// is drawn on. They still have to answer the reader's text size.
+        ///
+        /// So each call is scaled *relative to* the standard style nearest its
+        /// own size, using that style's own growth curve: a 9pt unit label
+        /// tracks `caption2`, a 30pt machine name tracks `largeTitle`, and the
+        /// two grow at the different rates Apple already tuned. Deriving the
+        /// style from the size here is what let 123 existing call sites gain
+        /// Dynamic Type without one of them changing.
+        private static func metrics(for size: CGFloat) -> UIFontMetrics {
+            UIFontMetrics(forTextStyle: textStyle(for: size))
+        }
+
+        static func textStyle(for size: CGFloat) -> UIFont.TextStyle {
+            switch size {
+            case ..<12: return .caption2      // 11pt base — labels, units, captions
+            case ..<13: return .caption1      // 12pt
+            case ..<14.5: return .footnote    // 13pt — supporting prose
+            case ..<16: return .subheadline   // 15pt — body prose, row titles
+            case ..<16.5: return .callout     // 16pt
+            case ..<20: return .body          // 17pt — readouts, action titles
+            case ..<21: return .title3        // 20pt
+            case ..<28: return .title2        // 22pt — screen titles, headlines
+            case ..<34: return .title1        // 28pt — the machine name
+            default: return .largeTitle       // 34pt — the zoom badge
+            }
+        }
+
+        /// UIKit and SwiftUI each ship their own `TextStyle`, and they do not
+        /// convert. The metrics side needs UIKit's; `Font.custom(relativeTo:)`
+        /// needs SwiftUI's. Same roles, mapped once.
+        private static func swiftUIStyle(for size: CGFloat) -> SwiftUI.Font.TextStyle {
+            switch textStyle(for: size) {
+            case .caption2: return .caption2
+            case .caption1: return .caption
+            case .footnote: return .footnote
+            case .subheadline: return .subheadline
+            case .callout: return .callout
+            case .title3: return .title3
+            case .title2: return .title2
+            case .title1: return .title
+            case .largeTitle: return .largeTitle
+            default: return .body
+            }
+        }
+
+        /// Nothing renders smaller than this, whatever the reader's setting.
+        /// The instrument is dense on purpose, but a 6pt caption is not density
+        /// — it is a value nobody can read.
+        static let floor: CGFloat = 9
+
+        private static func scaled(_ size: CGFloat) -> CGFloat {
+            max(floor, metrics(for: size).scaledValue(for: size))
+        }
+
         /// IBM Plex Mono if bundled, otherwise the system monospace. Every
         /// readout, label and key uses this.
+        ///
+        /// Note that nothing bundles Plex today — there is no `UIAppFonts` key
+        /// and no font file in the target — so every one of these is SF Mono in
+        /// practice. The branch is kept because it is the one place that would
+        /// need to change if the face is ever added, and because `custom`
+        /// scales natively against the same style the fallback computes.
         static func mono(_ size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
             if UIFont(name: "IBMPlexMono", size: size) != nil {
                 let name: String
@@ -74,14 +137,18 @@ enum LG {
                 case .bold: name = "IBMPlexMono-SemiBold"
                 default: name = "IBMPlexMono"
                 }
-                return .custom(name, size: size)
+                return .custom(
+                    name,
+                    size: max(floor, size),
+                    relativeTo: swiftUIStyle(for: size)
+                )
             }
-            return .system(size: size, weight: weight, design: .monospaced)
+            return .system(size: scaled(size), weight: weight, design: .monospaced)
         }
 
         /// Names, prose, answers.
         static func sans(_ size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
-            .system(size: size, weight: weight)
+            .system(size: scaled(size), weight: weight)
         }
     }
 

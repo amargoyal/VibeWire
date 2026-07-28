@@ -224,7 +224,9 @@ A near-black instrument ground carrying four saturated-but-soft signal hues, eac
 ## Typography
 
 **Display / Body Font:** SF Pro — the system sans, no custom brand face
-**Label / Readout / Code Font:** IBM Plex Mono when bundled, system monospaced as the fallback
+**Label / Readout / Code Font:** SF Mono. `LG.Font.mono` names IBM Plex Mono first, but nothing bundles it — there is no `UIAppFonts` key and no font file in the target — so every mono glyph in the app is the system monospace today. The branch is kept as the single place that would change if the face is ever added.
+
+**Scaling:** every size answers Dynamic Type. Each call is scaled relative to the standard text style nearest its own value — a 9 pt unit label tracks `caption2`, a 19 pt readout tracks `body`, a 30 pt machine name tracks `title1` — so the roles grow at the different rates Apple already tuned rather than all inflating together. The style is derived from the size inside `LG.Font`, which is what let every existing call site gain scaling without changing. Nothing renders below **9 pt** (`LG.Font.floor`).
 
 **Character:** A technical pairing with a strict division of labor. Mono is the machine's voice: uppercased, tracked wide (0.8–4.4 pt), and small enough that it reads as an annotation on a dial rather than a sentence. Sans is the human voice: mixed case, unmodified, used for anything written to be read as language. The contrast is the hierarchy — there is no bold-heavy type scale doing that job.
 
@@ -243,6 +245,10 @@ A near-black instrument ground carrying four saturated-but-soft signal hues, eac
 **The Two Registers Rule.** Monospace is for anything the machine measured or named: values, units, paths, keys, commands, statuses. Sans is for anything written to be read as language. A label never becomes sans to look friendlier, and prose never becomes mono to look technical.
 
 **The Verbatim Rule.** A command, a path, or an error the user may need to act on is rendered mono, selectable (`.textSelection(.enabled)`), and never truncated mid-token. Truncation, when unavoidable, takes the head of a path and the middle of a target — never the tail that carries the filename.
+
+**The 9 Point Floor Rule.** Nothing renders below 9 pt at any text size. This is a deliberate departure from the platform's 11 pt floor, taken because the instrument's density is the design and a uniform 11 pt would rewrite it — but 6 pt and 7 pt captions were not density, they were unreadable. The floor is enforced inside `LG.Font`, so a call site cannot opt out by passing a smaller number.
+
+**The Growing Control Rule.** A control that stacks text sets `minHeight`, never a fixed `height`. Identical at the default size; at large sizes the control grows instead of clipping the words inside it. The 76 pt primary action is the case that proves it — a fixed height clips the preflight line, which is the sentence saying what the action costs.
 
 ## Layout
 
@@ -400,6 +406,7 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 - **Don't** show a bare spinner in place of a value or a named step. Four named steps with real detail beat one indeterminate arc.
 - **Don't** collapse distinct failures into one message. A timeout, a refused connection, a missing permission, and a sleeping Mac are four states with four answers.
 - **Don't** wrap code or a diff. Scroll it horizontally; wrapped code lies about indentation and truncated code lies outright.
+- **Don't** pass a text size below 9, or set a fixed `height` on a control that stacks text. The floor is enforced in `LG.Font` and the growth in `minHeight`; both exist because the app has to answer the reader's text size.
 - **Don't** hard-code a new hex literal at a call site. Seven already exist outside the token file (`#C9A468`, `#C3C8D0`, `#A8AEB8`, `#0B0E12`, `#0D1014`, `#1E242C`, `#060709`); they are drift, not precedent — add the token instead.
 - **Don't** put an oversized decorative layer in a `ZStack` as a sibling. Anything wider than the phone goes in `.background(alignment:)`, or it resizes the whole screen.
 - **Don't** use dashes decoratively. A dashed stroke means unmeasured, pending, or unselected, and it resolves to solid when the thing becomes real.

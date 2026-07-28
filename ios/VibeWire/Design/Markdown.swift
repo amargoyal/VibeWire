@@ -146,7 +146,7 @@ private struct CodeBlock: View {
             HStack {
                 MonoCaps(
                     (language?.isEmpty == false ? language! : "CODE").uppercased(),
-                    size: 8,
+                    size: 9,
                     color: LG.Color.textTertiary,
                     tracking: 1.4
                 )
@@ -158,14 +158,14 @@ private struct CodeBlock: View {
                 } label: {
                     MonoCaps(
                         copied ? "COPIED" : "COPY",
-                        size: 8,
+                        size: 9,
                         color: copied ? LG.Color.green : LG.Color.textSecondary,
                         tracking: 1.4
                     )
-                    .frame(height: 28)
+                    .frame(minHeight: 28)
                     .padding(.horizontal, 12)
-                    // 8pt glyphs are a very small target to hit, and hit
-                    // testing would otherwise use the letter shapes themselves.
+                    // Small glyphs are a small target, and hit testing would
+                    // otherwise use the letter shapes themselves.
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

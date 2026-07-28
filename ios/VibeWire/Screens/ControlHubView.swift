@@ -122,7 +122,7 @@ struct ControlHubView: View {
                     .foregroundStyle(spoke.tint)
                 MonoCaps(
                     spoke.caption,
-                    size: 8,
+                    size: 9,
                     color: spoke.tint == LG.Color.cyan ? LG.Color.cyan : LG.Color.textSecondary,
                     tracking: 0.8
                 )

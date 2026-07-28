@@ -434,7 +434,7 @@ struct ClaudePanelView: View {
                 } label: {
                     VStack(spacing: 2) {
                         Rectangle().fill(LG.Color.red).frame(width: 12, height: 12)
-                        MonoCaps("STOP", size: 7, color: LG.Color.red, tracking: 1)
+                        MonoCaps("STOP", size: 9, color: LG.Color.red, tracking: 1)
                     }
                     .frame(width: 56, height: 56)
                     .background(

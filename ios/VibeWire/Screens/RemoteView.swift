@@ -79,6 +79,16 @@ struct RemoteView: View {
             .onChange(of: geometry.size) { _, size in applyOrientation(size) }
         }
         .statusBarHidden(isLandscape)
+        // The one screen that cannot take the whole Dynamic Type range, and it
+        // is worth being precise about why: almost nothing here is text. The
+        // hub's six spokes sit at hard-coded offsets tracing a thumb's sweep —
+        // that is hand geometry, not type — the picture holds a fixed aspect,
+        // and the landscape dock is 231pt of controls. Past this step the
+        // captions start colliding with the video they annotate.
+        //
+        // accessibility1 is already two steps beyond the largest standard size,
+        // and every other screen in the app takes the full range.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .task { await stallTicker() }
         .onAppear {
             // The teaching overlay retires after three sessions; the corner
@@ -311,7 +321,7 @@ struct RemoteView: View {
                             // Cyan at 16% over video was the same unverifiable
                             // bet the captions were making, and this badge is
                             // the one that says where input lands.
-                            MonoCaps("INPUT HERE", size: 8, color: LG.Color.cyan, tracking: 1.4)
+                            MonoCaps("INPUT HERE", size: 9, color: LG.Color.cyan, tracking: 1.4)
                                 .videoChip()
                                 .overlay(Rectangle().stroke(LG.Color.cyan.opacity(0.5), lineWidth: 1))
                         }

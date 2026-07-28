@@ -327,7 +327,7 @@ struct PairingView: View {
     private func machineTile(glyph: some View, caption: String, active: Bool) -> some View {
         VStack(spacing: 5) {
             glyph
-            MonoCaps(caption, size: 8, color: active ? LG.Color.cyan : LG.Color.textTertiary, tracking: 0.8)
+            MonoCaps(caption, size: 9, color: active ? LG.Color.cyan : LG.Color.textTertiary, tracking: 0.8)
         }
         .frame(width: 64, height: 64)
         .background(

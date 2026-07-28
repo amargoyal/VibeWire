@@ -80,13 +80,13 @@ struct Readout: View {
 /// enough that it reads as part of the video rather than pasted on top.
 struct VideoCaption: View {
     let text: String
-    var size: CGFloat = 8
+    var size: CGFloat = 9
     var color: Color = LG.Color.textSecondary
     var tracking: CGFloat = 1.4
 
     init(
         _ text: String,
-        size: CGFloat = 8,
+        size: CGFloat = 9,
         color: Color = LG.Color.textSecondary,
         tracking: CGFloat = 1.4
     ) {
@@ -282,7 +282,10 @@ struct PrimaryAction: View {
                     .foregroundStyle(ink)
             }
             .padding(.horizontal, 22)
-            .frame(height: LG.Metric.primaryAction)
+            // Minimum, not fixed. The title and its preflight line are stacked,
+            // so at a large text size a fixed 76pt clips the very sentence that
+            // says what the action costs. Identical at the default size.
+            .frame(minHeight: LG.Metric.primaryAction)
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: LG.Metric.radiusMedium).fill(tint)
@@ -305,7 +308,7 @@ struct SecondaryAction: View {
         Button(action: action) {
             MonoCaps(title, size: 10, color: tint)
                 .frame(maxWidth: .infinity)
-                .frame(height: LG.Metric.minimumTarget)
+                .frame(minHeight: LG.Metric.minimumTarget)
                 .overlay(
                     RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
                         .stroke(border, lineWidth: LG.Metric.hairline)
@@ -340,7 +343,7 @@ struct Segmented<Value: Hashable>: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: LG.Metric.minimumTarget)
+                    .frame(minHeight: LG.Metric.minimumTarget)
                     .background(
                         selection == option.value
                             ? LG.Color.cyan.opacity(0.14)
@@ -402,10 +405,13 @@ struct KeyCap: View {
                     .font(LG.Font.mono(fontSize))
                     .foregroundStyle(isHeld ? LG.Color.cyan : LG.Color.text)
                 if let caption {
-                    MonoCaps(caption, size: 7, color: isHeld ? LG.Color.cyan : LG.Color.textTertiary)
+                    MonoCaps(caption, size: 9, color: isHeld ? LG.Color.cyan : LG.Color.textTertiary)
                 }
             }
-            .frame(width: width, height: height)
+            // The cap's width is a keyboard geometry and stays fixed; its
+            // height gives way so a glyph stacked over a caption still fits.
+            .frame(width: width)
+            .frame(minHeight: height)
             .frame(maxWidth: width == nil ? .infinity : nil)
             .background(
                 RoundedRectangle(cornerRadius: 8)
@@ -458,7 +464,7 @@ struct ScreenHeader: View {
                 .accessibilityLabel("Settings")
             }
         }
-        .frame(height: LG.Metric.minimumTarget)
+        .frame(minHeight: LG.Metric.minimumTarget)
     }
 }
 
