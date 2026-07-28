@@ -336,7 +336,13 @@ Two custom silhouettes carry the instrument metaphor: **corner ticks** — four 
 
 ### Navigation
 
-Route-driven, not a tab bar: pairing → home → remote → claude → settings, held in `AppModel.route`. Screens carry their own chrome — a `ScreenHeader` with the `VibeWire` wordmark in 12 pt mono-caps at 4.1 tracking and a three-dot overflow, or a 44 pt back arrow with a 22 pt sans title. The Claude panel presents as a draggable sheet with a grabber and a drag-down-to-dismiss gesture; the diff, session picker, and combo editor are true sheets.
+**Three routes and two sheets — no navigation stack, and that is deliberate.** `AppModel.route` holds only the places the app can *be*: pairing → home → remote. Settings and the Claude panel are sheets over whichever of those is showing. The app has no hierarchy to push through: Settings is not deeper than Home, it is beside it, and a stack would buy one chevron at the cost of a navigation model nothing else needs. Sheets give the dismiss gesture that was actually missing, and give it to both.
+
+**The remote screen keeps no edge-swipe back, on purpose.** The whole glass is the trackpad, including the letterbox bands, so an interactive pop gesture would fight the pointer for the left edge — and the one that loses is the one you reach for in the dark. It is a full-screen immersive presentation, the same exemption a camera or a video player takes; `✕` and the hub are the exits.
+
+**The Claude sheet opens at the height its context calls for:** `.medium` from the remote screen, where there is a live picture worth keeping in view, and `.large` from Home, where there is nothing below to see. Derived at presentation, never remembered — a stored detent would be exactly the hand-set flag the Measured Condition Rule exists to forbid. Both sheets set `.presentationBackground` to the screen ground, because this app has one appearance and no system materials.
+
+Screens carry their own chrome: a `ScreenHeader` with the `VibeWire` wordmark in 12 pt mono-caps at 4.1 tracking and a three-dot overflow, or a 22 pt sans title with a `DONE` action. The diff, session picker, QR scanner, and combo editor are sheets presented from within their parent — note that SwiftUI honors only the **first** `.sheet` on a given view, so a second one must be attached to a child.
 
 **Every glyph-only or outline-only target carries `.contentShape(Rectangle())`.** Hit testing follows drawn ink, so three 3 pt dots, an arrow glyph, a dashed box, and 9 pt caption text are all visually buttons and practically untappable without it.
 

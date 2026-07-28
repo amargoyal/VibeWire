@@ -152,16 +152,32 @@ struct ChangedFile: Identifiable, Equatable {
 @MainActor
 @Observable
 final class AppModel {
+    /// Where the app *is*, which is only ever one of three places.
+    ///
+    /// Settings and the Claude panel used to live here too, which made them
+    /// destinations the app replaced itself with — and a replaced screen
+    /// inherits no way back, which is why the sole exit from Settings was one
+    /// 44pt arrow that had already needed a hit-shape fix. They are sheets now,
+    /// and a sheet is dismissed by the gesture every iOS user already has.
     enum Route: Equatable {
         case pairing
         case home
         case remote
-        case claude
+    }
+
+    /// What is presented *over* the route. One value, because SwiftUI honours
+    /// only the first `.sheet` on a given view — two modifiers on the root
+    /// would silently drop the second, which this codebase has already paid for
+    /// once (see the diff sheet in `HANDOFF.md`).
+    enum Presentation: String, Identifiable {
         case settings
+        case claude
+        var id: String { rawValue }
     }
 
     // Navigation
     var route: Route = .pairing
+    var presented: Presentation?
     var showHub = false
     var showKeyboard = false
     /// What the 07B confirm sheet is asking about. Revoking everything is the
@@ -934,6 +950,11 @@ final class AppModel {
         Identity.forgetHost()
         pairedHost = nil
         route = .pairing
+        // Revoking every device is triggered from inside the Settings sheet, so
+        // without this the sheet stays up over the pairing screen — settings
+        // for a host this phone no longer has a key to.
+        presented = nil
+        showRevokeConfirm = nil
         Task { await disconnect() }
     }
 

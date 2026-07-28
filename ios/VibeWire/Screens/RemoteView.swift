@@ -641,7 +641,7 @@ struct RemoteView: View {
                 Hairline(color: LG.Color.chrome)
                 HStack(spacing: 8) {
                     Button {
-                        model.route = .claude
+                        model.presented = .claude
                         model.listClaudeSessions()
                     } label: {
                         MonoCaps("CLAUDE", size: 10, color: LG.Color.cyan, tracking: 1.2)

@@ -41,7 +41,7 @@ struct HomeView: View {
     var body: some View {
         ScreenBody(scrolls: true) {
             VStack(alignment: .leading, spacing: 0) {
-                ScreenHeader { model.route = .settings }
+                ScreenHeader { model.presented = .settings }
 
                 machineTitle.padding(.top, 22)
 
@@ -573,7 +573,7 @@ struct HomeView: View {
             )
             Spacer()
             Button {
-                model.route = .claude
+                model.presented = .claude
                 model.listClaudeSessions()
             } label: {
                 MonoCaps("CLAUDE ⌃", size: 10, color: LG.Color.cyan, tracking: 1.2)

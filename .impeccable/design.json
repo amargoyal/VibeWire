@@ -8,133 +8,365 @@
         "role": "primary",
         "displayName": "Reachable Jade",
         "canonical": "oklch(80.2% 0.126 163)",
-        "tonalRamp": ["oklch(15% 0.126 163)", "oklch(26% 0.126 163)", "oklch(37% 0.126 163)", "oklch(48% 0.126 163)", "oklch(59% 0.126 163)", "oklch(70% 0.126 163)", "oklch(81% 0.126 163)", "oklch(92% 0.126 163)"]
+        "tonalRamp": [
+          "oklch(15% 0.126 163)",
+          "oklch(26% 0.126 163)",
+          "oklch(37% 0.126 163)",
+          "oklch(48% 0.126 163)",
+          "oklch(59% 0.126 163)",
+          "oklch(70% 0.126 163)",
+          "oklch(81% 0.126 163)",
+          "oklch(92% 0.126 163)"
+        ]
       },
       "held-cyan": {
         "role": "primary",
         "displayName": "Held Cyan",
         "canonical": "oklch(77.4% 0.096 220)",
-        "tonalRamp": ["oklch(15% 0.096 220)", "oklch(26% 0.096 220)", "oklch(37% 0.096 220)", "oklch(48% 0.096 220)", "oklch(59% 0.096 220)", "oklch(70% 0.096 220)", "oklch(81% 0.096 220)", "oklch(92% 0.096 220)"]
+        "tonalRamp": [
+          "oklch(15% 0.096 220)",
+          "oklch(26% 0.096 220)",
+          "oklch(37% 0.096 220)",
+          "oklch(48% 0.096 220)",
+          "oklch(59% 0.096 220)",
+          "oklch(70% 0.096 220)",
+          "oklch(81% 0.096 220)",
+          "oklch(92% 0.096 220)"
+        ]
       },
       "degraded-sodium": {
         "role": "secondary",
         "displayName": "Degraded Sodium",
         "canonical": "oklch(79.6% 0.111 78)",
-        "tonalRamp": ["oklch(15% 0.111 78)", "oklch(26% 0.111 78)", "oklch(37% 0.111 78)", "oklch(48% 0.111 78)", "oklch(59% 0.111 78)", "oklch(70% 0.111 78)", "oklch(81% 0.111 78)", "oklch(92% 0.111 78)"]
+        "tonalRamp": [
+          "oklch(15% 0.111 78)",
+          "oklch(26% 0.111 78)",
+          "oklch(37% 0.111 78)",
+          "oklch(48% 0.111 78)",
+          "oklch(59% 0.111 78)",
+          "oklch(70% 0.111 78)",
+          "oklch(81% 0.111 78)",
+          "oklch(92% 0.111 78)"
+        ]
       },
       "lost-clay": {
         "role": "tertiary",
         "displayName": "Lost Clay",
         "canonical": "oklch(65.5% 0.148 27)",
-        "tonalRamp": ["oklch(15% 0.148 27)", "oklch(26% 0.148 27)", "oklch(37% 0.148 27)", "oklch(48% 0.148 27)", "oklch(59% 0.148 27)", "oklch(70% 0.148 27)", "oklch(81% 0.148 27)", "oklch(92% 0.148 27)"]
+        "tonalRamp": [
+          "oklch(15% 0.148 27)",
+          "oklch(26% 0.148 27)",
+          "oklch(37% 0.148 27)",
+          "oklch(48% 0.148 27)",
+          "oklch(59% 0.148 27)",
+          "oklch(70% 0.148 27)",
+          "oklch(81% 0.148 27)",
+          "oklch(92% 0.148 27)"
+        ]
       },
       "deep-ground": {
         "role": "neutral",
         "displayName": "Deep Ground",
         "canonical": "oklch(14.6% 0.005 260)",
-        "tonalRamp": ["oklch(15% 0.005 260)", "oklch(26% 0.005 260)", "oklch(37% 0.005 260)", "oklch(48% 0.005 260)", "oklch(59% 0.005 260)", "oklch(70% 0.005 260)", "oklch(81% 0.005 260)", "oklch(92% 0.005 260)"]
+        "tonalRamp": [
+          "oklch(15% 0.005 260)",
+          "oklch(26% 0.005 260)",
+          "oklch(37% 0.005 260)",
+          "oklch(48% 0.005 260)",
+          "oklch(59% 0.005 260)",
+          "oklch(70% 0.005 260)",
+          "oklch(81% 0.005 260)",
+          "oklch(92% 0.005 260)"
+        ]
       },
       "screen-ground": {
         "role": "neutral",
         "displayName": "Screen Ground",
         "canonical": "oklch(16.8% 0.008 258)",
-        "tonalRamp": ["oklch(15% 0.008 258)", "oklch(26% 0.008 258)", "oklch(37% 0.008 258)", "oklch(48% 0.008 258)", "oklch(59% 0.008 258)", "oklch(70% 0.008 258)", "oklch(81% 0.008 258)", "oklch(92% 0.008 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.008 258)",
+          "oklch(26% 0.008 258)",
+          "oklch(37% 0.008 258)",
+          "oklch(48% 0.008 258)",
+          "oklch(59% 0.008 258)",
+          "oklch(70% 0.008 258)",
+          "oklch(81% 0.008 258)",
+          "oklch(92% 0.008 258)"
+        ]
       },
       "raised": {
         "role": "neutral",
         "displayName": "Raised",
         "canonical": "oklch(18.4% 0.009 258)",
-        "tonalRamp": ["oklch(15% 0.009 258)", "oklch(26% 0.009 258)", "oklch(37% 0.009 258)", "oklch(48% 0.009 258)", "oklch(59% 0.009 258)", "oklch(70% 0.009 258)", "oklch(81% 0.009 258)", "oklch(92% 0.009 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.009 258)",
+          "oklch(26% 0.009 258)",
+          "oklch(37% 0.009 258)",
+          "oklch(48% 0.009 258)",
+          "oklch(59% 0.009 258)",
+          "oklch(70% 0.009 258)",
+          "oklch(81% 0.009 258)",
+          "oklch(92% 0.009 258)"
+        ]
       },
       "panel": {
         "role": "neutral",
         "displayName": "Panel",
         "canonical": "oklch(19.9% 0.011 258)",
-        "tonalRamp": ["oklch(15% 0.011 258)", "oklch(26% 0.011 258)", "oklch(37% 0.011 258)", "oklch(48% 0.011 258)", "oklch(59% 0.011 258)", "oklch(70% 0.011 258)", "oklch(81% 0.011 258)", "oklch(92% 0.011 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.011 258)",
+          "oklch(26% 0.011 258)",
+          "oklch(37% 0.011 258)",
+          "oklch(48% 0.011 258)",
+          "oklch(59% 0.011 258)",
+          "oklch(70% 0.011 258)",
+          "oklch(81% 0.011 258)",
+          "oklch(92% 0.011 258)"
+        ]
       },
       "chrome": {
         "role": "neutral",
         "displayName": "Chrome",
         "canonical": "oklch(22.6% 0.012 258)",
-        "tonalRamp": ["oklch(15% 0.012 258)", "oklch(26% 0.012 258)", "oklch(37% 0.012 258)", "oklch(48% 0.012 258)", "oklch(59% 0.012 258)", "oklch(70% 0.012 258)", "oklch(81% 0.012 258)", "oklch(92% 0.012 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.012 258)",
+          "oklch(26% 0.012 258)",
+          "oklch(37% 0.012 258)",
+          "oklch(48% 0.012 258)",
+          "oklch(59% 0.012 258)",
+          "oklch(70% 0.012 258)",
+          "oklch(81% 0.012 258)",
+          "oklch(92% 0.012 258)"
+        ]
       },
       "text": {
         "role": "neutral",
         "displayName": "Text",
         "canonical": "oklch(92.8% 0.004 258)",
-        "tonalRamp": ["oklch(15% 0.004 258)", "oklch(26% 0.004 258)", "oklch(37% 0.004 258)", "oklch(48% 0.004 258)", "oklch(59% 0.004 258)", "oklch(70% 0.004 258)", "oklch(81% 0.004 258)", "oklch(92% 0.004 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.004 258)",
+          "oklch(26% 0.004 258)",
+          "oklch(37% 0.004 258)",
+          "oklch(48% 0.004 258)",
+          "oklch(59% 0.004 258)",
+          "oklch(70% 0.004 258)",
+          "oklch(81% 0.004 258)",
+          "oklch(92% 0.004 258)"
+        ]
       },
       "text-secondary": {
         "role": "neutral",
         "displayName": "Text Secondary",
         "canonical": "oklch(66.4% 0.013 262)",
-        "tonalRamp": ["oklch(15% 0.013 262)", "oklch(26% 0.013 262)", "oklch(37% 0.013 262)", "oklch(48% 0.013 262)", "oklch(59% 0.013 262)", "oklch(70% 0.013 262)", "oklch(81% 0.013 262)", "oklch(92% 0.013 262)"]
+        "tonalRamp": [
+          "oklch(15% 0.013 262)",
+          "oklch(26% 0.013 262)",
+          "oklch(37% 0.013 262)",
+          "oklch(48% 0.013 262)",
+          "oklch(59% 0.013 262)",
+          "oklch(70% 0.013 262)",
+          "oklch(81% 0.013 262)",
+          "oklch(92% 0.013 262)"
+        ]
       },
       "text-tertiary": {
         "role": "neutral",
         "displayName": "Text Tertiary",
         "canonical": "oklch(58.6% 0.018 262)",
         "note": "Default colour of MonoCaps and the most-read text in the app. Raised from #5C626D (2.9:1 on chrome) to clear 4.5:1 on every ground it lands on; 4.8:1 at worst.",
-        "tonalRamp": ["oklch(15% 0.018 262)", "oklch(26% 0.018 262)", "oklch(37% 0.018 262)", "oklch(48% 0.018 262)", "oklch(59% 0.018 262)", "oklch(70% 0.018 262)", "oklch(81% 0.018 262)", "oklch(92% 0.018 262)"]
+        "tonalRamp": [
+          "oklch(15% 0.018 262)",
+          "oklch(26% 0.018 262)",
+          "oklch(37% 0.018 262)",
+          "oklch(48% 0.018 262)",
+          "oklch(59% 0.018 262)",
+          "oklch(70% 0.018 262)",
+          "oklch(81% 0.018 262)",
+          "oklch(92% 0.018 262)"
+        ]
       },
       "text-disabled": {
         "role": "neutral",
         "displayName": "Text Disabled",
         "canonical": "oklch(34.6% 0.016 262)",
         "note": "1.7:1 — deliberately below the text threshold, which makes it not a text colour. Disabled-control ink and dormant indicator fills only.",
-        "tonalRamp": ["oklch(15% 0.016 262)", "oklch(26% 0.016 262)", "oklch(37% 0.016 262)", "oklch(48% 0.016 262)", "oklch(59% 0.016 262)", "oklch(70% 0.016 262)", "oklch(81% 0.016 262)", "oklch(92% 0.016 262)"]
+        "tonalRamp": [
+          "oklch(15% 0.016 262)",
+          "oklch(26% 0.016 262)",
+          "oklch(37% 0.016 262)",
+          "oklch(48% 0.016 262)",
+          "oklch(59% 0.016 262)",
+          "oklch(70% 0.016 262)",
+          "oklch(81% 0.016 262)",
+          "oklch(92% 0.016 262)"
+        ]
       },
       "hairline-dim": {
         "role": "neutral",
         "displayName": "Hairline Dim",
         "canonical": "oklch(22.0% 0.010 258)",
-        "tonalRamp": ["oklch(15% 0.010 258)", "oklch(26% 0.010 258)", "oklch(37% 0.010 258)", "oklch(48% 0.010 258)", "oklch(59% 0.010 258)", "oklch(70% 0.010 258)", "oklch(81% 0.010 258)", "oklch(92% 0.010 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.010 258)",
+          "oklch(26% 0.010 258)",
+          "oklch(37% 0.010 258)",
+          "oklch(48% 0.010 258)",
+          "oklch(59% 0.010 258)",
+          "oklch(70% 0.010 258)",
+          "oklch(81% 0.010 258)",
+          "oklch(92% 0.010 258)"
+        ]
       },
       "hairline": {
         "role": "neutral",
         "displayName": "Hairline",
         "canonical": "oklch(28.6% 0.013 258)",
-        "tonalRamp": ["oklch(15% 0.013 258)", "oklch(26% 0.013 258)", "oklch(37% 0.013 258)", "oklch(48% 0.013 258)", "oklch(59% 0.013 258)", "oklch(70% 0.013 258)", "oklch(81% 0.013 258)", "oklch(92% 0.013 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.013 258)",
+          "oklch(26% 0.013 258)",
+          "oklch(37% 0.013 258)",
+          "oklch(48% 0.013 258)",
+          "oklch(59% 0.013 258)",
+          "oklch(70% 0.013 258)",
+          "oklch(81% 0.013 258)",
+          "oklch(92% 0.013 258)"
+        ]
       },
       "stroke": {
         "role": "neutral",
         "displayName": "Stroke",
         "canonical": "oklch(31.8% 0.014 258)",
-        "tonalRamp": ["oklch(15% 0.014 258)", "oklch(26% 0.014 258)", "oklch(37% 0.014 258)", "oklch(48% 0.014 258)", "oklch(59% 0.014 258)", "oklch(70% 0.014 258)", "oklch(81% 0.014 258)", "oklch(92% 0.014 258)"]
+        "tonalRamp": [
+          "oklch(15% 0.014 258)",
+          "oklch(26% 0.014 258)",
+          "oklch(37% 0.014 258)",
+          "oklch(48% 0.014 258)",
+          "oklch(59% 0.014 258)",
+          "oklch(70% 0.014 258)",
+          "oklch(81% 0.014 258)",
+          "oklch(92% 0.014 258)"
+        ]
       },
-      "on-jade": { "role": "neutral", "displayName": "Ink on Jade", "canonical": "oklch(15.5% 0.033 163)" },
-      "on-sodium": { "role": "neutral", "displayName": "Ink on Sodium", "canonical": "oklch(15.1% 0.036 78)" },
-      "on-clay": { "role": "neutral", "displayName": "Ink on Clay", "canonical": "oklch(15.9% 0.038 27)" },
-      "on-cyan": { "role": "neutral", "displayName": "Ink on Cyan", "canonical": "oklch(16.2% 0.030 220)" }
+      "on-jade": {
+        "role": "neutral",
+        "displayName": "Ink on Jade",
+        "canonical": "oklch(15.5% 0.033 163)"
+      },
+      "on-sodium": {
+        "role": "neutral",
+        "displayName": "Ink on Sodium",
+        "canonical": "oklch(15.1% 0.036 78)"
+      },
+      "on-clay": {
+        "role": "neutral",
+        "displayName": "Ink on Clay",
+        "canonical": "oklch(15.9% 0.038 27)"
+      },
+      "on-cyan": {
+        "role": "neutral",
+        "displayName": "Ink on Cyan",
+        "canonical": "oklch(16.2% 0.030 220)"
+      }
     },
     "typographyMeta": {
-      "_scaling": { "displayName": "Dynamic Type", "purpose": "Every size is scaled relative to the standard text style nearest its own value — 9-11pt tracks caption2, 12pt caption1, 13-14pt footnote, 15pt subheadline, 16pt callout, 17-19pt body, 20pt title3, 22-27pt title2, 28-33pt title1, 34pt+ largeTitle. The style is derived from the size inside LG.Font, so roles grow at different rates and no call site had to change. Floor of 9pt; the remote screen clamps at accessibility1 because its geometry is thumb-arc and video, not text." },
-      "_family": { "displayName": "Actual family", "purpose": "SF Mono and SF Pro. LG.Font.mono names IBM Plex Mono first but nothing bundles it — no UIAppFonts key, no font file — so the custom branch never executes today." },
-      "display": { "displayName": "Display", "purpose": "The Mac's own name on Home. Used once per screen, never for a label." },
-      "headline": { "displayName": "Headline", "purpose": "The single sentence a full-screen moment turns on — pairing instruction, revoke consequence." },
-      "title": { "displayName": "Title", "purpose": "Screen titles and the label on a filled primary action." },
-      "body": { "displayName": "Body", "purpose": "All prose. 15pt primary, 13pt supporting. Never truncated." },
-      "label": { "displayName": "Label (Mono Caps)", "purpose": "Every heading, unit, status line and caption. Uppercased, tracked 0.8–4.4pt. The machine's voice." },
-      "readout": { "displayName": "Readout", "purpose": "A measured value with its unit set smaller and dimmer. The atom the system is built from." },
-      "code": { "displayName": "Code", "purpose": "Tool names, paths, diff lines, verbatim commands. Selectable, never truncated mid-token." }
+      "_scaling": {
+        "displayName": "Dynamic Type",
+        "purpose": "Every size is scaled relative to the standard text style nearest its own value — 9-11pt tracks caption2, 12pt caption1, 13-14pt footnote, 15pt subheadline, 16pt callout, 17-19pt body, 20pt title3, 22-27pt title2, 28-33pt title1, 34pt+ largeTitle. The style is derived from the size inside LG.Font, so roles grow at different rates and no call site had to change. Floor of 9pt; the remote screen clamps at accessibility1 because its geometry is thumb-arc and video, not text."
+      },
+      "_family": {
+        "displayName": "Actual family",
+        "purpose": "SF Mono and SF Pro. LG.Font.mono names IBM Plex Mono first but nothing bundles it — no UIAppFonts key, no font file — so the custom branch never executes today."
+      },
+      "display": {
+        "displayName": "Display",
+        "purpose": "The Mac's own name on Home. Used once per screen, never for a label."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The single sentence a full-screen moment turns on — pairing instruction, revoke consequence."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Screen titles and the label on a filled primary action."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All prose. 15pt primary, 13pt supporting. Never truncated."
+      },
+      "label": {
+        "displayName": "Label (Mono Caps)",
+        "purpose": "Every heading, unit, status line and caption. Uppercased, tracked 0.8–4.4pt. The machine's voice."
+      },
+      "readout": {
+        "displayName": "Readout",
+        "purpose": "A measured value with its unit set smaller and dimmer. The atom the system is built from."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Tool names, paths, diff lines, verbatim commands. Selectable, never truncated mid-token."
+      }
     },
     "shadows": [],
     "motion": [
-      { "name": "state-change", "value": "ease-out 150ms", "purpose": "Every state transition: selection, latch, expand, sheet. The default." },
-      { "name": "rise", "value": "move from bottom edge + opacity — opacity alone under Reduce Motion", "purpose": "Bottom sheets: permission, revoke, modifier tray, keyboard bar, Claude panel, banner. LG.Motion.rise(reduced:)." },
-      { "name": "push", "value": "move from trailing edge — opacity alone under Reduce Motion", "purpose": "The settings screen. The longest travel in the app, so the clearest Reduce Motion case. LG.Motion.push(reduced:)." },
-      { "name": "hub-spring", "value": "spring(response 280ms, damping 0.78), 18ms per-spoke stagger; ease-out 140ms with no scale under Reduce Motion", "purpose": "The control hub's six spokes arriving along the thumb arc — the app's one authored moment. The stagger survives Reduce Motion because sequence is timing, not movement." },
-      { "name": "condition-pulse-healthy", "value": "ease-in-out 2600ms alternate infinite", "purpose": "Condition dot at a healthy link. Suppressed while video is live, and under Reduce Motion — it rests at full opacity, since colour and label already carry the condition." },
-      { "name": "condition-pulse-degraded", "value": "ease-in-out 1400ms alternate infinite", "purpose": "Condition dot on a thin link — a faster blink is the signal." },
-      { "name": "spinner", "value": "linear 900ms infinite, arc trimmed to 0.75", "purpose": "Running tool calls, exchange steps, stream opening. The one loop that keeps running under Reduce Motion: a small rotating arc is not a vestibular trigger, and a frozen spinner would claim the host stopped answering." },
-      { "name": "caret", "value": "linear 1100ms infinite", "purpose": "Focused code box and the streaming indicator. Rests visible under Reduce Motion — a still caret still marks the position." },
-      { "name": "travelling-dot", "value": "linear 2200ms infinite", "purpose": "The one motion on the pairing screen: a dot crossing the dashed line between the two machines. Rests at the midpoint under Reduce Motion; the discovery line below always carried the state in words." },
-      { "name": "breathing-ring", "value": "ease-out 2800ms infinite", "purpose": "The trackpad teaching hint, retired after three sessions. Holds its outer radius under Reduce Motion rather than scaling out from a point." }
+      {
+        "name": "state-change",
+        "value": "ease-out 150ms",
+        "purpose": "Every state transition: selection, latch, expand, sheet. The default."
+      },
+      {
+        "name": "rise",
+        "value": "move from bottom edge + opacity — opacity alone under Reduce Motion",
+        "purpose": "Sheets and panels: Settings, Claude, permission, revoke, modifier tray, keyboard bar, banner. LG.Motion.rise(reduced:)."
+      },
+      {
+        "name": "hub-spring",
+        "value": "spring(response 280ms, damping 0.78), 18ms per-spoke stagger; ease-out 140ms with no scale under Reduce Motion",
+        "purpose": "The control hub's six spokes arriving along the thumb arc — the app's one authored moment. The stagger survives Reduce Motion because sequence is timing, not movement."
+      },
+      {
+        "name": "condition-pulse-healthy",
+        "value": "ease-in-out 2600ms alternate infinite",
+        "purpose": "Condition dot at a healthy link. Suppressed while video is live, and under Reduce Motion — it rests at full opacity, since colour and label already carry the condition."
+      },
+      {
+        "name": "condition-pulse-degraded",
+        "value": "ease-in-out 1400ms alternate infinite",
+        "purpose": "Condition dot on a thin link — a faster blink is the signal."
+      },
+      {
+        "name": "spinner",
+        "value": "linear 900ms infinite, arc trimmed to 0.75",
+        "purpose": "Running tool calls, exchange steps, stream opening. The one loop that keeps running under Reduce Motion: a small rotating arc is not a vestibular trigger, and a frozen spinner would claim the host stopped answering."
+      },
+      {
+        "name": "caret",
+        "value": "linear 1100ms infinite",
+        "purpose": "Focused code box and the streaming indicator. Rests visible under Reduce Motion — a still caret still marks the position."
+      },
+      {
+        "name": "travelling-dot",
+        "value": "linear 2200ms infinite",
+        "purpose": "The one motion on the pairing screen: a dot crossing the dashed line between the two machines. Rests at the midpoint under Reduce Motion; the discovery line below always carried the state in words."
+      },
+      {
+        "name": "breathing-ring",
+        "value": "ease-out 2800ms infinite",
+        "purpose": "The trackpad teaching hint, retired after three sessions. Holds its outer radius under Reduce Motion rather than scaling out from a point."
+      }
     ],
     "breakpoints": [
-      { "name": "measure", "value": "560pt", "purpose": "Maximum column width for every screen but the remote view; centred beyond it. Never binds on a phone (402pt glass = 354pt content). Covers iPad, landscape, Split View and phone-width windows on a tablet with no device check." },
-      { "name": "portrait", "value": "height > width — stacked instrument, 96pt bottom bar" },
-      { "name": "landscape", "value": "width > height — picture left, 231pt control dock right, status bar hidden" }
+      {
+        "name": "measure",
+        "value": "560pt",
+        "purpose": "Maximum column width for every screen but the remote view; centred beyond it. Never binds on a phone (402pt glass = 354pt content). Covers iPad, landscape, Split View and phone-width windows on a tablet with no device check."
+      },
+      {
+        "name": "portrait",
+        "value": "height > width — stacked instrument, 96pt bottom bar"
+      },
+      {
+        "name": "landscape",
+        "value": "width > height — picture left, 231pt control dock right, status bar hidden"
+      }
     ]
   },
   "components": [
@@ -231,25 +463,106 @@
       "Motion is 120–180 ms state change; nothing decorative moves beside live video"
     ],
     "rules": [
-      { "name": "The Two Voices Rule", "body": "Jade, sodium and clay describe the machine. Cyan describes the user. A control may never take a machine color to mean \"on\", and a condition may never take cyan to mean \"bad\". Any new color must declare which side of that line it lives on, or it does not get added.", "section": "colors" },
-      { "name": "The Dash Rule", "body": "A value that has not been measured renders as an em dash in Text Disabled at the same size the real value will take. Never 0, never blank, never a spinner in place of a number.", "section": "colors" },
-      { "name": "The Measured Condition Rule", "body": "Condition is derived from measured inputs (Condition.from(rttMillis:lossPercent:awake:)), never set by hand at a call site. The label and the numbers beside it cannot disagree, because they come from the same expression.", "section": "colors" },
-      { "name": "The Measured Contrast Rule", "body": "A text colour is chosen by computing it against the ground it actually lands on — and against the lightest such ground, not the average. Dark is a product decision here, so there is no light appearance to fall back on and the palette has to carry legibility by itself. Body and label text clears 4.5:1; anything that cannot is not a text colour.", "section": "colors" },
-      { "name": "The No Alpha Over Video Rule", "body": "Nothing readable sits on the Mac's picture as translucent ink. Alpha over content nobody controls has no contrast ratio — white at 34% measures 2.9:1 over a black desktop and 1.0:1 over a white document. Marks over video are solid and carry their own ground (.videoChip()).", "section": "colors" },
-      { "name": "The Two Registers Rule", "body": "Monospace is for anything the machine measured or named: values, units, paths, keys, commands, statuses. Sans is for anything written to be read as language. A label never becomes sans to look friendlier, and prose never becomes mono to look technical.", "section": "typography" },
-      { "name": "The Verbatim Rule", "body": "A command, a path, or an error the user may need to act on is rendered mono, selectable, and never truncated mid-token. Truncation, when unavoidable, takes the head of a path and the middle of a target — never the tail that carries the filename.", "section": "typography" },
-      { "name": "The Held Space Rule", "body": "A layout does not move when a value arrives. Pending values are drawn as a dashed rule or an em dash occupying the final geometry, so filling in is a substitution rather than a reflow.", "section": "layout" },
-      { "name": "The Whole Glass Rule", "body": "On the remote screen the input surface is the full frame, including the letterbox bands. Anything drawn over the picture is non-hit-testing unless it is itself a control.", "section": "layout" },
-      { "name": "The No Shadow Rule", "body": "Depth comes from tone and a hairline. If two surfaces are not separable, the fix is a hairline or a ground step — never a shadow, never a blur.", "section": "elevation" },
-      { "name": "The Tint Means Condition Rule", "body": "A colored panel wash (5% fill, 30% border) is reserved for a panel that is reporting that condition. It is never used to make an ordinary container look interesting.", "section": "elevation" },
-      { "name": "The Dashed-Is-Provisional Rule", "body": "Dashed means unmeasured, pending, or unselected. It resolves to a solid stroke the moment the thing becomes real. Dashes are never used decoratively.", "section": "shapes" },
-      { "name": "The Preflight Rule", "body": "A primary action always states, in its own sub-label, what it is about to do and what it will cost in time, resolution, or bytes.", "section": "components" },
-      { "name": "The Hit Shape Rule", "body": "Any target whose ink does not fill its frame — glyphs, outlines, dashed boxes, caption text — must declare an explicit rectangular content shape. This has caused four separate untappable controls in this codebase.", "section": "components" },
-      { "name": "The Consequence Rule", "body": "A destructive confirmation lists three plain sentences: what is destroyed, what it takes to undo it, and what is not affected. The last line is what makes the tap safe to judge one-handed.", "section": "components" },
-      { "name": "The Bounded Column Rule", "body": "Layout is driven by available width, never by device model. A column caps at measure (560pt) and centres; a row of equal controls shares the width it is given rather than claiming a fixed one. The six pairing boxes are the case that proves it — at a fixed 48pt they needed 333pt inside 327pt of iPhone SE, and overflowed the app's first screen.", "section": "layout" },
-      { "name": "The 9 Point Floor Rule", "body": "Nothing renders below 9pt at any text size. A deliberate departure from the platform's 11pt floor, taken because the instrument's density is the design and a uniform 11pt would rewrite it — but 6pt and 7pt captions were not density, they were unreadable. Enforced inside LG.Font, so a call site cannot opt out by passing a smaller number.", "section": "typography" },
-      { "name": "The Growing Control Rule", "body": "A control that stacks text sets minHeight, never a fixed height. Identical at the default size; at large sizes the control grows instead of clipping the words inside it. The 76pt primary action is the case that proves it — a fixed height clips the preflight line, which is the sentence saying what the action costs.", "section": "typography" },
-      { "name": "The Reduce Motion Rule", "body": "Reduce Motion is about the vestibular system, not about stillness. What goes is travel, scale and spring — sheets fade in place instead of rising, the settings screen crossfades instead of pushing, the hub's spokes keep their staggered sequence but lose the scale-up, and the pairing dot rests at the midpoint of its wire instead of crossing it. What stays is anything that would otherwise state something false: the spinner keeps turning, because a frozen one says the Mac stopped answering and nothing measured that. Every loop routes through LG.Motion.loop / linearLoop, which return nil under the setting so withAnimation lands on the resting state in one step.", "section": "components" }
+      {
+        "name": "The Two Voices Rule",
+        "body": "Jade, sodium and clay describe the machine. Cyan describes the user. A control may never take a machine color to mean \"on\", and a condition may never take cyan to mean \"bad\". Any new color must declare which side of that line it lives on, or it does not get added.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dash Rule",
+        "body": "A value that has not been measured renders as an em dash in Text Disabled at the same size the real value will take. Never 0, never blank, never a spinner in place of a number.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured Condition Rule",
+        "body": "Condition is derived from measured inputs (Condition.from(rttMillis:lossPercent:awake:)), never set by hand at a call site. The label and the numbers beside it cannot disagree, because they come from the same expression.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured Contrast Rule",
+        "body": "A text colour is chosen by computing it against the ground it actually lands on — and against the lightest such ground, not the average. Dark is a product decision here, so there is no light appearance to fall back on and the palette has to carry legibility by itself. Body and label text clears 4.5:1; anything that cannot is not a text colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Alpha Over Video Rule",
+        "body": "Nothing readable sits on the Mac's picture as translucent ink. Alpha over content nobody controls has no contrast ratio — white at 34% measures 2.9:1 over a black desktop and 1.0:1 over a white document. Marks over video are solid and carry their own ground (.videoChip()).",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Registers Rule",
+        "body": "Monospace is for anything the machine measured or named: values, units, paths, keys, commands, statuses. Sans is for anything written to be read as language. A label never becomes sans to look friendlier, and prose never becomes mono to look technical.",
+        "section": "typography"
+      },
+      {
+        "name": "The Verbatim Rule",
+        "body": "A command, a path, or an error the user may need to act on is rendered mono, selectable, and never truncated mid-token. Truncation, when unavoidable, takes the head of a path and the middle of a target — never the tail that carries the filename.",
+        "section": "typography"
+      },
+      {
+        "name": "The Held Space Rule",
+        "body": "A layout does not move when a value arrives. Pending values are drawn as a dashed rule or an em dash occupying the final geometry, so filling in is a substitution rather than a reflow.",
+        "section": "layout"
+      },
+      {
+        "name": "The Whole Glass Rule",
+        "body": "On the remote screen the input surface is the full frame, including the letterbox bands. Anything drawn over the picture is non-hit-testing unless it is itself a control.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Shadow Rule",
+        "body": "Depth comes from tone and a hairline. If two surfaces are not separable, the fix is a hairline or a ground step — never a shadow, never a blur.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Tint Means Condition Rule",
+        "body": "A colored panel wash (5% fill, 30% border) is reserved for a panel that is reporting that condition. It is never used to make an ordinary container look interesting.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Dashed-Is-Provisional Rule",
+        "body": "Dashed means unmeasured, pending, or unselected. It resolves to a solid stroke the moment the thing becomes real. Dashes are never used decoratively.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Preflight Rule",
+        "body": "A primary action always states, in its own sub-label, what it is about to do and what it will cost in time, resolution, or bytes.",
+        "section": "components"
+      },
+      {
+        "name": "The Hit Shape Rule",
+        "body": "Any target whose ink does not fill its frame — glyphs, outlines, dashed boxes, caption text — must declare an explicit rectangular content shape. This has caused four separate untappable controls in this codebase.",
+        "section": "components"
+      },
+      {
+        "name": "The Consequence Rule",
+        "body": "A destructive confirmation lists three plain sentences: what is destroyed, what it takes to undo it, and what is not affected. The last line is what makes the tap safe to judge one-handed.",
+        "section": "components"
+      },
+      {
+        "name": "The Bounded Column Rule",
+        "body": "Layout is driven by available width, never by device model. A column caps at measure (560pt) and centres; a row of equal controls shares the width it is given rather than claiming a fixed one. The six pairing boxes are the case that proves it — at a fixed 48pt they needed 333pt inside 327pt of iPhone SE, and overflowed the app's first screen.",
+        "section": "layout"
+      },
+      {
+        "name": "The 9 Point Floor Rule",
+        "body": "Nothing renders below 9pt at any text size. A deliberate departure from the platform's 11pt floor, taken because the instrument's density is the design and a uniform 11pt would rewrite it — but 6pt and 7pt captions were not density, they were unreadable. Enforced inside LG.Font, so a call site cannot opt out by passing a smaller number.",
+        "section": "typography"
+      },
+      {
+        "name": "The Growing Control Rule",
+        "body": "A control that stacks text sets minHeight, never a fixed height. Identical at the default size; at large sizes the control grows instead of clipping the words inside it. The 76pt primary action is the case that proves it — a fixed height clips the preflight line, which is the sentence saying what the action costs.",
+        "section": "typography"
+      },
+      {
+        "name": "The Reduce Motion Rule",
+        "body": "Reduce Motion is about the vestibular system, not about stillness. What goes is travel, scale and spring — sheets fade in place instead of rising, the settings screen crossfades instead of pushing, the hub's spokes keep their staggered sequence but lose the scale-up, and the pairing dot rests at the midpoint of its wire instead of crossing it. What stays is anything that would otherwise state something false: the spinner keeps turning, because a frozen one says the Mac stopped answering and nothing measured that. Every loop routes through LG.Motion.loop / linearLoop, which return nil under the setting so withAnimation lands on the resting state in one step.",
+        "section": "components"
+      },
+      {
+        "name": "The No Stack Rule",
+        "body": "Three routes and two sheets, no navigation stack. AppModel.route holds only where the app can be — pairing, home, remote. Settings and the Claude panel are sheets over whichever is showing, because the app has no hierarchy to push through: Settings is not deeper than Home, it is beside it. The remote screen keeps no edge-swipe back on purpose — the whole glass is the trackpad, so a pop gesture would fight the pointer for the left edge.",
+        "section": "components"
+      }
     ],
     "dos": [
       "Do derive every displayed condition from a measured value, through Condition.from(...), so the label and the numbers cannot disagree.",

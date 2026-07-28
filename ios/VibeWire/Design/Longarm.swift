@@ -214,12 +214,6 @@ enum LG {
                 : .move(edge: .bottom).combined(with: .opacity)
         }
 
-        /// A screen arriving from the trailing edge — the push metaphor, and
-        /// the longest travel in the app, so the one Reduce Motion means most.
-        static func push(reduced: Bool) -> AnyTransition {
-            reduced ? .opacity : .move(edge: .trailing)
-        }
-
         /// A perpetual loop, or `nil` when the system has asked for less
         /// motion. `nil` is deliberate rather than a still animation: it is
         /// what `withAnimation` takes to mean "set this value now", so a

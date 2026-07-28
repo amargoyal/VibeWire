@@ -7,6 +7,7 @@ import SwiftUI
 /// everything the agent touched is a row that can be opened.
 struct ClaudePanelView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
     @State private var draft = ""
     @State private var filesExpanded = false
     @State private var showSessionPicker = false
@@ -63,52 +64,43 @@ struct ClaudePanelView: View {
 
     // MARK: Chrome
 
+    /// The panel is a real sheet now, so the capsule and the drag-past-60pt
+    /// gesture that used to live here are the system's — including the pull
+    /// between half height and full, which the hand-rolled version could not
+    /// offer at all. What is left is the one thing the system does not know:
+    /// which Mac this is talking to, and how far away it is.
     private var grabber: some View {
-        VStack(spacing: 0) {
-            HStack {
-                MonoCaps(
-                    "● \(model.displays.first(where: \.selected)?.name.uppercased() ?? "MAC") · \(model.link.rttMillis.map { "\(Int($0))MS" } ?? "—")",
-                    size: 9,
-                    color: LG.Color.green,
-                    tracking: 1.4
-                )
-                // One line: this is a status caption, and wrapping it pushed
-                // the round trip figure onto a second row.
-                .lineLimit(1)
-                .truncationMode(.tail)
-                Spacer(minLength: 8)
-                Button {
-                    model.route = model.streamState == .live ? .remote : .home
-                } label: {
-                    MonoCaps("DRAG DOWN FOR SCREEN", size: 9, tracking: 1.4)
-                        .padding(.horizontal, 10)
-                        .frame(height: 44)
-                        // Hit testing follows the drawn glyphs, so without this
-                        // only the strokes of 9pt letters were tappable and the
-                        // gaps between them were not — the same trap the three
-                        // dots menu fell into.
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("closePanel")
-                .accessibilityLabel("Close Claude panel")
-            }
-            .opacity(0.75)
-            .frame(height: 30)
+        HStack {
+            MonoCaps(
+                "● \(model.displays.first(where: \.selected)?.name.uppercased() ?? "MAC") · \(model.link.rttMillis.map { "\(Int($0))MS" } ?? "—")",
+                size: 9,
+                color: LG.Color.green,
+                tracking: 1.4
+            )
+            // One line: this is a status caption, and wrapping it pushed
+            // the round trip figure onto a second row.
+            .lineLimit(1)
+            .truncationMode(.tail)
 
-            Capsule()
-                .fill(LG.Color.stroke)
-                .frame(width: 46, height: 4)
-                .padding(.vertical, 6)
-        }
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture().onEnded { value in
-                if value.translation.height > 60 {
-                    model.route = model.streamState == .live ? .remote : .home
-                }
+            Spacer(minLength: 8)
+
+            Button {
+                dismiss()
+            } label: {
+                MonoCaps("DONE", size: 9, color: LG.Color.cyan, tracking: 1.4)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: LG.Metric.minimumTarget)
+                    // Hit testing follows the drawn glyphs, so without this
+                    // only the strokes of 9pt letters were tappable and the
+                    // gaps between them were not — the same trap the three
+                    // dots menu fell into.
+                    .contentShape(Rectangle())
             }
-        )
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("closePanel")
+            .accessibilityLabel("Close Claude panel")
+        }
+        .padding(.top, 6)
     }
 
     private var modeSegment: some View {

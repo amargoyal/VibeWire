@@ -21,6 +21,14 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Which height the Claude panel opens at.
+    ///
+    /// Not a remembered preference — a fact about what is underneath it. Opened
+    /// from the remote screen there is a live picture worth keeping in view, so
+    /// it comes up half height; opened from Home there is nothing below to see,
+    /// so it takes the screen. Dragging still overrides it for that session.
+    @State private var claudeDetent: PresentationDetent = .large
+
     var body: some View {
         ZStack {
             LG.Color.screenGround.ignoresSafeArea()
@@ -35,12 +43,6 @@ struct RootView: View {
             case .remote:
                 RemoteView()
                     .transition(.opacity)
-            case .claude:
-                ClaudePanelView()
-                    .transition(LG.Motion.rise(reduced: reduceMotion))
-            case .settings:
-                SettingsView()
-                    .transition(LG.Motion.push(reduced: reduceMotion))
             }
 
             if let banner = model.banner {
@@ -50,6 +52,31 @@ struct RootView: View {
             }
         }
         .animation(LG.Motion.stateChange, value: model.route)
+        // Exactly one sheet modifier, driven by one value. Two modifiers here
+        // would present only the first and drop the other without a word.
+        .sheet(item: Binding(
+            get: { model.presented },
+            set: { model.presented = $0 }
+        )) { presentation in
+            switch presentation {
+            case .settings:
+                SettingsView()
+                    .presentationDetents([.large])
+                    // The app has one appearance and no system materials, so
+                    // the sheet supplies its own ground rather than letting the
+                    // default material show through.
+                    .presentationBackground(LG.Color.screenGround)
+            case .claude:
+                ClaudePanelView()
+                    .presentationDetents([.medium, .large], selection: $claudeDetent)
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(LG.Color.screenGround)
+            }
+        }
+        .onChange(of: model.presented) { _, presented in
+            guard presented == .claude else { return }
+            claudeDetent = model.route == .remote ? .medium : .large
+        }
         .task {
             await model.connectIfPaired()
         }

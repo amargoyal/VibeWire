@@ -7,6 +7,7 @@ import SwiftUI
 /// the only reason to come here.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScreenBody {
@@ -43,27 +44,29 @@ struct SettingsView: View {
         }
     }
 
+    /// A sheet now, so the swipe down every iOS user already has is the way
+    /// out and this button is the second one rather than the only one. The
+    /// back arrow it replaces was the sole exit from the screen, which is why
+    /// it had already needed a hit-shape fix to be tappable at all.
     private var header: some View {
         HStack(spacing: 8) {
+            Text("Settings")
+                .font(LG.Font.sans(22, weight: .medium))
+                .foregroundStyle(LG.Color.text)
+
+            Spacer()
+
             Button {
-                model.route = .home
+                dismiss()
             } label: {
-                Text("←")
-                    .font(LG.Font.mono(17))
-                    .foregroundStyle(LG.Color.textSecondary)
-                    .frame(width: 44, height: 44)
-                    // Only the arrow's own strokes were tappable, and this is
-                    // the sole way back out of settings.
+                MonoCaps("DONE", size: 11, color: LG.Color.cyan, tracking: 1.4)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: LG.Metric.minimumTarget)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("back")
-            .accessibilityLabel("Back")
-
-            Text("Settings")
-                .font(LG.Font.sans(22, weight: .medium))
-                .foregroundStyle(LG.Color.text)
-            Spacer()
+            .accessibilityLabel("Done")
         }
         .padding(.top, 8)
     }
