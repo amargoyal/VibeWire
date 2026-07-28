@@ -607,6 +607,7 @@ struct ChangedFileRow: View {
 /// will destroy in plain units, and how long it has been waiting.
 struct PermissionSheet: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let request: PermissionRequest
     let waited: Int
 
@@ -699,7 +700,7 @@ struct PermissionSheet: View {
         )
         .padding(.horizontal, 18)
         .padding(.bottom, 20)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(LG.Motion.rise(reduced: reduceMotion))
     }
 }
 

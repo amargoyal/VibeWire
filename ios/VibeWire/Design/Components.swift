@@ -55,11 +55,60 @@ struct Readout: View {
             } else {
                 // A dash, never a zero. An unmeasured value is not the same
                 // thing as a measured zero.
+                //
+                // Which makes the dash a reading, so it is legible like one.
+                // It used to be `textDisabled` — 1.9:1, invisible at arm's
+                // length — which quietly demoted the one mark that says the
+                // host has not answered. Dimmer than a real value, never
+                // fainter than the label above it.
                 Text("—")
                     .font(LG.Font.mono(19))
-                    .foregroundStyle(LG.Color.textDisabled)
+                    .foregroundStyle(LG.Color.textTertiary)
             }
         }
+    }
+}
+
+/// A caption laid over the Mac's picture.
+///
+/// Alpha cannot be verified against content nobody controls: the captions here
+/// were white at 34%, which measures 2.9:1 over a black desktop, 1.5:1 over a
+/// grey one, and 1.0:1 — invisible — over a white document, which is what a
+/// text editor actually looks like. The text is solid now and carries its own
+/// ground at 92%, the way the trackpad boundary labels already did. Worst case
+/// over pure white is 6.0:1, and the picture still shows through the chip
+/// enough that it reads as part of the video rather than pasted on top.
+struct VideoCaption: View {
+    let text: String
+    var size: CGFloat = 8
+    var color: Color = LG.Color.textSecondary
+    var tracking: CGFloat = 1.4
+
+    init(
+        _ text: String,
+        size: CGFloat = 8,
+        color: Color = LG.Color.textSecondary,
+        tracking: CGFloat = 1.4
+    ) {
+        self.text = text
+        self.size = size
+        self.color = color
+        self.tracking = tracking
+    }
+
+    var body: some View {
+        MonoCaps(text, size: size, color: color, tracking: tracking)
+            .videoChip()
+    }
+}
+
+extension View {
+    /// The ground any mark needs when it sits on the Mac's picture. Defined
+    /// once so a caption, a badge and a readout cannot drift apart.
+    func videoChip() -> some View {
+        padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(LG.Color.deepGround.opacity(0.92))
     }
 }
 
@@ -119,7 +168,15 @@ struct ConditionDot: View {
     /// a live feed.
     var animated: Bool = true
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
+
+    /// The pulse is emphasis, not information: the colour already reports the
+    /// condition and the label beside it spells it out. So it is safe to still
+    /// — at full opacity, never mid-fade, which would read as a dimmed dot.
+    private var shouldPulse: Bool {
+        animated && !reduceMotion && condition != .idle
+    }
 
     var body: some View {
         Circle()
@@ -131,19 +188,22 @@ struct ConditionDot: View {
                 }
             }
             .opacity(pulsing ? 1 : 0.35)
-            .onAppear {
-                guard animated, condition != .idle else {
-                    pulsing = true
-                    return
-                }
-                let period: Double = condition == .degraded ? 1.4 : 2.6
-                withAnimation(.easeInOut(duration: period).repeatForever(autoreverses: true)) {
-                    pulsing = true
-                }
-            }
-            .onChange(of: animated) { _, isAnimated in
-                if !isAnimated { pulsing = true }
-            }
+            .onAppear { applyPulse() }
+            .onChange(of: animated) { _, _ in applyPulse() }
+            .onChange(of: reduceMotion) { _, _ in applyPulse() }
+    }
+
+    private func applyPulse() {
+        guard shouldPulse else {
+            // `nil` sets the value outright, cancelling a loop already running.
+            withAnimation(nil) { pulsing = true }
+            return
+        }
+        // Rate carries meaning: a thin link blinks faster than a healthy one.
+        let period: Double = condition == .degraded ? 1.4 : 2.6
+        withAnimation(LG.Motion.loop(period, autoreverses: true, reduced: false)) {
+            pulsing = true
+        }
     }
 }
 
@@ -208,7 +268,11 @@ struct PrimaryAction: View {
                     Text(title)
                         .font(LG.Font.sans(19, weight: .medium))
                         .foregroundStyle(ink)
-                    MonoCaps(detail, size: 10, color: ink.opacity(0.66))
+                    // The preflight line — what this action costs before it is
+                    // tapped. 0.66 put it at 4.50:1 on the cyan fill, which is
+                    // the threshold to three decimal places; 0.72 gives it
+                    // actual margin on all four tints.
+                    MonoCaps(detail, size: 10, color: ink.opacity(0.72))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }

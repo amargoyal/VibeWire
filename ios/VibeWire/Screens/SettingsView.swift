@@ -25,7 +25,7 @@ struct SettingsView: View {
                         MonoCaps(
                             "VIBEWIRE \(model.settings.appVersion) · HOST \(model.settings.hostVersion) · NO ACCOUNT, NO CLOUD",
                             size: 9,
-                            color: LG.Color.textDisabled,
+                            color: LG.Color.textTertiary,
                             tracking: 1.2
                         )
                         .padding(.top, 10)
@@ -290,7 +290,9 @@ struct SettingsView: View {
                     .font(LG.Font.sans(15))
                     .foregroundStyle(LG.Color.red)
                 Spacer()
-                MonoCaps("\(model.devices.count) KEYS", size: 9, color: LG.Color.red.opacity(0.7), tracking: 1.2)
+                // Solid, not 70%: the count is the scale of what the tap
+                // destroys, and the faded version read at 3.4:1.
+                MonoCaps("\(model.devices.count) KEYS", size: 9, color: LG.Color.red, tracking: 1.2)
             }
             .padding(.horizontal, 18)
             .frame(height: 54)
@@ -332,6 +334,7 @@ struct SettingRow: View {
 /// it.
 struct RevokeConfirmSheet: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let target: AppModel.RevokeTarget
 
     private var title: String {
@@ -454,7 +457,7 @@ struct RevokeConfirmSheet: View {
                 MonoCaps(
                     "HOST WILL LOG: REVOKED · \(auditSubject) · \(auditNoun) DELETED",
                     size: 9,
-                    color: LG.Color.textDisabled,
+                    color: LG.Color.textTertiary,
                     tracking: 1.2
                 )
                 .frame(maxWidth: .infinity)
@@ -471,7 +474,7 @@ struct RevokeConfirmSheet: View {
             }
         }
         .ignoresSafeArea(edges: .bottom)
-        .transition(.move(edge: .bottom))
+        .transition(LG.Motion.rise(reduced: reduceMotion))
     }
 
     private func consequence(_ text: String, _ arrowColor: Color) -> some View {

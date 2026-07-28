@@ -8,6 +8,7 @@ import SwiftUI
 /// two one-hand taps.
 struct ControlHubView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
     @State private var showModifiers = false
 
@@ -141,10 +142,16 @@ struct ControlHubView: View {
         }
         .buttonStyle(.plain)
         .offset(x: -spoke.x, y: -spoke.y)
-        .scaleEffect(appeared ? 1 : 0.6)
+        // The spokes land in sequence along the thumb arc, which is the one
+        // authored moment in the app. Reduce Motion keeps the sequence — the
+        // stagger is timing, not movement — and drops the spring and the
+        // scale, which are the parts that travel.
+        .scaleEffect(reduceMotion ? 1 : (appeared ? 1 : 0.6))
         .opacity(appeared ? 1 : 0)
         .animation(
-            .spring(response: 0.28, dampingFraction: 0.78)
+            (reduceMotion
+                ? Animation.easeOut(duration: 0.14)
+                : Animation.spring(response: 0.28, dampingFraction: 0.78))
                 .delay(Double(index) * 0.018),
             value: appeared
         )
@@ -228,7 +235,7 @@ struct ControlHubView: View {
         .padding(.horizontal, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 128)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(LG.Motion.rise(reduced: reduceMotion))
     }
 
     private func glyph(for modifier: String) -> String {

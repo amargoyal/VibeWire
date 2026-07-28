@@ -19,6 +19,7 @@ struct VibeWireApp: App {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -36,10 +37,10 @@ struct RootView: View {
                     .transition(.opacity)
             case .claude:
                 ClaudePanelView()
-                    .transition(.move(edge: .bottom))
+                    .transition(LG.Motion.rise(reduced: reduceMotion))
             case .settings:
                 SettingsView()
-                    .transition(.move(edge: .trailing))
+                    .transition(LG.Motion.push(reduced: reduceMotion))
             }
 
             if let banner = model.banner {
@@ -77,6 +78,7 @@ struct RootView: View {
 /// Errors are stated, not swallowed. Amber because a banner is always a
 /// degraded condition, never a lost one — a lost condition gets a whole screen.
 struct BannerView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let text: String
     let dismiss: () -> Void
 
@@ -105,6 +107,6 @@ struct BannerView: View {
             .padding(.horizontal, LG.Metric.gutter)
             .padding(.bottom, 20)
         }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(LG.Motion.rise(reduced: reduceMotion))
     }
 }

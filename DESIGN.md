@@ -13,7 +13,7 @@ colors:
   chrome: "#14171C"
   text: "#E9EBEE"
   text-secondary: "#949AA5"
-  text-tertiary: "#5C626D"
+  text-tertiary: "#7C8493"
   text-disabled: "#3A404A"
   hairline-dim: "#1A1E24"
   hairline: "#262B33"
@@ -203,9 +203,9 @@ A near-black instrument ground carrying four saturated-but-soft signal hues, eac
 - **Panel** (`#101318`): input fields, display rows, and the pressable surfaces above them.
 - **Chrome** (`#14171C`): key caps, dock buttons, ledger backing, and the divider fill between stacked rows.
 - **Text** (`#E9EBEE`): prose and any value currently true.
-- **Text Secondary** (`#949AA5`): supporting prose, inactive labels, idle condition.
-- **Text Tertiary** (`#5C626D`): mono caps headings, units, and captions — the default color of a label.
-- **Text Disabled** (`#3A404A`): unmeasured values, version footers, and audit lines.
+- **Text Secondary** (`#949AA5`): supporting prose, inactive labels, idle condition. 6.9:1.
+- **Text Tertiary** (`#7C8493`): mono caps headings, units, and captions — the default color of a label, and so the most-read text in the product. 4.8:1 at worst, on chrome. It carries 70 of the app's 123 label call sites; every one of them is 8–10 pt, which is why it is set to clear AA on the lightest ground rather than the darkest.
+- **Text Disabled** (`#3A404A`): 1.7:1, deliberately under the text threshold — which makes it **not a text color**. Ink for a disabled control and fills for dormant indicators only.
 - **Hairline Dim** (`#1A1E24`) / **Hairline** (`#262B33`) / **Stroke** (`#2E343D`): the three rule weights, dim for divisions inside a group, hairline for a container edge, stroke for an interactive edge.
 - **Ink colors** (`#06130D`, `#170F02`, `#1B0805`, `#04141B`): near-black text laid on a filled signal button. Each is the signal hue driven to ~7% lightness so the pairing stays in family rather than punching a hole with pure black.
 
@@ -216,6 +216,10 @@ A near-black instrument ground carrying four saturated-but-soft signal hues, eac
 **The Dash Rule.** A value that has not been measured renders as `—` in Text Disabled at the same size the real value will take. Never `0`, never blank, never a spinner in place of a number.
 
 **The Measured Condition Rule.** Condition is derived from measured inputs (`Condition.from(rttMillis:lossPercent:awake:)`), never set by hand at a call site. The label and the numbers beside it cannot disagree, because they come from the same expression.
+
+**The Measured Contrast Rule.** A text color is chosen by computing it against the ground it actually lands on — and against the *lightest* such ground, not the average. Dark is a product decision here, so there is no light appearance to fall back on and the palette has to carry legibility by itself. Body and label text clears 4.5:1; anything that cannot is not a text color.
+
+**The No Alpha Over Video Rule.** Nothing readable sits on the Mac's picture as translucent ink. Alpha over content nobody controls has no contrast ratio — white at 34% measures 2.9:1 over a black desktop and 1.0:1 over a white document. Marks over video are solid and carry their own ground (`.videoChip()`).
 
 ## Typography
 
@@ -350,6 +354,8 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 
 **Diff** — mono 11 pt on `#0B0E12`, jade on 8% jade for additions, clay on 8% clay for removals, cyan for hunk headers, Text Tertiary for metadata. Scrolls in both axes; the leading `+`/`−` is preserved so a copied diff is still a diff.
 
+**`VideoCaption` / `.videoChip()`** — the ground any mark needs when it sits on the picture: 6 pt horizontal, 3 pt vertical, Deep Ground at 92%. Solid text on top. Defined once so a caption, the INPUT HERE badge, and the landscape live readout cannot drift apart, and so the contrast holds over a white document as well as a black one.
+
 **Markdown** — blocks split locally, inline spans through `AttributedString`. Inline code takes mono 13 pt in cyan; bullets and numbers take cyan markers at 80%; block quotes take a 2 pt cyan-35% rule; fenced code gets its own ground, horizontal scrolling, and a copy button. No bubbles — Claude's turns run the full measure under a cyan `CLAUDE` label and a hairline.
 
 ### Named Rules
@@ -359,6 +365,8 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 **The Hit Shape Rule.** Any target whose ink does not fill its frame — glyphs, outlines, dashed boxes, caption text — must declare `.contentShape(Rectangle())`. This has caused four separate untappable controls in this codebase.
 
 **The Consequence Rule.** A destructive confirmation lists three plain sentences: what is destroyed, what it takes to undo it, and what is *not* affected. The last line is what makes the tap safe to judge one-handed.
+
+**The Reduce Motion Rule.** Reduce Motion is about the vestibular system, not about stillness. What goes is travel, scale, and spring — sheets fade in place instead of rising, the settings screen crossfades instead of pushing, the hub's spokes keep their staggered sequence but lose the scale-up, and the pairing dot rests at the midpoint of its wire instead of crossing it. What stays is anything that would otherwise state something false: the spinner keeps turning, because a frozen one says the Mac stopped answering and nothing measured that. Every loop routes through `LG.Motion.loop` / `linearLoop`, which return `nil` under the setting so `withAnimation` lands on the resting state in one step.
 
 ## Do's and Don'ts
 
@@ -372,9 +380,13 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 - **Do** name the failure with its address and verdict — list both transports, their results, and the time of last contact rather than one word for "offline".
 - **Do** add `.contentShape(Rectangle())` to any glyph-only, outline-only, or caption-sized target.
 - **Do** separate surfaces with a 1 pt hairline (`#1A1E24` inside a group, `#262B33` at a container edge, `#2E343D` on an interactive edge) and a tonal step.
+- **Do** compute a text color against the lightest ground it lands on, and clear 4.5:1 there. `chrome` (`#14171C`) is that ground, and a 7 pt key-cap caption is the case to check.
+- **Do** give any mark over the Mac's picture its own ground with `.videoChip()`.
 - **Do** hold layout with a dashed rule or em dash so nothing reflows when a value arrives.
 - **Do** keep every tappable control at 44 pt or larger, and place destructive taps a full row away from irreversible ones.
 - **Do** suppress ambient animation while video is live — pass `animated: false` the way `ConditionDot` does on the remote screen.
+- **Do** route every perpetual loop through `LG.Motion.loop` / `linearLoop`, and every edge transition through `LG.Motion.rise` / `push`, so Reduce Motion is handled once rather than per view.
+- **Do** land on a resting state that still reads correctly when a loop is suppressed — full opacity for the condition dot, midpoint for the pairing dot, outer radius for the teaching ring. A frozen mid-fade looks like a bug.
 - **Do** keep motion at 120–180 ms for state changes; the only longer motions are the hub's 0.28 s spring with an 18 ms per-spoke stagger and the deliberately slow ambient loops on screens with no picture.
 
 ### Don't:
@@ -382,6 +394,8 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 - **Don't** add a shadow, blur, or glassmorphic material. Depth is tone plus hairline, and the app has zero `.shadow()` calls today.
 - **Don't** introduce a light mode or branch on `colorScheme`. `ScreenBody` pins `.preferredColorScheme(.dark)` and the palette assumes it.
 - **Don't** use a signal color decoratively, or use cyan for a machine condition. A new color must declare which of the two voices it belongs to.
+- **Don't** set text in `textDisabled` (`#3A404A`, 1.7:1). It is ink for a disabled control and fill for a dormant dot. If a mark is meant to be read — including the em dash that says "not measured" — it takes `textTertiary`.
+- **Don't** lower a color's opacity to make it recede. Every alpha step is an unverified contrast ratio: `ink.opacity(0.66)` on the preflight line measured 4.50:1, and a 70% red count measured 3.4:1. Pick the dimmer color, or accept the solid one.
 - **Don't** render a chat bubble, avatar, or typing-dot animation in the Claude panel. Prose runs the full measure under a label.
 - **Don't** show a bare spinner in place of a value or a named step. Four named steps with real detail beat one indeterminate arc.
 - **Don't** collapse distinct failures into one message. A timeout, a refused connection, a missing permission, and a sleeping Mac are four states with four answers.

@@ -9,6 +9,7 @@ import SwiftUI
 /// is the expensive mistake here.
 struct KeyboardBarView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var buffer = ""
     @State private var combos: [[String]] = [
         ["cmd", "s"], ["cmd", "z"], ["cmd", "shift", "z"], ["cmd", "k"], ["control", "c"],
@@ -48,7 +49,7 @@ struct KeyboardBarView: View {
                 }
         }
         .onAppear { focused = true }
-        .transition(.move(edge: .bottom))
+        .transition(LG.Motion.rise(reduced: reduceMotion))
     }
 
     /// What is being typed into, named.

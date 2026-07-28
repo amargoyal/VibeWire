@@ -483,20 +483,32 @@ struct ExchangeStepRow: View {
 // MARK: - Small animated pieces
 
 struct Caret: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var visible = true
+
     var body: some View {
         Rectangle()
             .fill(LG.Color.cyan)
             .frame(width: 2, height: 26)
             .opacity(visible ? 1 : 0)
             .onAppear {
-                withAnimation(.linear(duration: 1.1).repeatForever(autoreverses: false)) {
-                    visible.toggle()
+                // Still, the caret still marks the caret's position — which is
+                // the only thing it was ever there to say.
+                guard let blink = LG.Motion.linearLoop(1.1, reduced: reduceMotion) else {
+                    visible = true
+                    return
                 }
+                withAnimation(blink) { visible.toggle() }
             }
     }
 }
 
+/// The one loop that keeps running under Reduce Motion.
+///
+/// A small rotating arc is not a vestibular trigger, and iOS keeps its own
+/// `ProgressView` turning under the setting for the same reason. A frozen
+/// spinner would say the host had stopped answering — a claim about the Mac
+/// that nothing measured, which is exactly what this app refuses to make.
 struct Spinner: View {
     var color: Color = LG.Color.cyan
     @State private var angle: Double = 0
@@ -516,7 +528,14 @@ struct Spinner: View {
 
 /// The only motion on the waiting screen: one dot travelling the dashed line
 /// between the two named machines.
+///
+/// It is also the one piece of motion here that crosses the whole screen, so
+/// it is the one Reduce Motion most clearly means. Travel is replaced by a dot
+/// resting at the midpoint of the line: the wire is still drawn, the two
+/// machines are still joined, and the discovery line underneath was always the
+/// part that said in words whether anything answered.
 struct TravellingDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var progress: CGFloat = 0
 
     var body: some View {
@@ -534,12 +553,16 @@ struct TravellingDot: View {
                     .fill(LG.Color.green)
                     .frame(width: 5, height: 5)
                     .offset(x: progress * geometry.size.width)
-                    .opacity(progress > 0.02 && progress < 0.98 ? 1 : 0)
+                    // The fade at either end hides the dot as it wraps. A
+                    // resting dot must not inherit that, or it vanishes.
+                    .opacity(reduceMotion || (progress > 0.02 && progress < 0.98) ? 1 : 0)
             }
             .onAppear {
-                withAnimation(.linear(duration: 2.2).repeatForever(autoreverses: false)) {
-                    progress = 1
+                guard let travel = LG.Motion.linearLoop(2.2, reduced: reduceMotion) else {
+                    progress = 0.5
+                    return
                 }
+                withAnimation(travel) { progress = 1 }
             }
         }
         .frame(height: 6)

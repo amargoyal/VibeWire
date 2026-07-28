@@ -259,7 +259,7 @@ struct RemoteView: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            MonoCaps(pictureCaption, size: 8, color: (stallTint ?? .white.opacity(0.34)), tracking: 1.4)
+            VideoCaption(pictureCaption, color: stallTint ?? LG.Color.textSecondary)
                 .padding(.leading, 10)
                 .padding(.bottom, 26)
                 // The hub's hint text sits on this exact line, and two 8pt
@@ -308,18 +308,21 @@ struct RemoteView: View {
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 8) {
                         if model.inputPane == index {
+                            // Cyan at 16% over video was the same unverifiable
+                            // bet the captions were making, and this badge is
+                            // the one that says where input lands.
                             MonoCaps("INPUT HERE", size: 8, color: LG.Color.cyan, tracking: 1.4)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(LG.Color.cyan.opacity(0.16))
+                                .videoChip()
+                                .overlay(Rectangle().stroke(LG.Color.cyan.opacity(0.5), lineWidth: 1))
                         }
-                        MonoCaps(
+                        VideoCaption(
                             model.inputPane == index
                                 ? "\(display.name.uppercased()) · \(display.width) × \(display.height)"
                                 : "\(display.name.uppercased()) · TAP TO TAKE INPUT",
-                            size: 8,
-                            color: .white.opacity(model.inputPane == index ? 0.34 : 0.26),
-                            tracking: 1.4
+                            // The unfocused pane is dimmed by its own opacity
+                            // already; taking the text down as well stacked two
+                            // reductions on one caption.
+                            color: LG.Color.textSecondary
                         )
                     }
                     .padding(.leading, 10)
@@ -570,7 +573,9 @@ struct RemoteView: View {
                         Circle().fill(LG.Color.green).frame(width: 5, height: 5)
                         MonoCaps(liveLabel, size: 9, color: LG.Color.green, tracking: 1.4)
                     }
-                    MonoCaps(pictureCaption, size: 9, color: .white.opacity(0.34), tracking: 1.4)
+                    .videoChip()
+
+                    VideoCaption(pictureCaption, size: 9)
                 }
                 .padding(.leading, 24)
                 .padding(.bottom, 22)
@@ -982,7 +987,13 @@ struct CornerTicks: View {
 }
 
 /// The touch hint that retires after three sessions.
+///
+/// Scaling out from a point is the textbook Reduce Motion trigger, so with the
+/// setting on the ring holds its outer position instead: two concentric circles
+/// that still read as "a touch happens here", with the legend beside them
+/// carrying the actual instruction.
 struct BreathingRing: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expanded = false
 
     var body: some View {
@@ -993,10 +1004,11 @@ struct BreathingRing: View {
             Circle()
                 .stroke(.white.opacity(0.10), lineWidth: 1)
                 .frame(width: 30, height: 30)
-                .scaleEffect(expanded ? 1.7 : 1)
-                .opacity(expanded ? 0 : 0.55)
+                .scaleEffect(reduceMotion ? 1.45 : (expanded ? 1.7 : 1))
+                .opacity(reduceMotion ? 0.28 : (expanded ? 0 : 0.55))
         }
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.easeOut(duration: 2.8).repeatForever(autoreverses: false)) {
                 expanded = true
             }

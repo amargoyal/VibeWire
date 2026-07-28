@@ -30,9 +30,24 @@ enum LG {
         static let panel = SwiftUI.Color(hex: 0x101318)
         static let raised = SwiftUI.Color(hex: 0x0E1116)
 
+        /// Four steps, each one measured against the ground it actually lands
+        /// on rather than eyeballed. Worst case is `chrome`, the lightest
+        /// ground, which is what a key cap caption sits on.
+        ///
+        ///   text          16.3:1   textTertiary   4.8:1
+        ///   textSecondary  6.9:1   textDisabled   1.7:1 — non-text only
         static let text = SwiftUI.Color(hex: 0xE9EBEE)
         static let textSecondary = SwiftUI.Color(hex: 0x949AA5)
-        static let textTertiary = SwiftUI.Color(hex: 0x5C626D)
+        /// The default colour of every `MonoCaps` — 70 of the app's 123 call
+        /// sites take it, which made it the most-read text in the product and,
+        /// at its old value of `0x5C626D`, the least legible: 2.9:1 on chrome,
+        /// 3.2:1 on the screen ground, against the 4.5:1 a 9pt label needs.
+        /// Dark is a product decision here, so the palette has to carry the
+        /// contrast by itself; there is no light appearance to fall back to.
+        static let textTertiary = SwiftUI.Color(hex: 0x7C8493)
+        /// Deliberately below the text threshold, so it is not for text. Ink
+        /// for a disabled control and fills for dormant indicators only —
+        /// anything a user is meant to *read* takes `textTertiary`.
         static let textDisabled = SwiftUI.Color(hex: 0x3A404A)
 
         static let hairline = SwiftUI.Color(hex: 0x262B33)
@@ -95,11 +110,49 @@ enum LG {
     enum Motion {
         /// 120–180 ms, only for state changes and to hint at touch.
         static let stateChange = Animation.easeOut(duration: 0.15)
-        static let touch = Animation.easeOut(duration: 0.12)
 
-        /// Nothing decorative moves next to a live video feed, so the ambient
-        /// animations are gated on there being no picture on screen.
-        static let ambient = Animation.easeInOut(duration: 2.4).repeatForever(autoreverses: true)
+        /// A panel arriving from the bottom edge, and the same arrival for a
+        /// reader who asked the system for less motion.
+        ///
+        /// Reduce Motion is about the vestibular system, not about stillness:
+        /// what has to go is travel, scale and parallax, not the fact that
+        /// something appeared. So the sheet still arrives — it just fades in
+        /// place instead of sliding a screen height.
+        static func rise(reduced: Bool) -> AnyTransition {
+            reduced
+                ? .opacity
+                : .move(edge: .bottom).combined(with: .opacity)
+        }
+
+        /// A screen arriving from the trailing edge — the push metaphor, and
+        /// the longest travel in the app, so the one Reduce Motion means most.
+        static func push(reduced: Bool) -> AnyTransition {
+            reduced ? .opacity : .move(edge: .trailing)
+        }
+
+        /// A perpetual loop, or `nil` when the system has asked for less
+        /// motion. `nil` is deliberate rather than a still animation: it is
+        /// what `withAnimation` takes to mean "set this value now", so a
+        /// caller lands on the resting state in one step.
+        ///
+        /// The exception is an activity spinner. A small rotating arc is not a
+        /// vestibular trigger — iOS keeps its own `ProgressView` turning under
+        /// Reduce Motion — and freezing one would say the host had stopped
+        /// answering, which is a claim this app is not allowed to make without
+        /// having measured it.
+        static func loop(
+            _ duration: Double,
+            autoreverses: Bool,
+            reduced: Bool
+        ) -> Animation? {
+            guard !reduced else { return nil }
+            return .easeInOut(duration: duration).repeatForever(autoreverses: autoreverses)
+        }
+
+        static func linearLoop(_ duration: Double, reduced: Bool) -> Animation? {
+            guard !reduced else { return nil }
+            return .linear(duration: duration).repeatForever(autoreverses: false)
+        }
     }
 }
 
