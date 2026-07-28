@@ -40,6 +40,23 @@ struct Readout: View {
     let unit: String
     var valueColor: Color = LG.Color.text
 
+    /// Spoken as one reading rather than three fragments. Left to itself
+    /// VoiceOver announces "RTT", "18", "MS" as separate elements, which is
+    /// three swipes to learn one number.
+    private var spokenValue: String {
+        guard let value else { return "not measured" }
+        return unit.isEmpty ? value : "\(value) \(spokenUnit)"
+    }
+
+    private var spokenUnit: String {
+        switch unit.uppercased() {
+        case "MS": return "milliseconds"
+        case "%": return "percent"
+        case "MB": return "megabits per second"
+        default: return unit
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             MonoCaps(label, size: 9)
@@ -66,6 +83,9 @@ struct Readout: View {
                     .foregroundStyle(LG.Color.textTertiary)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(spokenValue)
     }
 }
 
@@ -191,6 +211,10 @@ struct ConditionDot: View {
             .onAppear { applyPulse() }
             .onChange(of: animated) { _, _ in applyPulse() }
             .onChange(of: reduceMotion) { _, _ in applyPulse() }
+            // The condition is always spelled out in the label beside this dot
+            // — "AWAKE · REACHABLE" — so announcing the dot as well is one more
+            // swipe to reach the same fact.
+            .accessibilityHidden(true)
     }
 
     private func applyPulse() {
@@ -222,6 +246,9 @@ struct SignalBars: View {
             }
         }
         .frame(height: 16, alignment: .bottom)
+        // Strength is a picture of the condition the card already states, and
+        // the RTT and loss readouts carry the numbers behind it.
+        .accessibilityHidden(true)
     }
 }
 
@@ -249,6 +276,10 @@ struct Sparkline: View {
             }
         }
         .frame(height: height, alignment: .bottom)
+        // Sixty bars is not something to hear one at a time. The trace shows
+        // jitter; the RTT readout beside it is the number that matters, and the
+        // condition label says whether it is good enough.
+        .accessibilityHidden(true)
     }
 }
 
@@ -298,6 +329,12 @@ struct PrimaryAction: View {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
+        // The preflight is the cost of the tap, so it is spoken as the value of
+        // the control rather than as a second element after it.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(detail)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -355,6 +392,13 @@ struct Segmented<Value: Hashable>: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(option.label)
+                // Without this the selected segment sounds exactly like the
+                // three beside it, and the control's whole job is to say which
+                // one is current.
+                .accessibilityAddTraits(
+                    selection == option.value ? [.isButton, .isSelected] : .isButton
+                )
             }
         }
         .background(LG.Color.hairlineDim)
@@ -388,6 +432,11 @@ struct LGToggle: View {
             .frame(width: 52, height: 30)
         }
         .buttonStyle(.plain)
+        // Drawn in the system's shape but built from a Button, so none of the
+        // switch semantics came for free: without this it announced as an
+        // unlabelled button with no on or off about it.
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityValue(isOn ? "On" : "Off")
     }
 }
 
@@ -435,6 +484,27 @@ struct KeyCap: View {
             }
         }
         .buttonStyle(.plain)
+        // A modifier symbol read aloud is a coin toss — "⌘" is announced as
+        // "place of interest sign". The caption is the word for it.
+        .accessibilityLabel(caption ?? Self.spoken(glyph))
+        .accessibilityAddTraits(isHeld ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(isHeld ? "Held. Activates to release." : "")
+    }
+
+    /// Caps without captions — the keyboard bar's modifier row, the hub — still
+    /// have to be nameable.
+    static func spoken(_ glyph: String) -> String {
+        switch glyph {
+        case "⌘": return "Command"
+        case "⇧": return "Shift"
+        case "⌥": return "Option"
+        case "⌃": return "Control"
+        case "←": return "Left arrow"
+        case "→": return "Right arrow"
+        case "↑": return "Up arrow"
+        case "↓": return "Down arrow"
+        default: return glyph
+        }
     }
 }
 

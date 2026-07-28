@@ -101,6 +101,7 @@ struct BannerView: View {
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss message")
             }
             .padding(.leading, 14)
             .background(LG.Color.amber.opacity(0.07))

@@ -77,7 +77,11 @@ struct KeyboardBarView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close the keyboard")
         }
+        // Typing blind into the wrong window is the expensive mistake here, so
+        // the banner is one announcement rather than four fragments.
+        .accessibilityElement(children: .combine)
         .padding(.leading, 14)
         .frame(height: 46)
         .background(
@@ -128,6 +132,7 @@ struct KeyboardBarView: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private var arrowCluster: some View {
@@ -196,6 +201,7 @@ struct KeyboardBarView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(spokenCombo(combo))
             }
 
             Button {
@@ -227,6 +233,15 @@ struct KeyboardBarView: View {
         combo.map { part in
             ModifierSpec.all.first { $0.name == part }?.glyph ?? part.uppercased()
         }.joined()
+    }
+
+    /// "⌘⇧Z" is four symbols run together with no spaces — VoiceOver reads it
+    /// as a stream of punctuation names. Spoken, it is "Command Shift Z".
+    private func spokenCombo(_ combo: [String]) -> String {
+        combo.map { part in
+            ModifierSpec.all.first { $0.name == part }
+                .map { KeyCap.spoken($0.glyph) } ?? part.uppercased()
+        }.joined(separator: " ")
     }
 
     /// Diffs the text field rather than intercepting keystrokes, so autocorrect

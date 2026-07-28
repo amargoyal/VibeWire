@@ -40,7 +40,17 @@ struct ClaudePanelView: View {
         // underneath it: a tool sits waiting on an answer the user cannot see
         // or reach. Typing gives way to the question.
         .onChange(of: model.permission == nil) { _, noPermission in
-            if !noPermission { composerFocused = false }
+            if !noPermission {
+                composerFocused = false
+                // The sheet arrives at the bottom of a scrolling transcript, so
+                // sighted users get it in their peripheral vision and VoiceOver
+                // users got nothing at all — while a tool sat waiting on them.
+                if let request = model.permission {
+                    AccessibilityNotification
+                        .Announcement("Claude is asking to run \(request.command)")
+                        .post()
+                }
+            }
         }
         .sheet(isPresented: $showSessionPicker) {
             SessionPicker()
@@ -329,11 +339,13 @@ struct ClaudePanelView: View {
                     )
                     Spacer()
                 }
-                .frame(height: 34)
+                .frame(minHeight: 34)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("changedFiles")
+            .accessibilityLabel("\(model.changedFiles.count) changed files")
+            .accessibilityValue(filesExpanded ? "Expanded" : "Collapsed")
 
             if filesExpanded {
                 VStack(spacing: 1) {
@@ -443,17 +455,10 @@ struct ClaudePanelView: View {
                         Rectangle().fill(LG.Color.red).frame(width: 12, height: 12)
                         MonoCaps("STOP", size: 9, color: LG.Color.red, tracking: 1)
                     }
-                    .frame(width: 56, height: 56)
-                    .background(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusLarge)
-                            .fill(LG.Color.red.opacity(0.12))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusLarge)
-                            .stroke(LG.Color.red.opacity(0.5), lineWidth: 1)
-                    )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Stop Claude")
+                .accessibilityHint("Interrupts the run in progress.")
             } else {
                 Button {
                     model.sendToClaude(draft)
@@ -663,10 +668,11 @@ struct PermissionSheet: View {
                         .font(LG.Font.sans(16, weight: .medium))
                         .foregroundStyle(LG.Color.onCyan)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 56)
+                        .frame(minHeight: 56)
                         .background(RoundedRectangle(cornerRadius: 10).fill(LG.Color.cyan))
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint("Runs this command once. You will be asked again next time.")
 
                 // Deny gets its own full width row, and the standing grant is
                 // moved away from it. These two used to sit side by side, the
@@ -695,10 +701,14 @@ struct PermissionSheet: View {
                         tracking: 1.2
                     )
                     .frame(maxWidth: .infinity)
-                    .frame(height: LG.Metric.minimumTarget)
+                    .frame(minHeight: LG.Metric.minimumTarget)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                // Visually demoted on purpose, and this is the one that cannot
+                // be taken back — so the hint has to carry what the size does.
+                .accessibilityLabel("Always allow this here")
+                .accessibilityHint("Grants this command in this folder permanently. Cannot be undone from the phone.")
                 .padding(.top, 2)
             }
             .padding(16)
@@ -713,6 +723,10 @@ struct PermissionSheet: View {
         .padding(.horizontal, 18)
         .padding(.bottom, 20)
         .transition(LG.Motion.rise(reduced: reduceMotion))
+        // A modal in fact if not in presentation: the agent is stopped until
+        // this is answered, so the transcript behind it is not what to explore.
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
     }
 }
 

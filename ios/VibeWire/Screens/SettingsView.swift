@@ -233,6 +233,26 @@ struct SettingsView: View {
                 Spacer(minLength: 0)
                 MonoCaps("\(model.settings.sensitivity * 216)PX / SWIPE", size: 9, tracking: 1)
             }
+            // Eight bare rectangles announced as eight anonymous buttons, none
+            // of which said what it would set or what was set now. Collapsed
+            // into the one adjustable control it has always looked like, driven
+            // by the swipe-up and swipe-down VoiceOver already uses for these.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Trackpad sensitivity")
+            .accessibilityValue(
+                "\(model.settings.sensitivity) of 8, \(model.settings.sensitivity * 216) pixels per swipe"
+            )
+            .accessibilityAdjustableAction { direction in
+                let current = model.settings.sensitivity
+                switch direction {
+                case .increment where current < 8:
+                    model.setSetting("sensitivity", current + 1)
+                case .decrement where current > 1:
+                    model.setSetting("sensitivity", current - 1)
+                default:
+                    break
+                }
+            }
 
             SettingRow(
                 title: "Natural scrolling",

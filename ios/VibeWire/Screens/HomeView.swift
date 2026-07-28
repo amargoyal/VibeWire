@@ -329,8 +329,38 @@ struct HomeView: View {
 
     // MARK: Lists
 
+    /// A connected, awake Mac reporting no displays is not an empty list — it
+    /// is almost always Screen Recording permission missing, because that is
+    /// what ScreenCaptureKit returns nothing without. The host only says so
+    /// when a stream is actually requested, so until then this screen offered
+    /// a heading over nothing and a button reading "NO DISPLAY".
+    private var noDisplays: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("The Mac answered, but reports no displays.")
+                .font(LG.Font.sans(15))
+                .foregroundStyle(LG.Color.text)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Screen Recording permission is the usual cause. On the Mac: System Settings → Privacy & Security → Screen Recording → VibeWire.")
+                .font(LG.Font.sans(13))
+                .foregroundStyle(LG.Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
+                .fill(LG.Color.amber.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
+                .stroke(LG.Color.amber.opacity(0.30), lineWidth: 1)
+        )
+    }
+
     private var displayList: some View {
         VStack(spacing: 8) {
+            if model.displays.isEmpty { noDisplays }
+
             ForEach(model.displays) { display in
                 DisplayRow(
                     display: display,
@@ -421,7 +451,9 @@ struct HomeView: View {
                     detail: preflightLabel,
                     glyph: "→",
                     tint: LG.Color.green,
-                    ink: LG.Color.onGreen
+                    ink: LG.Color.onGreen,
+                    // Nothing to open, and the card above now says why.
+                    enabled: !model.displays.isEmpty
                 ) {
                     model.startStream()
                 }
@@ -625,5 +657,15 @@ struct DisplayRow: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(display.name)
+        .accessibilityValue(
+            dimmed
+                ? "Last known \(display.width) by \(display.height)"
+                : "\(display.width) by \(display.height)"
+        )
+        .accessibilityAddTraits(
+            display.selected ? [.isButton, .isSelected] : .isButton
+        )
     }
 }

@@ -169,6 +169,7 @@ private struct CodeBlock: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(copied ? "Code copied" : "Copy code")
             }
             .padding(.horizontal, 10)
             .padding(.top, 4)

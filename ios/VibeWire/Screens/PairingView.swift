@@ -173,7 +173,7 @@ struct PairingView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .frame(height: 60)
+            .frame(minHeight: 60)
             .background(
                 RoundedRectangle(cornerRadius: LG.Metric.radiusMedium).fill(LG.Color.panel)
             )
@@ -183,6 +183,8 @@ struct PairingView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Scan the QR code instead")
+        .accessibilityHint("Opens the camera. Same handshake as typing the code.")
     }
 
     private var addressRow: some View {
@@ -352,6 +354,11 @@ struct PairingView: View {
     // MARK: Actions
 
     private func submit(code: String) {
+        // The field submits the moment it holds six digits, and a paste can
+        // deliver six digits more than once. Pairing twice burns the code —
+        // the second attempt arrives after the first has consumed it, and the
+        // host answers `code_expired` for a code that was in fact correct.
+        guard !isExchanging else { return }
         guard !address.isEmpty, let portValue = Int(port) else {
             errorText = "Enter the Mac's address first."
             return

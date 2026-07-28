@@ -24,6 +24,21 @@ struct ControlHubView: View {
         let tint: Color
     }
 
+    /// The arc reads by glyph and a two-word caption — "⛶ SHOT", "⇅ LOCK",
+    /// "COPY ← MAC". Neither half survives being spoken: the symbols announce
+    /// as their Unicode names, and the captions are fragments.
+    private static func spokenName(_ spoke: Spoke) -> String {
+        switch spoke.action {
+        case "keys": return "Keyboard"
+        case "shot": return "Screenshot the Mac"
+        case "copy": return "Copy from the Mac"
+        case "paste": return "Paste to the Mac"
+        case "lock": return "Lock scrolling"
+        case "mods": return "Modifier keys"
+        default: return spoke.caption
+        }
+    }
+
     private var spokes: [Spoke] {
         [
             Spoke(action: "keys", glyph: "⌨", caption: "KEYS", x: 20, y: 244, tint: LG.Color.text),
@@ -141,6 +156,7 @@ struct ControlHubView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Self.spokenName(spoke))
         .offset(x: -spoke.x, y: -spoke.y)
         // The spokes land in sequence along the thumb arc, which is the one
         // authored moment in the app. Reduce Motion keeps the sequence — the
@@ -169,6 +185,7 @@ struct ControlHubView: View {
                 .overlay(Circle().stroke(LG.Color.cyan, lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Close the control hub")
         .offset(x: -20, y: -34)
     }
 

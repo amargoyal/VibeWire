@@ -614,10 +614,10 @@ struct RemoteView: View {
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                dockButton("⌨ KEYS") { model.showKeyboard = true }
-                dockButton("⛶ SHOT") { model.hub("shot") }
-                dockButton("COPY ←") { model.hub("copy") }
-                dockButton("PASTE →") { model.hub("paste") }
+                dockButton("⌨ KEYS", spoken: "Keyboard") { model.showKeyboard = true }
+                dockButton("⛶ SHOT", spoken: "Screenshot the Mac") { model.hub("shot") }
+                dockButton("COPY ←", spoken: "Copy from the Mac") { model.hub("copy") }
+                dockButton("PASTE →", spoken: "Paste to the Mac") { model.hub("paste") }
             }
 
             HStack(spacing: 6) {
@@ -681,17 +681,24 @@ struct RemoteView: View {
         }
     }
 
-    private func dockButton(_ title: String, action: @escaping () -> Void) -> some View {
+    private func dockButton(
+        _ title: String,
+        spoken: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             MonoCaps(title, size: 10, color: LG.Color.text, tracking: 0.8)
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
+                .frame(minHeight: 50)
                 .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.chrome))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairline, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
+        // The visible labels carry a glyph and a direction arrow — "⌨ KEYS",
+        // "COPY ←" — which is legible and unspeakable.
+        .accessibilityLabel(spoken)
     }
 
     private func dockReadout(_ label: String, _ value: String) -> some View {
@@ -883,6 +890,7 @@ struct RemoteView: View {
         .accessibilityIdentifier("padMode-\(mode.rawValue)")
         .accessibilityLabel(label)
         .accessibilityHint(hint)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
     /// Stops the picture being dragged off its own glass: the travel available
