@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Swift Package Manager (host)
+.build/
+.swiftpm/
+Package.resolved
+
+# Per-user Xcode state (breakpoints, scheme ordering, window layout).
+# Unanchored so it matches at any depth — the project lives at ios/.
+xcuserdata/
+*.xcuserdatad/
+
+# Xcode (ios)
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Node (channel)
+node_modules/
+npm-debug.log*
+.npm/
+
+# Secrets — the host keeps trust records and the channel token in
+# ~/.config/vibewire, outside this repo. These patterns are a backstop in case
+# anything is ever copied in.
+*.pem
+*.p12
+*.mobileprovision
+*.cer
+channel.token
+devices.secret
+.env
+.env.*
+
+# Tooling state — vendored skills and machine-local config. The design record
+# itself (DESIGN.md, .impeccable/design.json) stays tracked.
+.claude/
+.impeccable/config.local.json
+.impeccable/live/

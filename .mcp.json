@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vibewire": {
+      "command": "node",
+      "args": ["./channel/vibewire-channel.mjs"]
+    }
+  }
+}

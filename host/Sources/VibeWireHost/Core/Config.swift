@@ -1,0 +1,100 @@
+import Foundation
+
+/// Host configuration. Reads `~/.config/vibewire/config.json` if present,
+/// otherwise uses defaults. Settings changed from the phone (07A) are written
+/// back here so they survive a restart.
+struct HostSettings: Codable, Sendable {
+    /// `auto` lets the encoder pick from the ladder based on measured link.
+    enum QualityLadder: String, Codable, Sendable {
+        case auto, p1080 = "1080", p720 = "720", p540 = "540"
+
+        var maxHeight: Int? {
+            switch self {
+            case .auto: return nil
+            case .p1080: return 1080
+            case .p720: return 720
+            case .p540: return 540
+            }
+        }
+    }
+
+    var quality: QualityLadder = .auto
+    /// 07A "Cap on cellular · CEILING 3 MB/S"
+    var capOnCellular: Bool = true
+    var cellularCeilingMbps: Double = 3.0
+    /// 07A trackpad, 8 discrete ticks so a thumb can hit one.
+    var sensitivity: Int = 5
+    var naturalScrolling: Bool = true
+    /// 07A "Face ID each session · ADDS ~0.4S TO OPEN"
+    var requireBiometricEachSession: Bool = true
+    /// 07A "Relay over internet". Off means Tailscale only, and the host will
+    /// not start cloudflared.
+    var relayOverInternet: Bool = false
+    var targetFps: Int = 60
+    var port: UInt16 = 8787
+
+    static let `default` = HostSettings()
+}
+
+enum Config {
+    /// Read once at launch. Never mutated, so it needs no isolation.
+    static let verbose: Bool = ProcessInfo.processInfo.environment["VIBEWIRE_VERBOSE"] == "1"
+
+    static let hostVersion = "0.9.4"
+
+    /// Bumped when the wire protocol changes incompatibly. The phone refuses to
+    /// connect on mismatch rather than half-working.
+    static let protocolVersion = 1
+
+    static let keychainService = "com.vibewire.host.trust"
+    static let pairingCodeLifetime: TimeInterval = 60
+    static let nonceLifetime: TimeInterval = 30
+    static let maxPairAttempts = 5
+    static let pairLockout: TimeInterval = 60
+
+    static var configDirectory: URL {
+        let base = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config", isDirectory: true)
+            .appendingPathComponent("vibewire", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base
+    }
+
+    static var settingsURL: URL {
+        configDirectory.appendingPathComponent("config.json")
+    }
+
+    static func loadSettings() -> HostSettings {
+        guard let data = try? Data(contentsOf: settingsURL),
+              let decoded = try? JSONDecoder().decode(HostSettings.self, from: data)
+        else { return .default }
+        return decoded
+    }
+
+    static func saveSettings(_ settings: HostSettings) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(settings) else { return }
+        try? data.write(to: settingsURL, options: .atomic)
+    }
+
+    /// Human name for this Mac, e.g. "MacBook Pro 14"".
+    static var machineName: String {
+        if let name = Host.current().localizedName, !name.isEmpty { return name }
+        return "Mac"
+    }
+
+    static var machineModel: String {
+        var size = 0
+        sysctlbyname("hw.model", nil, &size, nil, 0)
+        guard size > 0 else { return "Mac" }
+        var bytes = [CChar](repeating: 0, count: size)
+        sysctlbyname("hw.model", &bytes, &size, nil, 0)
+        return String(cString: bytes)
+    }
+
+    static var osVersion: String {
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(v.majorVersion).\(v.minorVersion)"
+    }
+}

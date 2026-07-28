@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string></string>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>CFBundleDisplayName</key>
+	<string>VibeWire</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scanning the pairing QR code shown on your Mac.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Reaching your Mac on the same Wi-Fi network.</string>
+	<!--
+	  The host serves plain HTTP and WebSocket by design: over Tailscale the
+	  transport is already WireGuard, and over the relay TLS terminates at
+	  Cloudflare's edge. Either way the Ed25519 handshake authenticates the
+	  session at the application layer.
+
+	  ATS has to be told, because it does not see it that way. Local networking
+	  alone is not enough: Tailscale addresses live in 100.64.0.0/10, which ATS
+	  treats as public, so cleartext to a Tailscale peer is refused while the
+	  identical request to 192.168.x succeeds. That asymmetry is what made
+	  pairing work at home and fail everywhere else.
+
+	  DO NOT ADD NSAllowsLocalNetworking BACK. On iOS 10 and later the presence
+	  of NSAllowsLocalNetworking — or NSAllowsArbitraryLoadsInWebContent, or
+	  NSAllowsArbitraryLoadsForMedia — makes the system IGNORE
+	  NSAllowsArbitraryLoads and fall back to NO. The two keys read as belt and
+	  braces; they are mutually exclusive. Having both is what produced
+	  "NSURLErrorDomain -1022 after 1ms" on every pair attempt over Tailscale
+	  while Safari on the same phone reached the same URL fine.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_vibewire._tcp</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.vibewire.pair</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vibewire</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
