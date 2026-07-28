@@ -45,6 +45,12 @@ final class VideoRenderer: @unchecked Sendable {
         spsData = nil
         ppsData = nil
         isWaitingForKeyframe = true
+        // Both of these describe the spell that just ended, not the next one.
+        // Leaving `didReportFailure` set meant a renderer logged its first
+        // failure and then went quiet for the rest of the process, which is the
+        // opposite of what a once-per-spell guard is for.
+        parameterSetsChanged = false
+        didReportFailure = false
         lock.unlock()
         layer.flush()
     }
@@ -290,6 +296,18 @@ final class RendererPool: @unchecked Sendable {
     func resetAll() {
         lock.lock()
         let all = Array(byStream.values)
+        lock.unlock()
+        for renderer in all { renderer.reset() }
+    }
+
+    /// Drops every renderer. The host renumbers streams on each start — a
+    /// stream id is a position in the selection, not a stable identity — so
+    /// after a restart the surviving objects belong to the previous numbering
+    /// and vending one hands a view a decoder that will never be fed again.
+    func removeAll() {
+        lock.lock()
+        let all = Array(byStream.values)
+        byStream.removeAll()
         lock.unlock()
         for renderer in all { renderer.reset() }
     }

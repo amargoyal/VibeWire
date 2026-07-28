@@ -229,16 +229,14 @@ struct RemoteView: View {
 
     private var picture: some View {
         ZStack {
-            // KNOWN BUG, narrowed: leaving side by side back to a single
-            // display still leaves this black until the screen is re-entered.
-            // Switching between single displays is fixed (the layer needed a
-            // flush when the parameter sets changed). Ruled out for the
-            // remaining case: the layer never reports `.failed`; forcing a
-            // fresh surface with `.id(selected display)` does not help; and
-            // flushing plus re-arming the keyframe wait when the layer is
-            // re-parented does not either. Note that this path is the one where
-            // a pane and the picture share a renderer, so suspicion sits on two
-            // surfaces contending for the single layer.
+            // This used to stay black on the way back from side by side, and it
+            // was never a decoding fault: a stream id is a *position in the
+            // selection*, not an identity, so display 2 stopped being stream 1
+            // the moment it became the only selected display. The phone kept
+            // the old number, resolved this picture to renderer 1 in the window
+            // before `videoConfig` landed, and then watched every frame of the
+            // new stream arrive on renderer 0. Selection now renumbers locally
+            // the way the host does — see `AppModel.selectDisplay`.
             VideoSurface(renderer: model.selectedRenderer)
                 .aspectRatio(pictureAspect, contentMode: .fit)
                 .scaleEffect(model.zoomScale, anchor: .center)

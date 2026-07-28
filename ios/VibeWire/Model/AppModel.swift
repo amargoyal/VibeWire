@@ -703,13 +703,25 @@ final class AppModel {
     func selectDisplay(_ id: UInt32) {
         for index in displays.indices {
             displays[index].selected = displays[index].id == id
+            // The host numbers streams by position within the selection, so a
+            // single display is always stream 0 and an unselected one has no
+            // stream at all. Leaving the previous value here is what left the
+            // picture black on the way back from side by side: display 2 kept
+            // claiming stream 1, the window before `videoConfig` arrives
+            // resolved the picture to renderer 1, and every frame of the new
+            // single stream was arriving on renderer 0.
+            displays[index].streamId = displays[index].id == id ? 0 : nil
         }
         sideBySide = false
         send(["t": "selectDisplay", "displayIds": [Int(id)], "mode": "single"])
     }
 
     func selectBothDisplays() {
-        for index in displays.indices { displays[index].selected = true }
+        // Same numbering the host uses, over the same order sent below.
+        for index in displays.indices {
+            displays[index].selected = true
+            displays[index].streamId = index
+        }
         sideBySide = true
         send([
             "t": "selectDisplay",
@@ -749,9 +761,13 @@ final class AppModel {
 
     func startStream() {
         // Stream ids are reassigned per start; keeping the old configs would
-        // point a pane at a decoder the host is no longer filling.
+        // point a pane at a decoder the host is no longer filling. Resetting
+        // the renderers is not enough for the same reason — a reset renderer is
+        // still the object stream 1 resolved to a moment ago, and a view that
+        // already adopted its layer would hold a decoder nothing feeds. Drop
+        // them, so the next resolution builds a renderer for the new numbering.
         videoConfigs.removeAll()
-        renderers.resetAll()
+        renderers.removeAll()
         streamState = .starting
         route = .remote
         send([
