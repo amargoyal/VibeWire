@@ -48,7 +48,7 @@ struct DiffView: View {
                         }
                     }
                     .background(
-                        RoundedRectangle(cornerRadius: 8).fill(Color(hex: 0x0B0E12))
+                        RoundedRectangle(cornerRadius: 8).fill(LG.Color.codeGround)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -101,10 +101,7 @@ struct DiffView: View {
             HStack {
                 MonoCaps("LIVE DIFF", size: 10, color: LG.Color.cyan, tracking: 2)
                 Spacer()
-                Button("Close") { dismiss() }
-                    .font(LG.Font.mono(11))
-                    .foregroundStyle(LG.Color.textSecondary)
-                    .frame(height: 44)
+                SheetDismiss("CLOSE") { dismiss() }
             }
             Text(model.diffPath ?? "")
                 .font(LG.Font.mono(12))

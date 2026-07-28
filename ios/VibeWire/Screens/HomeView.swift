@@ -392,7 +392,7 @@ struct HomeView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 16)
-                    .frame(height: 50)
+                    .frame(minHeight: 50)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -466,7 +466,7 @@ struct HomeView: View {
                     Rectangle().fill(LG.Color.amber).frame(width: 2)
                     Text("Text will be soft until the link recovers. Pointer input stays instant — only video is throttled.")
                         .font(LG.Font.sans(13))
-                        .foregroundStyle(Color(hex: 0xC9A468))
+                        .foregroundStyle(LG.Color.onAmberWash)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.leading, 12)
@@ -531,7 +531,7 @@ struct HomeView: View {
                         )
                     }
                     .padding(.horizontal, 18)
-                    .frame(height: 56)
+                    .frame(minHeight: 56)
                     .background(
                         RoundedRectangle(cornerRadius: LG.Metric.radiusMedium).fill(LG.Color.panel)
                     )
@@ -646,7 +646,7 @@ struct DisplayRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 62)
+            .frame(minHeight: 62)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(display.selected ? LG.Color.cyan.opacity(0.08) : LG.Color.panel)

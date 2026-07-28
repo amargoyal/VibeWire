@@ -110,7 +110,7 @@ struct PairingView: View {
             .textContentType(.oneTimeCode)
             .focused($codeFieldFocused)
             .opacity(0.01)
-            .frame(height: 64)
+            .frame(minHeight: 64)
 
             HStack(spacing: 9) {
                 ForEach(0..<6, id: \.self) { index in
@@ -135,7 +135,7 @@ struct PairingView: View {
         return RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
             .fill(isActive ? LG.Color.cyan.opacity(0.08) : LG.Color.panel)
             .frame(maxWidth: 48)
-            .frame(height: 64)
+            .frame(minHeight: 64)
             .overlay(
                 RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
                     .stroke(isActive ? LG.Color.cyan : LG.Color.hairline, lineWidth: 1)
@@ -198,7 +198,7 @@ struct PairingView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .padding(.horizontal, 12)
-                    .frame(height: 44)
+                    .frame(minHeight: 44)
                     .background(
                         RoundedRectangle(cornerRadius: LG.Metric.radiusSmall).fill(LG.Color.panel)
                     )
@@ -271,7 +271,7 @@ struct PairingView: View {
                         // Same share-the-width rule as the entry boxes, so the
                         // digits do not jump when the screen swaps to this one.
                         .frame(maxWidth: 48)
-                        .frame(height: 64)
+                        .frame(minHeight: 64)
                         .overlay(
                             RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
                                 .stroke(LG.Color.stroke, lineWidth: 1)
@@ -463,7 +463,7 @@ struct ExchangeStepRow: View {
             Spacer(minLength: 0)
             MonoCaps(step.detail, size: 11, color: detailColor, tracking: 0)
         }
-        .frame(height: 52)
+        .frame(minHeight: 52)
         .overlay(alignment: .bottom) {
             if step.id != 3 { Hairline() }
         }

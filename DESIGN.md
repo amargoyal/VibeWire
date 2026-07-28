@@ -372,6 +372,8 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 
 **Diff** — mono 11 pt on `#0B0E12`, jade on 8% jade for additions, clay on 8% clay for removals, cyan for hunk headers, Text Tertiary for metadata. Scrolls in both axes; the leading `+`/`−` is preserved so a copied diff is still a diff. The column's width is computed from the longest line rather than measured (`LG.Font.monoAdvance` — monospaced text advances 0.6 em per character), so the added and removed tints run the full width of the column instead of stopping raggedly at each line's own last character.
 
+**`SheetDismiss`** — the way out of a sheet, defined once. `DONE` by default, `CLOSE` on the two read-only viewers, always 11 pt mono-caps in Text Secondary at a 44 pt target. Text Secondary rather than the accent is the point: every sheet can also be swiped down, so this is the second way out and never the primary action on the screen.
+
 **`VideoCaption` / `.videoChip()`** — the ground any mark needs when it sits on the picture: 6 pt horizontal, 3 pt vertical, Deep Ground at 92%. Solid text on top. Defined once so a caption, the INPUT HERE badge, and the landscape live readout cannot drift apart, and so the contrast holds over a white document as well as a black one.
 
 **Markdown** — blocks split locally, inline spans through `AttributedString`. Inline code takes mono 13 pt in cyan; bullets and numbers take cyan markers at 80%; block quotes take a 2 pt cyan-35% rule; fenced code gets its own ground, horizontal scrolling, and a copy button. No bubbles — Claude's turns run the full measure under a cyan `CLAUDE` label and a hairline.
@@ -419,7 +421,7 @@ Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill 
 - **Don't** collapse distinct failures into one message. A timeout, a refused connection, a missing permission, and a sleeping Mac are four states with four answers.
 - **Don't** wrap code or a diff. Scroll it horizontally; wrapped code lies about indentation and truncated code lies outright.
 - **Don't** pass a text size below 9, or set a fixed `height` on a control that stacks text. The floor is enforced in `LG.Font` and the growth in `minHeight`; both exist because the app has to answer the reader's text size.
-- **Don't** hard-code a new hex literal at a call site. Seven already exist outside the token file (`#C9A468`, `#C3C8D0`, `#A8AEB8`, `#0B0E12`, `#0D1014`, `#1E242C`, `#060709`); they are drift, not precedent — add the token instead.
+- **Don't** hard-code a hex literal that appears more than once. The two that did are now tokens: `codeGround` (`#0B0E12`, the ground under fenced code and the diff) and `onAmberWash` (`#C9A468`, prose on an amber wash). Six single-use literals remain — `#D5DBE3`, `#C3C8D0`, `#A8AEB8`, `#0D1014`, `#1E242C`, `#060709` — and are left deliberately: a local exception used once is not a system value, and promoting it would grow the palette without teaching it anything.
 - **Don't** put an oversized decorative layer in a `ZStack` as a sibling. Anything wider than the phone goes in `.background(alignment:)`, or it resizes the whole screen.
 - **Don't** use dashes decoratively. A dashed stroke means unmeasured, pending, or unselected, and it resolves to solid when the thing becomes real.
 - **Don't** attach two `.sheet` modifiers to one view — SwiftUI honors only the first. Move the second onto a child.

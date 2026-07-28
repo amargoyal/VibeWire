@@ -84,21 +84,9 @@ struct ClaudePanelView: View {
 
             Spacer(minLength: 8)
 
-            Button {
-                dismiss()
-            } label: {
-                MonoCaps("DONE", size: 9, color: LG.Color.cyan, tracking: 1.4)
-                    .padding(.horizontal, 10)
-                    .frame(minHeight: LG.Metric.minimumTarget)
-                    // Hit testing follows the drawn glyphs, so without this
-                    // only the strokes of 9pt letters were tappable and the
-                    // gaps between them were not — the same trap the three
-                    // dots menu fell into.
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("closePanel")
-            .accessibilityLabel("Close Claude panel")
+            SheetDismiss { dismiss() }
+                .accessibilityIdentifier("closePanel")
+                .accessibilityLabel("Close Claude panel")
         }
         .padding(.top, 6)
     }
@@ -261,7 +249,7 @@ struct ClaudePanelView: View {
                 } label: {
                     MonoCaps("PICK A SESSION", size: 11, color: LG.Color.cyan, tracking: 1.4)
                         .padding(.horizontal, 20)
-                        .frame(height: 46)
+                        .frame(minHeight: 46)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
                                 .stroke(LG.Color.cyan.opacity(0.45), lineWidth: 1)
@@ -331,7 +319,7 @@ struct ClaudePanelView: View {
                     )
                     Spacer()
                 }
-                .frame(minHeight: 34)
+                .frame(minHeight: LG.Metric.minimumTarget)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -408,7 +396,7 @@ struct ClaudePanelView: View {
                 } label: {
                     MonoCaps(suggestion, size: 10, color: LG.Color.textSecondary, tracking: 1)
                         .padding(.horizontal, 14)
-                        .frame(height: 44)
+                        .frame(minHeight: 44)
                         .overlay(Capsule().stroke(LG.Color.hairline, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
@@ -735,10 +723,7 @@ struct SessionPicker: View {
                 HStack {
                     MonoCaps("RESUME A SESSION", size: 10, tracking: 2)
                     Spacer()
-                    Button("Close") { dismiss() }
-                        .font(LG.Font.mono(11))
-                        .foregroundStyle(LG.Color.textSecondary)
-                        .frame(height: 44)
+                    SheetDismiss("CLOSE") { dismiss() }
                 }
                 .padding(.top, 24)
 
@@ -757,7 +742,7 @@ struct SessionPicker: View {
                         Spacer()
                     }
                     .padding(.horizontal, 16)
-                    .frame(height: 52)
+                    .frame(minHeight: 52)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(LG.Color.cyan.opacity(0.4), lineWidth: 1)

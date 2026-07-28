@@ -162,10 +162,11 @@ private struct CodeBlock: View {
                         color: copied ? LG.Color.green : LG.Color.textSecondary,
                         tracking: 1.4
                     )
-                    .frame(minHeight: 28)
+                    // 28pt was below the floor for a target, and the ink is
+                    // four small letters. The chip looks the same; the area
+                    // that answers a thumb is a full one.
+                    .frame(minHeight: LG.Metric.minimumTarget)
                     .padding(.horizontal, 12)
-                    // Small glyphs are a small target, and hit testing would
-                    // otherwise use the letter shapes themselves.
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -185,7 +186,7 @@ private struct CodeBlock: View {
                     .padding(.top, 2)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(hex: 0x0B0E12)))
+        .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.codeGround))
         .overlay(
             RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairlineDim, lineWidth: 1)
         )

@@ -56,17 +56,8 @@ struct SettingsView: View {
 
             Spacer()
 
-            Button {
-                dismiss()
-            } label: {
-                MonoCaps("DONE", size: 11, color: LG.Color.cyan, tracking: 1.4)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: LG.Metric.minimumTarget)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("back")
-            .accessibilityLabel("Done")
+            SheetDismiss { dismiss() }
+                .accessibilityIdentifier("dismissSettings")
         }
         .padding(.top, 8)
     }
@@ -117,7 +108,7 @@ struct SettingsView: View {
                         } label: {
                             MonoCaps("REVOKE", size: 10, color: LG.Color.red, tracking: 1)
                                 .padding(.horizontal, 14)
-                                .frame(height: 44)
+                                .frame(minHeight: 44)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
                                         .stroke(LG.Color.red.opacity(0.4), lineWidth: 1)
@@ -133,7 +124,7 @@ struct SettingsView: View {
             if model.devices.isEmpty {
                 MonoCaps("NO DEVICES REPORTED BY THE HOST", size: 10, tracking: 1.2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 50)
+                    .frame(minHeight: 50)
             }
         }
     }
@@ -323,7 +314,7 @@ struct SettingsView: View {
                 MonoCaps("\(model.devices.count) KEYS", size: 9, color: LG.Color.red, tracking: 1.2)
             }
             .padding(.horizontal, 18)
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .overlay(
                 RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
                     .stroke(LG.Color.red.opacity(0.4), lineWidth: 1)
@@ -463,7 +454,7 @@ struct RevokeConfirmSheet: View {
                             .font(LG.Font.sans(17, weight: .medium))
                             .foregroundStyle(LG.Color.onRed)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 60)
+                            .frame(minHeight: 60)
                             .background(RoundedRectangle(cornerRadius: 10).fill(LG.Color.red))
                     }
                     .buttonStyle(.plain)
@@ -473,7 +464,7 @@ struct RevokeConfirmSheet: View {
                     } label: {
                         MonoCaps(cancelLabel, size: 11, color: LG.Color.textSecondary, tracking: 1.2)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 52)
+                            .frame(minHeight: 52)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(LG.Color.hairline, lineWidth: 1)

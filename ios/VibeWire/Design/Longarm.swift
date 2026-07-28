@@ -8,8 +8,11 @@ import SwiftUI
 ///    degraded, red lost. Cyan is reserved for the user's own input — held
 ///    keys, Claude, active selection — so machine state and user state never
 ///    look alike.
-///  - Monospace for anything measured. Helvetica for names, prose, answers.
+///  - Monospace for anything measured. The system sans for names, prose and
+///    answers. Both scale with the reader's text size; nothing renders under 9pt.
 ///  - Hairlines instead of cards. No shadows inside the app.
+///  - Reduce Motion takes the travel and the scale, never the fact that
+///    something happened, and never the spinner.
 enum LG {
 
     // MARK: Colour
@@ -53,6 +56,15 @@ enum LG {
         static let hairline = SwiftUI.Color(hex: 0x262B33)
         static let hairlineDim = SwiftUI.Color(hex: 0x1A1E24)
         static let stroke = SwiftUI.Color(hex: 0x2E343D)
+
+        /// The ground under code: fenced blocks in Claude's answers, and the
+        /// diff. A half-step below `deepGround` so a listing reads as inset
+        /// into the panel rather than floating on it.
+        static let codeGround = SwiftUI.Color(hex: 0x0B0E12)
+        /// Prose on an amber wash — the thin-link note and the error banner.
+        /// Warmer than `text` so the sentence belongs to the condition it sits
+        /// inside, and light enough to clear AA on that 7% ground.
+        static let onAmberWash = SwiftUI.Color(hex: 0xC9A468)
 
         /// Ink used on top of a filled action button.
         static let onGreen = SwiftUI.Color(hex: 0x06130D)
@@ -130,8 +142,6 @@ enum LG {
             scaledSize(size) * 0.6
         }
 
-        private static func scaled(_ size: CGFloat) -> CGFloat { scaledSize(size) }
-
         /// IBM Plex Mono if bundled, otherwise the system monospace. Every
         /// readout, label and key uses this.
         ///
@@ -154,12 +164,12 @@ enum LG {
                     relativeTo: swiftUIStyle(for: size)
                 )
             }
-            return .system(size: scaled(size), weight: weight, design: .monospaced)
+            return .system(size: scaledSize(size), weight: weight, design: .monospaced)
         }
 
         /// Names, prose, answers.
         static func sans(_ size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
-            .system(size: scaled(size), weight: weight)
+            .system(size: scaledSize(size), weight: weight)
         }
     }
 

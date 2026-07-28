@@ -508,6 +508,37 @@ struct KeyCap: View {
     }
 }
 
+/// The way out of a sheet.
+///
+/// There were three of these and four sheets: a system `Button("Close")` in the
+/// diff and the session picker, and mono caps reading `DONE` at two different
+/// sizes in Settings and the Claude panel. Same job, same position, four
+/// implementations.
+///
+/// Text Secondary rather than the accent, deliberately: every one of these
+/// sheets can also be dismissed by swiping down, so this is the second way out,
+/// never the primary action on the screen. The accent is not spent on it.
+struct SheetDismiss: View {
+    let title: String
+    let action: () -> Void
+
+    init(_ title: String = "DONE", action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            MonoCaps(title, size: 11, color: LG.Color.textSecondary, tracking: 1.4)
+                .padding(.horizontal, 12)
+                .frame(minHeight: LG.Metric.minimumTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title.capitalized)
+    }
+}
+
 // MARK: - Screen chrome
 
 /// The LONGARM wordmark and overflow control that sits at the top of the

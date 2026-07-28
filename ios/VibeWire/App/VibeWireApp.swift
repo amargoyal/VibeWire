@@ -118,7 +118,7 @@ struct BannerView: View {
                     .frame(width: 2)
                 Text(text)
                     .font(LG.Font.sans(13))
-                    .foregroundStyle(Color(hex: 0xC9A468))
+                    .foregroundStyle(LG.Color.onAmberWash)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Button(action: dismiss) {
