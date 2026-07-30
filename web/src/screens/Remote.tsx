@@ -42,7 +42,7 @@ import {
   VideoCaption,
 } from '../design/components'
 import { ControlHub } from './ControlHub'
-import { isTouchPrimary, KeyboardBar } from './KeyboardBar'
+import { focusKeyboardField, isTouchPrimary, KeyboardBar, KeyboardField } from './KeyboardBar'
 import { VideoSurface } from './VideoSurface'
 
 type PadMode = 'pointer' | 'pan'
@@ -487,6 +487,10 @@ export function Remote() {
       {stalled ? <ReconnectingOverlay seconds={stallSeconds} /> : null}
       {store.showHub.value ? <ControlHub /> : null}
       {store.showKeyboard.value ? <KeyboardBar /> : null}
+      {/* Mounted for the whole session, not with the bar: iOS opens the keyboard only
+          for a focus() that happens inside a tap handler, and a field that does not
+          exist yet cannot be focused. */}
+      <KeyboardField />
     </div>
   )
 }
@@ -1363,7 +1367,10 @@ function LandscapeDock() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-        <DockButton label="⌨ KEYS" spoken="Keyboard" onClick={() => (store.showKeyboard.value = true)} />
+        <DockButton label="⌨ KEYS" spoken="Keyboard" onClick={() => {
+            focusKeyboardField()
+            store.showKeyboard.value = true
+          }} />
         <DockButton label="⛶ SHOT" spoken="Screenshot the Mac" onClick={() => void store.hub('shot')} />
         <DockButton label="COPY ←" spoken="Copy from the Mac" onClick={() => void store.hub('copy')} />
         <DockButton label="PASTE →" spoken="Paste to the Mac" onClick={() => void store.hub('paste')} />

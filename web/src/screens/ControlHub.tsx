@@ -12,6 +12,7 @@ import { useEffect, useState } from 'preact/hooks'
 
 import { store } from '../app/store'
 import { Caps, KeyCap, MODIFIERS, modifierGlyph } from '../design/components'
+import { focusKeyboardField } from './KeyboardBar'
 
 interface Spoke {
   action: string
@@ -23,17 +24,26 @@ interface Spoke {
 }
 
 /**
- * The arc traces the path of a thumb pivoting at the base of the palm: a 210px
- * sweep, 56px targets on a 66px pitch, ending at the two easiest positions.
- * Offsets are from the bottom-right corner.
+ * The arc traces the path of a thumb pivoting at the base of the palm: 56px targets
+ * on a 62px pitch, ending at the two easiest positions. Offsets are from the
+ * bottom-right corner.
+ *
+ * Seven of them now, and the sweep had to grow for it. Six sat on a 245px radius
+ * across 77°, which is a 66px pitch. Adding a seventh in the same span drops the
+ * pitch to 55px — closer than the buttons are wide, so they would overlap. Extending
+ * the span instead runs off the right edge, because the arc already ends pointing
+ * straight up. So the radius went to 277px, which holds seven at 62px with 6px of
+ * air between them, and reaches 330px from the right edge — inside the narrowest
+ * phone this app targets.
  */
 const SPOKES: Spoke[] = [
-  { action: 'keys', glyph: '⌨', caption: 'KEYS', x: 20, y: 244, accent: false },
-  { action: 'shot', glyph: '⛶', caption: 'SHOT', x: 85, y: 234, accent: false },
-  { action: 'copy', glyph: 'COPY', caption: '← MAC', x: 143, y: 204, accent: false },
-  { action: 'paste', glyph: 'PASTE', caption: '→ MAC', x: 190, y: 157, accent: false },
-  { action: 'lock', glyph: '⇅', caption: 'LOCK', x: 220, y: 99, accent: false },
-  { action: 'mods', glyph: '⌘', caption: 'MODS', x: 230, y: 34, accent: true },
+  { action: 'keys', glyph: '⌨', caption: 'KEYS', x: 22, y: 276, accent: false },
+  { action: 'shot', glyph: '⛶', caption: 'SHOT', x: 83, y: 264, accent: false },
+  { action: 'copy', glyph: 'COPY', caption: '← MAC', x: 140, y: 239, accent: false },
+  { action: 'paste', glyph: 'PASTE', caption: '→ MAC', x: 189, y: 202, accent: false },
+  { action: 'enter', glyph: '⏎', caption: 'ENTER', x: 229, y: 155, accent: false },
+  { action: 'lock', glyph: '⏻', caption: 'LOCK MAC', x: 258, y: 100, accent: false },
+  { action: 'mods', glyph: '⌘', caption: 'MODS', x: 274, y: 40, accent: true },
 ]
 
 /**
@@ -46,7 +56,8 @@ const SPOKEN: Record<string, string> = {
   shot: 'Screenshot the Mac',
   copy: 'Copy from the Mac',
   paste: 'Paste to the Mac',
-  lock: 'Lock scrolling',
+  enter: 'Press Return on the Mac',
+  lock: 'Lock the Mac’s screen',
   mods: 'Modifier keys',
 }
 
@@ -92,10 +103,10 @@ export function ControlHub() {
         aria-hidden="true"
         style={{
           position: 'absolute',
-          right: '-170px',
-          bottom: '-170px',
-          width: '660px',
-          height: '660px',
+          right: '-186px',
+          bottom: '-186px',
+          width: '724px',
+          height: '724px',
           borderRadius: '50%',
           background:
             'radial-gradient(circle at bottom right, color-mix(in srgb, var(--lg-deep) 95%, transparent) 40px, transparent 330px)',
@@ -106,10 +117,10 @@ export function ControlHub() {
         aria-hidden="true"
         style={{
           position: 'absolute',
-          right: '-162px',
-          bottom: '-148px',
-          width: '420px',
-          height: '420px',
+          right: '-183px',
+          bottom: '-167px',
+          width: '475px',
+          height: '475px',
           borderRadius: '50%',
           border: '1px dashed color-mix(in srgb, var(--lg-cyan) 16%, transparent)',
           pointerEvents: 'none',
@@ -124,7 +135,19 @@ export function ControlHub() {
             navigator.vibrate?.(6)
             switch (spoke.action) {
               case 'keys':
+                // Focus first, and synchronously. iOS Safari opens the keyboard only
+                // while a gesture is being handled, so doing this after the state
+                // change — one render later — focuses a field and shows no keyboard,
+                // which is what KEYS used to do.
+                focusKeyboardField()
                 store.showKeyboard.value = true
+                store.showHub.value = false
+                break
+              case 'enter':
+                // The one key worth reaching without opening a keyboard: it is what
+                // finishes a command in a terminal, and summoning the whole system
+                // keyboard to press it once is the long way round.
+                store.key('return')
                 store.showHub.value = false
                 break
               case 'mods':
@@ -133,10 +156,6 @@ export function ControlHub() {
                 // already held, which is the one state you cannot reach without the
                 // tray.
                 setShowModifiers((current) => !current)
-                break
-              case 'lock':
-                store.scrollLock.value = !store.scrollLock.value
-                void store.hub('lock')
                 break
               default:
                 void store.hub(spoke.action)

@@ -41,21 +41,38 @@ export function isTouchPrimary(): boolean {
   return matchMedia('(pointer: coarse)').matches
 }
 
-export function KeyboardBar() {
-  const [combos, setCombos] = useState(DEFAULT_COMBOS)
-  const [showEditor, setShowEditor] = useState(false)
-  const field = useRef<HTMLTextAreaElement | null>(null)
+/**
+ * The field that owns the system keyboard, and why it lives outside the bar.
+ *
+ * iOS Safari opens the keyboard for a programmatic `focus()` **only while a user
+ * gesture is still being handled**. Mounting the field with the bar and focusing it
+ * from an effect is one render too late: the gesture is over, the field takes focus,
+ * and no keyboard appears. That is exactly what KEYS did.
+ *
+ * So the field is mounted for the whole session and `focusKeyboardField()` is called
+ * synchronously inside the tap handler. Same field, same diffing; the only change is
+ * *when* focus happens, which is the whole of the bug.
+ */
+let fieldElement: HTMLTextAreaElement | null = null
+
+export function focusKeyboardField(): void {
+  const field = fieldElement
+  if (!field) return
+  // `preventScroll` stops iOS yanking the picture around to reveal a 1px field.
+  field.focus({ preventScroll: true })
+}
+
+export function blurKeyboardField(): void {
+  fieldElement?.blur()
+}
+
+/**
+ * Diffs the field rather than intercepting keystrokes, so autocorrect replacements,
+ * dictation and emoji all forward correctly.
+ */
+export function KeyboardField() {
   const previous = useRef('')
-  const touch = isTouchPrimary()
 
-  useEffect(() => {
-    if (touch) field.current?.focus()
-  }, [touch])
-
-  /**
-   * Diffs the field rather than intercepting keystrokes, so autocorrect
-   * replacements and multi-character insertions all forward correctly.
-   */
   const forward = (current: string) => {
     const before = previous.current
     if (current.length > before.length && current.startsWith(before)) {
@@ -71,9 +88,61 @@ export function KeyboardBar() {
     }
 
     // Keep the buffer short so the diff stays cheap over a long session.
-    previous.current = current.length > 200 ? current.slice(-40) : current
-    if (field.current && current.length > 200) field.current.value = previous.current
+    if (current.length > 200) {
+      const trimmed = current.slice(-40)
+      previous.current = trimmed
+      if (fieldElement) fieldElement.value = trimmed
+    } else {
+      previous.current = current
+    }
   }
+
+  return (
+    <textarea
+      ref={(node) => {
+        fieldElement = node
+      }}
+      aria-label="Type into the Mac"
+      rows={1}
+      autocapitalize="sentences"
+      autocomplete="off"
+      spellcheck={false}
+      onInput={(event) => forward(event.currentTarget.value)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter') return
+        event.preventDefault()
+        store.key('return')
+      }}
+      // Present but invisible. Off-screen would stop iOS treating it as focusable at
+      // all; 1px and all but transparent keeps it real without being seen.
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '1px',
+        height: '1px',
+        opacity: 0.001,
+        padding: 0,
+        border: 0,
+        resize: 'none',
+        zIndex: 0,
+      }}
+    />
+  )
+}
+
+export function KeyboardBar() {
+  const [combos, setCombos] = useState(DEFAULT_COMBOS)
+  const [showEditor, setShowEditor] = useState(false)
+  const touch = isTouchPrimary()
+
+  // A second chance at focus, for the paths that reach here without a tap — a
+  // restored session, or the bar being reopened by state rather than by a finger.
+  // The tap handlers focus synchronously because iOS demands it; this covers the
+  // rest without being the thing relied on.
+  useEffect(() => {
+    if (touch) focusKeyboardField()
+  }, [touch])
 
   return (
     <div
@@ -158,19 +227,17 @@ export function KeyboardBar() {
       </div>
 
       {touch ? (
-        <textarea
-          ref={field}
-          aria-label="Type into the Mac"
-          rows={1}
-          autocapitalize="sentences"
-          onInput={(event) => forward(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return
-            event.preventDefault()
-            store.key('return')
-          }}
-          style={{ height: '1px', opacity: 0.001, resize: 'none', padding: 0 }}
-        />
+        // Tapping the bar's own ground brings the system keyboard back after it has
+        // been dismissed by a swipe, which otherwise leaves the two rows on screen
+        // with nothing to type into and no way to say so.
+        <button
+          onClick={() => focusKeyboardField()}
+          style={{ paddingInline: '18px', marginTop: '8px', minHeight: '32px', width: '100%' }}
+        >
+          <Caps size="var(--fs-9)" tracking="0.12em">
+            TAP HERE IF THE KEYBOARD HAS GONE
+          </Caps>
+        </button>
       ) : (
         <Caps
           size="var(--fs-9)"
