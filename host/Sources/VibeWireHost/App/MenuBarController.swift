@@ -262,27 +262,56 @@ final class MenuBarController: NSObject {
         lanHost: String,
         port: UInt16
     ) {
-        // Nothing to open if this host has no bundle to serve. A QR pointing at a
-        // 404 is worse than no QR: it looks like the feature working and failing.
-        guard Config.webRoot != nil else {
-            browserQRView?.image = nil
-            browserCaption?.stringValue = "BROWSER\nNO WEB BUILD — SEE web/README.md"
-            return
-        }
-
-        let base: String
+        // Whichever address of this Mac the phone has the best chance of reaching.
+        // The tunnel wins when it is up, because it works from cellular and a tailnet
+        // address does not.
+        let origin: String
         let reach: String
         if let tunnel = status.cloudflareHostname, status.cloudflareRunning {
-            base = tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel
+            origin = tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel
             reach = "WORKS ON CELLULAR"
         } else {
-            base = "http://\(lanHost):\(port)"
+            origin = "http://\(lanHost):\(port)"
             reach = status.tailscaleAddress == nil ? "SAME NETWORK ONLY" : "ON THE TAILNET"
         }
 
-        let url = "\(base)/?code=\(code.value)"
+        let url: String
+        let caption: String
+
+        if let site = Config.webClientURL {
+            // Send the phone to the published copy, carrying this Mac's address —
+            // that page was served by GitHub and has no idea where the Mac is, so
+            // unlike the host-served copy it cannot read the address off its own
+            // origin. `URLComponents` does the percent-encoding; hand-built, the `:`
+            // and `//` in the address are exactly what gets mangled.
+            let trimmed = site.hasSuffix("/") ? String(site.dropLast()) : site
+            guard var components = URLComponents(string: trimmed) else {
+                browserQRView?.image = nil
+                browserCaption?.stringValue = "BROWSER\nwebClientURL IS NOT A URL"
+                return
+            }
+            components.queryItems = [
+                URLQueryItem(name: "host", value: origin),
+                URLQueryItem(name: "code", value: code.value),
+            ]
+            guard let built = components.url?.absoluteString else { return }
+            url = built
+            caption = "BROWSER · PUBLISHED SITE\n\(reach)"
+        } else {
+            // Nothing to open if this host has no bundle to serve. A QR pointing at a
+            // 404 is worse than no QR: it looks like the feature working and failing.
+            guard Config.webRoot != nil else {
+                browserQRView?.image = nil
+                browserCaption?.stringValue = "BROWSER\nNO WEB BUILD — SEE web/README.md"
+                return
+            }
+            // Only the code: the page comes from this host, so it reads the address
+            // off its own origin and the QR stays small.
+            url = "\(origin)/?code=\(code.value)"
+            caption = "BROWSER\n\(reach)"
+        }
         browserQRView?.image = Self.qrImage(from: url)
-        browserCaption?.stringValue = "BROWSER\n\(reach)"
+        browserCaption?.stringValue = caption
         // Printed as well as drawn: this is the one string worth being able to paste
         // into another machine, and reading it off a QR is not pasting.
         //

@@ -33,6 +33,19 @@ struct HostSettings: Codable, Sendable {
     var targetFps: Int = 60
     var port: UInt16 = 8787
 
+    /// Where the public copy of the web client lives, e.g.
+    /// `https://you.github.io/VibeWire`.
+    ///
+    /// Only affects the BROWSER QR in the pairing window. Set, the QR sends a phone
+    /// to that page carrying this Mac's address; unset, it sends the phone to the
+    /// copy this host serves itself, which is the same build at a different address.
+    ///
+    /// Unset by default, and the default is the better one for daily use: a
+    /// host-served page is same-origin with the protocol, so it needs no address at
+    /// all and cannot go stale. Pointing at the public site is for when the address
+    /// bar matters — showing someone the thing, or a bookmark you want to keep.
+    var webClientURL: String?
+
     static let `default` = HostSettings()
 }
 
@@ -62,6 +75,18 @@ enum Config {
 
     static var settingsURL: URL {
         configDirectory.appendingPathComponent("config.json")
+    }
+
+    /// The public web client to send a scanned QR to, or nil to use the copy this
+    /// host serves. `VIBEWIRE_WEB_CLIENT` wins over the stored setting, so it can be
+    /// tried for one launch without editing anything.
+    static var webClientURL: String? {
+        if let override = ProcessInfo.processInfo.environment["VIBEWIRE_WEB_CLIENT"],
+           !override.isEmpty {
+            return override
+        }
+        guard let stored = loadSettings().webClientURL, !stored.isEmpty else { return nil }
+        return stored
     }
 
     /// Where the built web client lives, or nil if it was never built.
