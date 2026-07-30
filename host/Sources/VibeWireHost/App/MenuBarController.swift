@@ -16,8 +16,12 @@ final class MenuBarController: NSObject {
     private var pairingWindow: NSWindow?
     private var codeField: NSTextField?
     private var qrView: NSImageView?
+    /// The second QR: an ordinary URL, for the phone's own camera.
+    private var browserQRView: NSImageView?
+    private var browserCaption: NSTextField?
     private var countdownField: NSTextField?
     private var rotationTimer: Timer?
+    private var lastLoggedBrowserURL: String?
 
     init(pairing: PairingService, trust: TrustStore, transport: TransportManager) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -127,7 +131,7 @@ final class MenuBarController: NSObject {
     private func showPairingWindow(code: PairingService.ActiveCode) {
         if pairingWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 360, height: 460),
+                contentRect: NSRect(x: 0, y: 0, width: 560, height: 470),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false
@@ -138,8 +142,8 @@ final class MenuBarController: NSObject {
 
             let content = NSView(frame: window.contentLayoutRect)
 
-            let instruction = NSTextField(labelWithString: "Type these six digits into VibeWire on your phone.")
-            instruction.frame = NSRect(x: 24, y: 400, width: 312, height: 34)
+            let instruction = NSTextField(labelWithString: "Scan one of these, or type the six digits.")
+            instruction.frame = NSRect(x: 24, y: 410, width: 512, height: 34)
             instruction.alignment = .center
             instruction.maximumNumberOfLines = 2
             instruction.font = .systemFont(ofSize: 12)
@@ -147,27 +151,54 @@ final class MenuBarController: NSObject {
             content.addSubview(instruction)
 
             let codeField = NSTextField(labelWithString: code.value)
-            codeField.frame = NSRect(x: 24, y: 340, width: 312, height: 52)
+            codeField.frame = NSRect(x: 24, y: 350, width: 512, height: 52)
             codeField.alignment = .center
             codeField.font = .monospacedSystemFont(ofSize: 44, weight: .medium)
             content.addSubview(codeField)
             self.codeField = codeField
 
             let countdown = NSTextField(labelWithString: "")
-            countdown.frame = NSRect(x: 24, y: 314, width: 312, height: 18)
+            countdown.frame = NSRect(x: 24, y: 324, width: 512, height: 18)
             countdown.alignment = .center
             countdown.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
             countdown.textColor = .tertiaryLabelColor
             content.addSubview(countdown)
             self.countdownField = countdown
 
-            let qr = NSImageView(frame: NSRect(x: 80, y: 60, width: 200, height: 200))
+            // Two QRs, because they are read by two different things and only one
+            // of them is a scanner. The left is `vibewire://pair?…` for the iOS
+            // app — a custom scheme, which a browser can never handle. The right is
+            // an ordinary URL, so the phone's own camera opens it in the browser
+            // and the web client pairs on load. Same handshake, same code, no
+            // typing and no in-app scanner.
+            let qr = NSImageView(frame: NSRect(x: 62, y: 96, width: 176, height: 176))
             qr.imageScaling = .scaleProportionallyUpOrDown
             content.addSubview(qr)
             self.qrView = qr
 
-            let hint = NSTextField(labelWithString: "Or scan the code with the phone's camera.")
-            hint.frame = NSRect(x: 24, y: 28, width: 312, height: 18)
+            let appCaption = NSTextField(labelWithString: "iPHONE APP")
+            appCaption.frame = NSRect(x: 42, y: 72, width: 216, height: 16)
+            appCaption.alignment = .center
+            appCaption.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
+            appCaption.textColor = .secondaryLabelColor
+            content.addSubview(appCaption)
+
+            let browserQR = NSImageView(frame: NSRect(x: 322, y: 96, width: 176, height: 176))
+            browserQR.imageScaling = .scaleProportionallyUpOrDown
+            content.addSubview(browserQR)
+            self.browserQRView = browserQR
+
+            let browserCaption = NSTextField(labelWithString: "BROWSER")
+            browserCaption.frame = NSRect(x: 302, y: 72, width: 216, height: 32)
+            browserCaption.alignment = .center
+            browserCaption.maximumNumberOfLines = 2
+            browserCaption.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
+            browserCaption.textColor = .secondaryLabelColor
+            content.addSubview(browserCaption)
+            self.browserCaption = browserCaption
+
+            let hint = NSTextField(labelWithString: "The right one opens in any phone's camera. Point and pair.")
+            hint.frame = NSRect(x: 24, y: 34, width: 512, height: 18)
             hint.alignment = .center
             hint.font = .systemFont(ofSize: 11)
             hint.textColor = .tertiaryLabelColor
@@ -206,9 +237,61 @@ final class MenuBarController: NSObject {
                 ?? status.lanAddress
                 ?? status.tailscaleDNSName
                 ?? "127.0.0.1"
+            let port = Config.loadSettings().port
             // The QR carries everything the phone needs to skip typing.
-            let payload = "vibewire://pair?host=\(host)&port=\(Config.loadSettings().port)&code=\(code.value)"
+            let payload = "vibewire://pair?host=\(host)&port=\(port)&code=\(code.value)"
             qrView?.image = Self.qrImage(from: payload)
+
+            updateBrowserQR(code: code, status: status, lanHost: host, port: port)
+        }
+    }
+
+    /// The QR a phone's camera can act on.
+    ///
+    /// Encodes a URL to the web client the host is already serving, carrying only
+    /// the code — the client reads its own origin for the address, which keeps the
+    /// payload short enough to scan from across a desk and means there is nothing to
+    /// copy by hand.
+    ///
+    /// The tunnel wins when it is up, because that address works from cellular and a
+    /// tailnet address does not. Failing that, whichever local address the app would
+    /// have put in the other QR.
+    private func updateBrowserQR(
+        code: PairingService.ActiveCode,
+        status: TransportManager.Status,
+        lanHost: String,
+        port: UInt16
+    ) {
+        // Nothing to open if this host has no bundle to serve. A QR pointing at a
+        // 404 is worse than no QR: it looks like the feature working and failing.
+        guard Config.webRoot != nil else {
+            browserQRView?.image = nil
+            browserCaption?.stringValue = "BROWSER\nNO WEB BUILD — SEE web/README.md"
+            return
+        }
+
+        let base: String
+        let reach: String
+        if let tunnel = status.cloudflareHostname, status.cloudflareRunning {
+            base = tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel
+            reach = "WORKS ON CELLULAR"
+        } else {
+            base = "http://\(lanHost):\(port)"
+            reach = status.tailscaleAddress == nil ? "SAME NETWORK ONLY" : "ON THE TAILNET"
+        }
+
+        let url = "\(base)/?code=\(code.value)"
+        browserQRView?.image = Self.qrImage(from: url)
+        browserCaption?.stringValue = "BROWSER\n\(reach)"
+        // Printed as well as drawn: this is the one string worth being able to paste
+        // into another machine, and reading it off a QR is not pasting.
+        //
+        // Once per value, not once per redraw — this runs on a one-second timer while
+        // the window is open, and a log that repeats the same line sixty times a
+        // minute is a log nobody reads.
+        if url != lastLoggedBrowserURL {
+            lastLoggedBrowserURL = url
+            Log.info(.app, "browser pairing url \(url)")
         }
     }
 

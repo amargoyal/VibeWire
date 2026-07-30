@@ -259,7 +259,12 @@ textarea {
 }
 
 /* A dashed rule that stands in for a live value the host has not reported yet.
-   The layout does not move when the real value arrives — it just fills in. */
+   The layout does not move when the real value arrives — it just fills in.
+
+   A state mark, not decoration, and the main instance of the rule DESIGN.md states
+   as "a dashed stroke means unmeasured, pending, or unselected, and it resolves to
+   solid when the thing becomes real". One axis, one pixel tall: the gradient tiles
+   along x to make dashes, which is a line, not a field. */
 .dashed-rule {
   height: 1px;
   background-image: linear-gradient(

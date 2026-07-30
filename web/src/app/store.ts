@@ -398,11 +398,18 @@ export class Store {
   }
 
   /**
-   * `vibewire://pair?host=…&port=…&code=…` — the payload behind the QR the Mac
-   * shows. A browser cannot be the handler for a custom scheme, so the same
-   * fields are read from this page's own query string or hash instead: opening
-   * `…/?host=mac&port=8787&code=482917` pairs on load. That is what makes a
-   * bookmark or a scanned link work here.
+   * Pairing from this page's own URL.
+   *
+   * A browser cannot be the handler for `vibewire://`, so the Mac's second QR
+   * encodes an ordinary `https://…/?code=482917` instead — which the phone's own
+   * camera opens, in the browser, with no app and no scanner. This is what reads
+   * it, and it is why scanning is one action rather than four.
+   *
+   * `host` is optional and usually absent. Left out, the address is this page's
+   * own origin: the bundle was served by the Mac, so the Mac is already known,
+   * and leaving it out keeps the QR small enough to scan from across a desk. It
+   * is still honoured when present, so a link pointing at one Mac from a page
+   * served by another keeps working.
    */
   async handlePairingParams(search: string, hash: string): Promise<void> {
     const parameters = new URLSearchParams(search || '')
@@ -412,14 +419,18 @@ export class Store {
       }
     }
 
-    const address = parameters.get('host')
     const code = parameters.get('code')
-    if (!address || !code) return
-    if (code.length !== 6) {
-      this.banner.value = 'That pairing link is missing an address or code.'
+    if (!code) return
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      this.banner.value = 'That pairing link does not carry a six-digit code.'
       return
     }
 
+    // Already paired with this Mac: a stale link in history must not tear down a
+    // working session and burn a code that has since rotated.
+    if (this.pairedHost.value) return
+
+    const address = parameters.get('host') ?? location.origin
     try {
       const port = Number(parameters.get('port') ?? 8787)
       const endpoint = parseEndpoint(address, Number.isFinite(port) ? port : 8787)

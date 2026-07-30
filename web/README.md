@@ -68,15 +68,25 @@ timeout where a scheme mismatch belongs would be the exact defect it exists to a
 Same handshake as the phone: six digits from the Mac's menu bar, an Ed25519 key
 exchange, and no stored bearer token.
 
-Three ways in:
+Four ways in, fastest first:
 
+- **Scan the BROWSER QR.** The Mac's pairing window shows two. The left is
+  `vibewire://pair?…` for the iOS app — a custom scheme, which no browser can
+  handle. The right is an ordinary URL, so the phone's **own camera** opens it in
+  the browser and it pairs on load. Nothing to type, no in-app scanner, works on
+  every phone. It carries only the code; the address comes from the page's own
+  origin, which keeps the QR small enough to scan across a desk.
+
+  The right-hand QR points at the Cloudflare tunnel when the relay is up — the
+  caption reads `WORKS ON CELLULAR` — and at the tailnet or LAN address otherwise.
+  It redraws every second, so the code in it is never the stale one.
+
+  The same URL is printed in the host log as `browser pairing url …`, for when
+  pasting beats pointing.
 - **Type the code.** Enter the Mac's address, then the six digits.
-- **Paste the pairing link.** The Mac's QR encodes
-  `vibewire://pair?host=…&port=…&code=…`. A browser cannot register for a custom
-  scheme — scanning that QR with a phone camera opens nothing here — but pasting it
-  reads all four fields and pairs.
-- **A link with the fields in it.** Opening
-  `http://<mac>:8787/?host=<mac>&port=8787&code=<code>` pairs on load. That is the
+- **Paste the pairing link.** Reads either QR's payload off the clipboard.
+- **A link with the fields in it.** `…/?host=<mac>&port=8787&code=<code>`. `host`
+  and `port` are optional — left out, the page's own origin is used. That is the
   form to bookmark.
 
 **Browser storage is per-origin.** A key made on `https://you.github.io` is a
