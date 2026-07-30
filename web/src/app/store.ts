@@ -11,7 +11,7 @@ import { batch, computed, signal } from '@preact/signals'
 import { HostClient, type ConnectionState, type ControlMessage } from '../net/hostClient'
 import { Identity, type KeyStorage, type PairedHost } from '../net/identity'
 import { LinkMonitor } from '../net/linkMonitor'
-import { parseEndpoint, type Endpoint } from '../net/endpoint'
+import { describe, parseEndpoint, reachability, type Endpoint } from '../net/endpoint'
 import { RendererPool, type VideoRenderer } from '../video/renderer'
 import { conditionFrom, type Condition } from '../design/components'
 
@@ -395,6 +395,51 @@ export class Store {
 
   probe(endpoint: Endpoint): Promise<number | null> {
     return this.client.probe(endpoint)
+  }
+
+  /**
+   * The Mac moved. Same Mac, same key, new address.
+   *
+   * Pairing binds a device id to a public key, and neither depends on where the Mac
+   * is — so an address that stops answering is not a reason to trade keys again. The
+   * phone has never had this and pays for it: `Identity.PairedHost` stores one
+   * address, so a Mac that changes IP is unreachable until re-paired.
+   *
+   * A browser pays for it harder. A Cloudflare quick tunnel gets a fresh hostname on
+   * every host restart, and the published copy of this client cannot read the Mac's
+   * address off its own origin the way the host-served copy does — so it holds a
+   * stored address that is dead by design, several times a day.
+   *
+   * Probes before committing: replacing a working address with a typo would be a
+   * worse outcome than the problem being solved.
+   */
+  async repoint(endpoint: Endpoint): Promise<string | null> {
+    const paired = this.pairedHost.value
+    if (!paired) return 'Nothing is paired, so there is no address to change.'
+
+    const blocked = describe(endpoint)
+    if (reachability(endpoint) === 'blocked') return blocked
+
+    if ((await this.client.probe(endpoint)) == null) {
+      return `Nothing answered at ${endpoint.host}. The address is unchanged.`
+    }
+
+    const moved: PairedHost = {
+      ...paired,
+      origin: endpoint.origin,
+      host: endpoint.host,
+      port: endpoint.port,
+    }
+    await Identity.savePairedHost(moved)
+    this.pairedHost.value = moved
+
+    // Retire the old socket explicitly. Its backoff has usually given up by the time
+    // anyone reaches for this, and `connect` declines to open a second socket for a
+    // device that already has one.
+    this.client.disconnect()
+    this.banner.value = null
+    await this.connectIfPaired()
+    return null
   }
 
   /**

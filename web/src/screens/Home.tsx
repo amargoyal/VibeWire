@@ -21,9 +21,11 @@ import {
   Readout,
   ScreenBody,
   ScreenHeader,
+  SecondaryAction,
   SignalBars,
   Sparkline,
 } from '../design/components'
+import { parseEndpoint } from '../net/endpoint'
 
 type Posture = 'awake' | 'weak' | 'asleep' | 'connecting' | 'unreachable'
 
@@ -467,7 +469,7 @@ function DisplayList({ posture }: { posture: Posture }) {
                 style={{
                   width: '15px',
                   height: '20px',
-                  borderRadius: '2px',
+                  borderRadius: 'var(--radius-screen)',
                   border: '1px solid var(--lg-text-tertiary)',
                 }}
               />
@@ -527,7 +529,7 @@ export function DisplayRow({
           width: '34px',
           height: '22px',
           flex: '0 0 auto',
-          borderRadius: '2px',
+          borderRadius: 'var(--radius-screen)',
           background: display.selected
             ? 'color-mix(in srgb, var(--lg-cyan) 14%, transparent)'
             : 'transparent',
@@ -758,7 +760,7 @@ function Footer({
                 width: '30px',
                 height: '20px',
                 flex: '0 0 auto',
-                borderRadius: '2px',
+                borderRadius: 'var(--radius-screen)',
                 border: '1px solid var(--lg-text-tertiary)',
               }}
             />
@@ -783,9 +785,127 @@ function Footer({
               store.retry()
             }}
           />
+          <MovedAddress />
         </div>
       )
   }
+}
+
+/**
+ * The Mac moved.
+ *
+ * Sits under "Try again" because it is the second question to ask, not the first: a
+ * Mac that is asleep and a Mac that changed address look identical from here, and
+ * retrying is cheaper than typing. But when the address really has changed — and a
+ * Cloudflare quick tunnel changes on every host restart — no amount of retrying the
+ * old one will work, and the only other way out used to be revoking the pairing.
+ *
+ * Deliberately not a primary action, and deliberately not automatic: the app does not
+ * go looking for a Mac at an address nobody gave it.
+ */
+function MovedAddress() {
+  const [open, setOpen] = useState(false)
+  const [address, setAddress] = useState('')
+  const [failure, setFailure] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const paired = store.pairedHost.value
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => {
+          setAddress(paired?.origin ?? '')
+          setOpen(true)
+        }}
+        style={{ minHeight: 'var(--target)', display: 'flex', alignItems: 'center', gap: '8px' }}
+      >
+        <Caps size="var(--fs-10)" tracking="0.12em">
+          THE MAC MOVED ·
+        </Caps>
+        <Caps size="var(--fs-10)" tracking="0.12em" color="var(--lg-cyan)">
+          CHANGE THE ADDRESS
+        </Caps>
+      </button>
+    )
+  }
+
+  const submit = async () => {
+    setBusy(true)
+    setFailure(null)
+    try {
+      const endpoint = parseEndpoint(address)
+      const problem = await store.repoint(endpoint)
+      if (problem) setFailure(problem)
+      else setOpen(false)
+    } catch (error) {
+      setFailure((error as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div class="stack" style={{ gap: '10px' }}>
+      <Caps size="var(--fs-10)" tracking="0.12em">
+        NEW ADDRESS FOR THIS MAC
+      </Caps>
+      <p
+        class="wrap"
+        style={{
+          margin: 0,
+          fontSize: 'var(--fs-13)',
+          lineHeight: 1.45,
+          color: 'var(--lg-text-secondary)',
+        }}
+      >
+        The key stays. This is the same Mac at a different address, so there is nothing
+        to pair again — no code, no trip to the menu bar.
+      </p>
+      <input
+        value={address}
+        placeholder="https://…trycloudflare.com, or 192.168.1.24"
+        aria-label="The Mac’s new address"
+        spellcheck={false}
+        autocapitalize="none"
+        autocorrect="off"
+        inputMode="url"
+        onInput={(event) => setAddress(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') void submit()
+        }}
+        class="mono"
+        style={{
+          fontSize: 'var(--fs-13)',
+          paddingInline: '12px',
+          minHeight: 'var(--target)',
+          background: 'var(--lg-panel)',
+          border: '1px solid var(--lg-hairline)',
+          borderRadius: 'var(--radius-small)',
+          color: 'var(--lg-text)',
+        }}
+      />
+      {failure ? (
+        <p
+          class="wrap"
+          role="alert"
+          style={{ margin: 0, fontSize: 'var(--fs-13)', color: 'var(--lg-red)', lineHeight: 1.45 }}
+        >
+          {failure}
+        </p>
+      ) : null}
+      <div class="row" style={{ gap: '9px' }}>
+        <SecondaryAction title="CANCEL" onClick={() => setOpen(false)} />
+        <SecondaryAction
+          title={busy ? 'CHECKING…' : 'USE IT'}
+          tint="var(--lg-cyan)"
+          border="color-mix(in srgb, var(--lg-cyan) 45%, transparent)"
+          onClick={() => {
+            if (!busy) void submit()
+          }}
+        />
+      </div>
+    </div>
+  )
 }
 
 function ClaudeHandle() {

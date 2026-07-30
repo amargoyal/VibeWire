@@ -99,6 +99,11 @@
   --radius-row: 8px;
   --radius-key: 7px;
   --radius-pill: 999px;
+  /* The outline of a screen, wherever one is drawn small: the display rows, the
+     side-by-side pair, the last-frame thumbnail. Tighter than `hairline` on purpose
+     — a 22px-tall rectangle with a 3px corner reads as a rounded box rather than a
+     monitor. */
+  --radius-screen: 2px;
   --gutter: 24px;
 
   /* The widest a column of readings is allowed to get. Every screen but the
