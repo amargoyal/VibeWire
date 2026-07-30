@@ -1,0 +1,75 @@
+# Builds the web client and publishes it to GitHub Pages.
+#
+# Deliberately knows nothing about the site's name. `web/vite.config.ts` sets
+# `base: './'`, so every asset reference is relative to the document — which makes
+# the same `dist/` correct at a user site (`https://you.github.io/`), a project site
+# (`https://you.github.io/VibeWire/`), and a custom domain, with no rebuild and no
+# value to change here when the name is decided.
+#
+# The one thing that has to happen outside this file: Settings → Pages → Build and
+# deployment → Source → **GitHub Actions**. Until that is set, this workflow builds
+# and then fails at the deploy step with "Pages site not found".
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    # The iOS app and the Mac host cannot change what is published, so they do not
+    # trigger a publish.
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publish at a time, and a newer push wins: a queue of stale deploys is worse
+# than none.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `npm ci` rather than `npm install`: the lockfile is the build, and a
+      # transitive bump arriving silently between two deploys is a change nobody
+      # reviewed.
+      - name: Install
+        run: npm ci
+        working-directory: web
+
+      # `npm run build` runs `tsc --noEmit` first, so a type error fails the deploy
+      # instead of shipping a broken bundle.
+      - name: Build
+        run: npm run build
+        working-directory: web
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

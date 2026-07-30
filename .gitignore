@@ -25,10 +25,16 @@ build/
 *.dSYM.zip
 *.dSYM
 
-# Node (channel)
+# Node (channel, web)
 node_modules/
 npm-debug.log*
 .npm/
+
+# Web client build output. Built by CI for Pages and by hand for the host, so a
+# committed copy would only ever be a stale one. `web/package-lock.json` stays
+# tracked — it is what `npm ci` builds from.
+web/dist/
+web/.vite/
 
 # Secrets — the host keeps trust records and the channel token in
 # ~/.config/vibewire, outside this repo. These patterns are a backstop in case

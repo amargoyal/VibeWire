@@ -9,13 +9,19 @@ authentication on top so the Cloudflare path is not defended by obscurity.
 
 ```
 iPhone ──┬── Tailscale (direct LAN path, or NAT-traversed, or DERP relay)
-         └── Cloudflare Tunnel (fallback)
+Browser ─┘   Cloudflare Tunnel (fallback, and the only path a page
+         └──   served over HTTPS is allowed to take)
                      │
                      ▼
               Mac host :8787
-              ├── HTTP  /v1/…      pairing, discovery
-              └── WS    /v1/socket authenticated session
+              ├── HTTP  /v1/…      pairing, discovery, verify
+              ├── WS    /v1/socket authenticated session
+              └── HTTP  /          the web client itself (web/dist)
 ```
+
+Two clients, one protocol. The iPhone app and the browser client speak the same
+version 1 and are interchangeable; where a browser cannot do something the way
+the phone does, this document says so at that point rather than forking.
 
 ## 1. Authentication
 
@@ -62,7 +68,7 @@ GET /v1/challenge?deviceId=<uuid>
 200 { "nonce": "<base64, 32 random bytes>", "expiresIn": 30 }
 ```
 
-The phone signs `"vibewire-auth-v1" || nonce` and opens the socket with:
+The client signs `"vibewire-auth-v1" || nonce` and opens the socket with:
 
 ```
 GET /v1/socket
@@ -75,6 +81,41 @@ GET /v1/socket
 A bad signature, unknown device, reused nonce, or expired nonce gets `401` and
 the TCP connection is closed without an upgrade. Nonces are single-use and held
 for 30 s.
+
+**Query-string spelling.** A browser cannot set headers on a WebSocket handshake
+— `new WebSocket(url)` takes a URL and a subprotocol list and nothing else — so
+the same three values are accepted from the query string, percent-encoded:
+
+```
+GET /v1/socket?device=<deviceId>&nonce=<base64 nonce>&sig=<base64 signature>
+  Upgrade: websocket
+```
+
+Headers win where both are present. Standard base64, not the URL-safe alphabet:
+the host decodes with `Data(base64Encoded:)`, which rejects `-` and `_`.
+
+This is not a weakening. The nonce is single-use and dead in 30 s, and the
+signature covers that nonce, so a URL that lands in a log cannot be replayed.
+Nor can a hostile page produce one: signing needs the private key, which the
+browser holds non-extractably and scopes to its own origin. Possession of the
+key is the check, which is why the host validates no `Origin` header.
+
+### 1.3 Verify (browser only)
+
+```
+GET /v1/verify?device=<deviceId>&nonce=<base64>&sig=<base64>
+200 { "ok": true, "deviceId": "<uuid>" }
+401 { "error": "unauthorized" }
+```
+
+The same challenge-response over plain HTTP. It exists because a browser cannot
+see the status line of a refused upgrade: an HTTP `401` and an unplugged cable
+both arrive as WebSocket close code `1006`. Without it a revoked browser would
+retry for the full 30 s and then report "unreachable" about a Mac that was
+answering perfectly. Asked once, on the first failure of a spell.
+
+It grants nothing — a caller who can sign the nonce could have opened the socket
+instead — and it burns the nonce like any other use.
 
 ## 2. Socket framing
 
@@ -215,3 +256,30 @@ The phone reconnects with exponential backoff (0.5 s → 8 s, capped) for 30 s
 total, matching the "GIVING UP AT 30S" readout on 03D. Input generated while
 disconnected is queued locally, capped at 64 events, and replayed in order once
 `streamState` returns to `live`. The count is surfaced as `QUEUED INPUT`.
+
+The browser client uses the same policy, with two differences the platform
+forces. Success is `onopen` rather than the first frame — a refused upgrade never
+opens, so the browser learns sooner than the phone does. And a revoked device is
+identified by asking `/v1/verify` (§1.3), because close code `1006` says nothing.
+
+## 7. Static surface
+
+Anything that is not `/v1/…` is served from the built web client, so the browser
+sees one origin for the page and the protocol both — which is what makes the
+client usable over Tailscale, where the host speaks plain HTTP and a page on
+`https://` would be forbidden from reaching it.
+
+```
+GET /                → index.html   Cache-Control: no-store
+GET /assets/<hash>.*  → the bundle   Cache-Control: immutable, 1 year
+GET /<no extension>   → index.html   so ?host=…&code=… links resolve
+```
+
+Served from the first of `VIBEWIRE_WEB_ROOT`, `~/.config/vibewire/web`, or
+`<checkout>/web/dist`. A host with none of those simply 404s; the protocol does
+not depend on it.
+
+`index.html` carries a CSP that allows only its own script and stylesheet, with
+`connect-src *` because the client may be pointed at a different address than the
+one that served it. Path traversal is refused before the filesystem is touched
+and again after resolution, and `/v1/` is never served from disk.

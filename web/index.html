@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VibeWire</title>
+    <!--
+      `viewport-fit=cover` plus the safe-area insets in longarm.css: the remote
+      view runs edge to edge, and on a notched phone in landscape the picture
+      would otherwise sit under the sensor housing.
+
+      `user-scalable=no` is a deliberate exception to the usual rule against it.
+      This document is a trackpad: a pinch on the glass has to reach the Mac's
+      zoom, and the browser's own page zoom would eat it first. Every text size
+      here is derived from the reader's root font size instead, so the accessible
+      way to make this bigger — browser or OS text size — still works.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1"
+    />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0B0D10" />
+    <meta
+      name="description"
+      content="VibeWire puts the whole Mac in a browser: its screen, its pointer, its keyboard, its clipboard."
+    />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

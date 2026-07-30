@@ -42,6 +42,10 @@ final class HostRouter: Router, @unchecked Sendable {
     private let transport: TransportManager
     private let state: Guarded<State>
 
+    /// The built web client, when there is one. Resolved once at launch — see
+    /// `Config.webRoot` — so a host without a bundle costs nothing per request.
+    private let web = WebAssets(root: Config.webRoot)
+
     weak var server: HTTPServer?
 
     init(
@@ -88,6 +92,23 @@ final class HostRouter: Router, @unchecked Sendable {
                 "expiresIn": Int(Config.nonceLifetime),
             ])
 
+        case ("GET", "/v1/verify"):
+            // Exists for the web client, and for one reason: a browser cannot see
+            // the status line of a refused WebSocket upgrade. An HTTP 401 and an
+            // unplugged cable both arrive as close code 1006, so a revoked browser
+            // would retry for the full 30 seconds and then report "unreachable"
+            // about a Mac that was answering perfectly — the collapsed-failure
+            // defect this product has already paid for once.
+            //
+            // It is the same challenge-response as the upgrade and grants nothing:
+            // a caller who can sign the nonce could have opened the socket instead,
+            // and one who cannot learns only what the upgrade would already have
+            // told them.
+            guard let device = await verifyQuery(request) else {
+                return .error(401, "unauthorized")
+            }
+            return .json(200, ["ok": true, "deviceId": device.id])
+
         case ("OPTIONS", _):
             return HTTPResponse(
                 status: 200,
@@ -100,6 +121,12 @@ final class HostRouter: Router, @unchecked Sendable {
             )
 
         default:
+            // The web client, served from the same port so the browser sees one
+            // origin for the page and the protocol both. Anything under /v1 has
+            // already been matched above, and `WebAssets` refuses that prefix too.
+            if request.method == "GET", let response = web?.response(for: request.path) {
+                return response
+            }
             return .error(404, "not_found")
         }
     }
@@ -157,14 +184,46 @@ final class HostRouter: Router, @unchecked Sendable {
 
     // MARK: Socket lifecycle
 
+    /// Two spellings of the same challenge-response, because one client cannot use
+    /// the other's.
+    ///
+    /// The phone sends `X-VibeWire-Device` / `-Nonce` / `-Signature` as headers. A
+    /// browser cannot: `new WebSocket(url)` takes a URL and a subprotocol list and
+    /// nothing else, so no header can be set on the handshake. The same three values
+    /// are accepted from the query string instead.
+    ///
+    /// This is not a weakening. The nonce is single-use and dead in 30 seconds, and
+    /// the signature covers that nonce — a URL that ends up in a proxy log is a URL
+    /// that cannot be replayed. Nor is a query string reachable by a hostile page:
+    /// signing requires the private key, which the browser holds non-extractably and
+    /// scopes to its own origin, so a cross-site socket attempt cannot produce a
+    /// signature at all. That is why no `Origin` check is needed here — possession
+    /// of the key *is* the check.
     func authenticateUpgrade(_ request: HTTPRequest) async -> TrustedDevice? {
-        guard let deviceId = request.header("x-vibewire-device"),
-              let nonce = request.header("x-vibewire-nonce"),
-              let signatureBase64 = request.header("x-vibewire-signature"),
+        guard let credentials = Self.credentials(in: request) else { return nil }
+        return await pairing.verify(
+            deviceId: credentials.deviceId,
+            nonce: credentials.nonce,
+            signature: credentials.signature
+        )
+    }
+
+    /// The same check over plain HTTP, for `GET /v1/verify`.
+    private func verifyQuery(_ request: HTTPRequest) async -> TrustedDevice? {
+        await authenticateUpgrade(request)
+    }
+
+    private static func credentials(
+        in request: HTTPRequest
+    ) -> (deviceId: String, nonce: String, signature: Data)? {
+        let deviceId = request.header("x-vibewire-device") ?? request.query["device"]
+        let nonce = request.header("x-vibewire-nonce") ?? request.query["nonce"]
+        let signatureBase64 = request.header("x-vibewire-signature") ?? request.query["sig"]
+
+        guard let deviceId, let nonce, let signatureBase64,
               let signature = Data(base64Encoded: signatureBase64)
         else { return nil }
-
-        return await pairing.verify(deviceId: deviceId, nonce: nonce, signature: signature)
+        return (deviceId, nonce, signature)
     }
 
     func socketOpened(_ socket: SocketConnection, device: TrustedDevice) async {

@@ -4,9 +4,11 @@
 
 ## Platform
 
-ios
+ios, web
 
-The iPhone app (`ios/VibeWire`, SwiftUI, iOS 17+) is the primary design surface and follows iOS conventions. The Mac host (`host/`, Swift Package) carries a second, smaller native surface — menu bar item, pairing window with code and QR, permission and fatal alerts — which follows macOS conventions, not iOS ones. A marketing/README page is a planned third surface and is web; it does not exist yet.
+The iPhone app (`ios/VibeWire`, SwiftUI, iOS 17+) is the primary design surface and follows iOS conventions. The web client (`web/`, Preact + TypeScript, built by Vite) is a full second client, not a companion: same seven screens, same Longarm system, same `protocolVersion = 1`, ported screen for screen. It is served from two places at once — GitHub Pages for the internet, and the Mac host itself at `http://<mac>:8787/` for the tailnet, because a page on `https://` may not open `ws://` and the host speaks plain HTTP by design. The Mac host (`host/`, Swift Package) carries a third, smaller native surface — menu bar item, pairing window with code and QR, permission and fatal alerts — which follows macOS conventions, not iOS ones. There is still no marketing page.
+
+Where the browser cannot do what the phone does, the web client states the difference on screen rather than degrading quietly: Settings → THIS BROWSER names where the signing key actually lives (a non-extractable `CryptoKey`, or a raw seed where WebCrypto lacks Ed25519 — never a Secure Enclave, and never implied to be one), whether this engine has a WebCodecs decoder at all, and which origin the pairing belongs to. `web/README.md` carries the full table.
 
 ## Users
 
@@ -39,7 +41,7 @@ The general remote-desktop category treats the Mac as a picture to poke at. Vibe
 
 ## Capabilities and Constraints
 
-**Shipping today (host `0.9.4`, phone `0.9.4`)**
+**Shipping today (host `0.9.4`, phone `0.9.4`, web `0.9.4`)**
 
 - Screen: up to two displays, single or side-by-side; H.264 with a 1080/720/540 ladder plus `auto`; 60 fps target; per-display renderer.
 - Input: relative trackpad with 8 sensitivity ticks, click/drag/scroll with natural-scroll toggle, pinch zoom, modifier keys (held and latched), key rows, combos, and batched text from the system keyboard.
@@ -51,6 +53,7 @@ The general remote-desktop category treats the Mac as a picture to poke at. Vibe
 
 - macOS host needs **Screen Recording** (ScreenCaptureKit) and **Accessibility** (CGEvent posting) permission. Without Accessibility, input is silently dropped — the UI must never present that as a working connection.
 - iOS needs camera (QR scan) and local network. The host serves plain HTTP/WS deliberately; `NSAllowsArbitraryLoads` is required and `NSAllowsLocalNetworking` must never be re-added alongside it (it makes iOS ignore the former).
+- The web client inherits three browser rules that cannot be coded around, only named. A page on `https://` may not open `http://` or `ws://`, so the Pages copy reaches the Mac only over the Cloudflare Tunnel and the host serves its own copy for the tailnet. A WebSocket handshake carries no custom headers, so the socket challenge-response has a query-string spelling (`PROTOCOL.md` §1.2) — additive, still version 1. And storage is per-origin, so each address the client is opened from pairs once and appears as its own device on the Mac.
 - `NWListener` does not accept on Tailscale's `utun`; a POSIX dual-stack socket owns `:8787` and splices to a loopback listener. Port conflicts are fatal and surfaced, not swallowed.
 - Claude Code runs on subscription credentials — API key env vars are stripped from the child process. No API billing is in play and nothing may imply otherwise.
 - The MCP channel that injects into a running terminal session depends on a research-preview flag (`--dangerously-load-development-channels`) and may break.
@@ -72,6 +75,7 @@ The general remote-desktop category treats the Mac as a picture to poke at. Vibe
 - `PROTOCOL.md` — complete wire protocol, authoritative for message names and payloads.
 - `HANDOFF.md` — engineering log of fixed defects and known gotchas. Historical; some entries are already superseded.
 - E2E harness (`scratchpad/e2e.swift`) verified the full path end to end: wrong-code rejection, pairing, Ed25519 handshake, WebSocket upgrade, 25 Claude sessions, 608 KB of H.264 in 4 s.
+- `web/e2e.mjs` — the browser spelling of the same path, checked into the repo and runnable against any host that is showing a code: query-string credentials, pairing, nonce reuse, forged signatures, and the static server's traversal refusals.
 - **No** customers, testimonials, reviews, install counts, benchmarks against competitors, press, pricing, or App Store presence exist. None may be invented on any surface, including the future landing page.
 
 ## Product Principles

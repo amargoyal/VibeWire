@@ -1,0 +1,672 @@
+/*
+ * The Longarm design system, ported from ios/VibeWire/Design/Longarm.swift.
+ *
+ * Rules the whole client obeys, unchanged from the phone:
+ *  - Dark only. There is no light mode and no `prefers-color-scheme` branching.
+ *  - Colour reports a condition, never decorates. Green reachable, amber
+ *    degraded, red lost. Cyan is reserved for the user's own input — held keys,
+ *    Claude, active selection — so machine state and user state never look alike.
+ *  - Monospace for anything measured. The system sans for names, prose and
+ *    answers. Both scale with the reader's text size; nothing renders under 9px.
+ *  - Hairlines instead of cards. No shadows inside the app.
+ *  - Reduce Motion takes the travel and the scale, never the fact that something
+ *    happened, and never the spinner.
+ */
+
+:root {
+  /* Condition */
+  --lg-green: #58d9a3;
+  --lg-amber: #e8b45a;
+  --lg-red: #e4685a;
+  --lg-cyan: #6bc7e8;
+
+  /* Ground */
+  --lg-chrome: #14171c;
+  --lg-screen: #0b0d10;
+  --lg-deep: #08090b;
+  --lg-panel: #101318;
+  --lg-raised: #0e1116;
+  --lg-code: #0b0e12;
+
+  /* Ink — four steps, each measured against the ground it lands on.
+     text 16.3:1 · text-secondary 6.9:1 · text-tertiary 4.8:1
+     text-disabled 1.7:1, deliberately below the text threshold, so it is not
+     for text: disabled control ink and dormant indicator fills only. */
+  --lg-text: #e9ebee;
+  --lg-text-secondary: #949aa5;
+  --lg-text-tertiary: #7c8493;
+  --lg-text-disabled: #3a404a;
+  --lg-on-amber-wash: #c9a468;
+  --lg-context: #a8aeb8;
+  --lg-code-ink: #d5dbe3;
+  --lg-you: #c3c8d0;
+
+  /* Lines */
+  --lg-hairline: #262b33;
+  --lg-hairline-dim: #1a1e24;
+  --lg-stroke: #2e343d;
+
+  /* Ink on a filled action */
+  --lg-on-green: #06130d;
+  --lg-on-amber: #170f02;
+  --lg-on-cyan: #04141b;
+  --lg-on-red: #1b0805;
+
+  /* Type. Sizes are the phone's designed point values expressed against the
+     reader's root font size, so raising the browser or OS text size scales the
+     whole instrument the way Dynamic Type does on iOS. The `max()` is the 9pt
+     floor: the instrument is dense on purpose, but a 6px caption is not
+     density — it is a value nobody can read. */
+  --lg-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --lg-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --fs-9: max(9px, 0.5625rem);
+  --fs-10: max(9px, 0.625rem);
+  --fs-11: max(9px, 0.6875rem);
+  --fs-12: max(9px, 0.75rem);
+  --fs-13: max(9px, 0.8125rem);
+  --fs-14: max(9px, 0.875rem);
+  --fs-15: max(9px, 0.9375rem);
+  --fs-16: 1rem;
+  --fs-17: 1.0625rem;
+  --fs-19: 1.1875rem;
+  --fs-22: 1.375rem;
+  --fs-24: 1.5rem;
+  --fs-27: 1.6875rem;
+  --fs-30: 1.875rem;
+  --fs-46: 2.875rem;
+
+  /* Tracking on all-caps mono, per the spec sheet: 1.4pt at 10pt. */
+  --caps-tracking: 0.14em;
+
+  /* Metrics */
+  --target: 44px;
+  --primary-action: 76px;
+  --hub-button: 56px;
+  --radius-hairline: 3px;
+  --radius-small: 6px;
+  --radius-medium: 10px;
+  --radius-large: 12px;
+
+  /* Three shapes the incumbent uses constantly and never named.
+     `LG.Metric` on the phone stops at the four above, and then the screens reach
+     past it for a bare `8` twenty-odd times — every list row, key cap, tool ledger
+     and tray — a bare `7` for the keyboard-bar keys, and `Capsule()` for the pill
+     buttons. Carried over as tokens rather than as literals: the same values, in one
+     place, so the next change to a row's corner is one edit and not twenty-four. */
+  --radius-row: 8px;
+  --radius-key: 7px;
+  --radius-pill: 999px;
+  --gutter: 24px;
+
+  /* The widest a column of readings is allowed to get. Every screen but the
+     remote view is a single column of label-on-the-left, value-on-the-right
+     rows; run that to the glass on a desktop monitor and the two ends stop
+     reading as one line. Bounded and centred, the same column reads as a
+     deliberate panel at any width — which is the whole of the large-screen
+     story, and it never asks what device it is running on. */
+  --measure: 560px;
+
+  /* 120–180 ms, only for state changes and to hint at touch. */
+  --state-change: 150ms;
+
+  /* Safe areas, so the remote view can run edge to edge without hiding
+     controls under a home indicator or a sensor housing. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: dark;
+  /* Held keys and pinch-to-zoom on the glass belong to the Mac, not to the
+     browser's own selection and page zoom. */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--lg-screen);
+  color: var(--lg-text);
+  font-family: var(--lg-sans);
+  font-size: var(--fs-15);
+  /* `overscroll-behavior: none` stops the pull-to-refresh that would otherwise
+     fire on the first downward swipe over the trackpad. */
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100%;
+  display: flow-root;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  /* Every tappable thing in this app is at least 44px, and a double tap on one
+     must not be read as a page zoom. */
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  margin: 0;
+}
+
+/* Keyboard focus is the only way to drive this client on a laptop, so it is
+   drawn deliberately rather than left to the browser default over a dark
+   ground. Cyan, because focus is the user's own state. */
+:focus-visible {
+  outline: 2px solid var(--lg-cyan);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduce Motion is about the vestibular system, not about stillness: what has
+   to go is travel, scale and parallax, not the fact that something appeared.
+   The one exception is the activity spinner — a small rotating arc is not a
+   trigger, and freezing one would say the host had stopped answering, which is
+   a claim this app is not allowed to make without having measured it. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.lg-spinner) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Type helpers ─────────────────────────────────────────────────────── */
+
+.mono {
+  font-family: var(--lg-mono);
+  font-variant-ligatures: none;
+}
+
+/* All-caps monospace with the spec's tracking. Used for every readout heading,
+   status line and unit. The trailing letter-space is trimmed so a tracked run
+   still sits flush against whatever follows it. */
+.caps {
+  font-family: var(--lg-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--caps-tracking);
+  color: var(--lg-text-tertiary);
+  font-size: var(--fs-10);
+  line-height: 1.25;
+  white-space: pre-wrap;
+}
+
+.sans {
+  font-family: var(--lg-sans);
+}
+
+/* ── Structure ────────────────────────────────────────────────────────── */
+
+.screen {
+  background: var(--lg-screen);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen--scrolls {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.column {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: calc(var(--gutter) + var(--safe-left));
+  padding-block-start: var(--safe-top);
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hairline {
+  height: 1px;
+  background: var(--lg-hairline-dim);
+  flex: 0 0 auto;
+}
+
+/* A dashed rule that stands in for a live value the host has not reported yet.
+   The layout does not move when the real value arrives — it just fills in. */
+.dashed-rule {
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    var(--lg-stroke) 0 4px,
+    transparent 4px 8px
+  );
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+}
+
+.panel {
+  background: var(--lg-raised);
+  border: 1px solid var(--lg-hairline);
+  border-radius: var(--radius-medium);
+}
+
+.panel--tinted {
+  background: color-mix(in srgb, var(--tint) 5%, transparent);
+  border-color: color-mix(in srgb, var(--tint) 30%, transparent);
+}
+
+/* ── Indicators ───────────────────────────────────────────────────────── */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* Pulse rate carries meaning: a thin link blinks faster than a healthy one.
+   The pulse is emphasis, not information — the colour already reports the
+   condition and the label beside it spells it out — so it is safe to hold
+   still, at full opacity, never mid-fade. */
+.dot--pulse {
+  animation: lg-pulse 2.6s ease-in-out infinite alternate;
+}
+
+.dot--pulse-fast {
+  animation-duration: 1.4s;
+}
+
+@keyframes lg-pulse {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dot--idle {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--lg-text-tertiary);
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+
+.bars > i {
+  width: 4px;
+  background: var(--lg-stroke);
+  display: block;
+}
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 22px;
+}
+
+.spark > i {
+  width: 4px;
+  display: block;
+  background: currentColor;
+  opacity: 0.42;
+}
+
+.spark > i.spark--now {
+  opacity: 1;
+}
+
+/* The one loop that keeps running under Reduce Motion. See the note above. */
+.lg-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  border-right-color: transparent;
+  animation: lg-spin 0.9s linear infinite;
+}
+
+@keyframes lg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.caret {
+  width: 2px;
+  background: var(--lg-cyan);
+  animation: lg-blink 1.1s step-end infinite;
+}
+
+@keyframes lg-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+
+/* The 76px primary action. Carries its own preflight in the sub-label, because
+   the button should say what it is about to do and how long it will take.
+   `min-height`, not `height`: at a large text size a fixed 76px clips the very
+   sentence that says what the action costs. */
+.primary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: var(--primary-action);
+  padding-inline: 22px;
+  border-radius: var(--radius-medium);
+  background: var(--tint);
+  color: var(--ink);
+  text-align: left;
+}
+
+.primary:disabled {
+  opacity: 0.45;
+}
+
+.primary__title {
+  font-size: var(--fs-19);
+  font-weight: 500;
+  display: block;
+}
+
+.primary__detail {
+  display: block;
+  margin-top: 3px;
+  /* 0.66 put this at 4.50:1 on the cyan fill, which is the threshold to three
+     decimal places; 0.72 gives it actual margin on all four tints. */
+  opacity: 0.72;
+  color: inherit;
+}
+
+.primary__glyph {
+  margin-left: auto;
+  font-family: var(--lg-mono);
+  font-size: var(--fs-22);
+}
+
+.secondary {
+  width: 100%;
+  min-height: var(--target);
+  border: 1px solid var(--lg-hairline);
+  border-radius: var(--radius-small);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.segmented {
+  display: flex;
+  gap: 1px;
+  background: var(--lg-hairline-dim);
+  border: 1px solid var(--lg-hairline-dim);
+  border-radius: var(--radius-small);
+  overflow: hidden;
+}
+
+.segmented > button {
+  flex: 1 1 0;
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--lg-raised);
+  transition: background var(--state-change) ease-out;
+}
+
+.segmented > button[aria-selected='true'] {
+  background: color-mix(in srgb, var(--lg-cyan) 14%, transparent);
+}
+
+/* Drawn in the system's shape but the app's colours. */
+.toggle {
+  width: 52px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--lg-stroke);
+  background: var(--lg-chrome);
+  position: relative;
+  flex: 0 0 auto;
+  transition:
+    background var(--state-change) ease-out,
+    border-color var(--state-change) ease-out;
+}
+
+.toggle[aria-checked='true'] {
+  border-color: var(--lg-cyan);
+  background: color-mix(in srgb, var(--lg-cyan) 30%, transparent);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--lg-text-tertiary);
+  transition:
+    transform var(--state-change) ease-out,
+    background var(--state-change) ease-out;
+}
+
+.toggle[aria-checked='true']::after {
+  transform: translateX(22px);
+  background: var(--lg-cyan);
+}
+
+/* A key cap. Cyan and dotted when held — the app's one signal for "this is
+   still down", used identically on the hub, the modifier bar and the key row. */
+.cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 46px;
+  border-radius: var(--radius-row);
+  background: var(--lg-chrome);
+  border: 1px solid var(--lg-stroke);
+  position: relative;
+  flex: 1 1 0;
+  transition:
+    background var(--state-change) ease-out,
+    border-color var(--state-change) ease-out;
+}
+
+.cap--held {
+  background: color-mix(in srgb, var(--lg-cyan) 18%, transparent);
+  border-color: var(--lg-cyan);
+  color: var(--lg-cyan);
+}
+
+.cap--held::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--lg-cyan);
+}
+
+.cap__glyph {
+  font-family: var(--lg-mono);
+  font-size: var(--fs-15);
+  color: var(--lg-text);
+}
+
+.cap--held .cap__glyph {
+  color: var(--lg-cyan);
+}
+
+/* ── Video chrome ─────────────────────────────────────────────────────── */
+
+/* The ground any mark needs when it sits on the Mac's picture. Defined once so
+   a caption, a badge and a readout cannot drift apart.
+
+   Alpha cannot be verified against content nobody controls: these captions were
+   white at 34%, which measures 2.9:1 over a black desktop, 1.5:1 over a grey
+   one, and 1.0:1 — invisible — over a white document, which is what a text
+   editor actually looks like. The text is solid now and carries its own ground
+   at 92%. */
+.video-chip {
+  padding: 3px 6px;
+  background: color-mix(in srgb, var(--lg-deep) 92%, transparent);
+}
+
+/* ── Sheets ───────────────────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, #060709 72%, transparent);
+  z-index: 40;
+}
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--lg-screen);
+  animation: lg-rise var(--state-change) ease-out;
+}
+
+/* Half height over a live picture, full height over Home — a fact about what is
+   underneath, not a remembered preference. */
+.sheet--half {
+  top: auto;
+  height: min(74dvh, 100dvh);
+  border-top: 1px solid var(--lg-hairline);
+  border-radius: var(--radius-large) var(--radius-large) 0 0;
+}
+
+.sheet--bottom {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 60;
+  animation: lg-rise var(--state-change) ease-out;
+}
+
+@keyframes lg-rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Travel is what Reduce Motion means; arrival is not. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes lg-rise {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* ── Layout atoms used across screens ─────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row--baseline {
+  align-items: baseline;
+}
+
+.row--top {
+  align-items: flex-start;
+}
+
+.spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Truncating a path from the front keeps the filename, which is the half that
+   identifies it. */
+.ellipsis--head {
+  direction: rtl;
+  text-align: left;
+}
+
+.ellipsis--head > span {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

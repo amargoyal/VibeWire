@@ -64,6 +64,45 @@ enum Config {
         configDirectory.appendingPathComponent("config.json")
     }
 
+    /// Where the built web client lives, or nil if it was never built.
+    ///
+    /// Three places, in order of how deliberate they are:
+    ///
+    ///  1. `VIBEWIRE_WEB_ROOT`, for anyone who wants to point the host at a bundle
+    ///     somewhere else entirely.
+    ///  2. `~/.config/vibewire/web`, which is where `web/deploy-to-host.sh` copies a
+    ///     release build. This is the one an installed host uses.
+    ///  3. `<repo>/web/dist`, found by walking up from this file's own compile-time
+    ///     path. Only ever true for a host built from the checkout, which is exactly
+    ///     when it is wanted: `npm run build` in `web/` and the running host serves
+    ///     the new client with no copy step.
+    static var webRoot: URL? {
+        let manager = FileManager.default
+
+        if let override = ProcessInfo.processInfo.environment["VIBEWIRE_WEB_ROOT"], !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
+        }
+
+        let installed = configDirectory.appendingPathComponent("web", isDirectory: true)
+        if manager.fileExists(atPath: installed.appendingPathComponent("index.html").path) {
+            return installed
+        }
+
+        // .../host/Sources/VibeWireHost/Core/Config.swift → .../web/dist
+        let checkout = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Core/
+            .deletingLastPathComponent()   // VibeWireHost/
+            .deletingLastPathComponent()   // Sources/
+            .deletingLastPathComponent()   // host/
+            .deletingLastPathComponent()   // the checkout root
+            .appendingPathComponent("web/dist", isDirectory: true)
+        if manager.fileExists(atPath: checkout.appendingPathComponent("index.html").path) {
+            return checkout
+        }
+
+        return nil
+    }
+
     static func loadSettings() -> HostSettings {
         guard let data = try? Data(contentsOf: settingsURL),
               let decoded = try? JSONDecoder().decode(HostSettings.self, from: data)

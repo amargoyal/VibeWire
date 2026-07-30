@@ -122,3 +122,39 @@ E2E harness (`scratchpad/e2e.swift`, run with the pairing code as argv[1]) passe
 - Host serves plain HTTP/WS, no TLS: Tailscale is WireGuard already, cloudflared terminates TLS at the edge, Ed25519 defends the Cloudflare path.
 - Swift 6 strict concurrency: `NSLock.lock()` is unavailable in async contexts. Use `Guarded` (`Core/Guarded.swift`), not `OSAllocatedUnfairLock`.
 - Simulator geometry: device 402×874pt, screenshots 1206×2622 (÷3 for points).
+
+## Web client
+
+`web/` is a full second client, ported screen for screen from `ios/VibeWire`. Preact + TypeScript, Vite, 50 KB gzipped. `npm run build` runs `tsc --noEmit` first, so a type error cannot ship.
+
+Two host changes were needed and both are additive — still `protocolVersion = 1`:
+
+- **Query-string socket auth.** A browser cannot set headers on a WebSocket handshake, so `device` / `nonce` / `sig` are accepted from the query string as well (`HostRouter.credentials(in:)`). Headers win where both are present. Standard base64, not URL-safe: `Data(base64Encoded:)` rejects `-` and `_`. Percent-encoding survives `HTTPRequest.parse`, which calls `removingPercentEncoding` on query values — verified, and it is the one thing in the change that would silently break everything if it did not.
+- **`GET /v1/verify`.** Same challenge-response over plain HTTP. Exists because a browser cannot see the status line of a refused upgrade: HTTP 401 and an unplugged cable both arrive as close code 1006. Without it a revoked browser retries for 30 s and then blames the network.
+
+Plus `WebAssets.swift`, which serves `web/dist` for anything outside `/v1/`. Root resolves from `VIBEWIRE_WEB_ROOT`, then `~/.config/vibewire/web` (filled by `web/deploy-to-host.sh`), then `<checkout>/web/dist` via `#filePath`. **The `#filePath` walk needs five `deletingLastPathComponent()` calls, not four** — four lands on `host/`, which silently 404s everything.
+
+### The constraint that shaped the whole thing
+
+A page on `https://` may not open `http://` or `ws://`. The host serves plain HTTP by design, so GitHub Pages can only reach the Mac through the Cloudflare tunnel, and the tailnet needs the host to serve its own copy of the bundle. Hence two homes for one build. `vite.config.ts` sets `base: './'` so the same `dist/` works at a user site, a project site, a custom domain, and `http://<mac>:8787/` — which is why picking the Pages name needs no code change.
+
+Chromium treats loopback as trustworthy and Safari does not, so `http://localhost` from an HTTPS page is reported as a warning rather than blocked or fine. `net/endpoint.ts` owns all three verdicts.
+
+### Verifying
+
+`node web/e2e.mjs <code>` against a host started with `--pair`. Speaks the browser spelling without a browser. Traversal attempts go over a raw socket on purpose — `fetch` normalises `/../x` to `/x` before the request leaves, so going through it tests the client and not the host.
+
+Verified this session: static serving, cache headers, CSP, hashed-asset fetch, six traversal attempts refused (403/404, nothing leaked), `/v1/verify` 401 on a forged nonce. **Not** verified: pairing and the socket, because the trust store would not open — see below.
+
+### Gotchas found
+
+- The trust store is unreadable from a sandboxed shell: keychain reads time out after 45 s and `~/.config/vibewire/devices.secret` gives `EPERM` despite mode 600 and correct ownership. Both stores failing surfaces as `pair rejected 401 bad_code` with the real cause only in the host log — the `default:` catch in `handlePair` swallows a store failure into a wrong-code answer, which is a mislabel worth fixing.
+- `VIBEWIRE_SECRET_STORE=file` does not escape it: `homeDirectoryForCurrentUser` reads `getpwuid`, not `$HOME`, so overriding `HOME` does not move the file store.
+- `Log` output is block-buffered when stdout is not a tty. Run the host under `script -q /dev/null` to read it live from a pipe.
+- The host answers every request with `Connection: keep-alive` regardless of what was asked, so a raw HTTP client waiting for `end` waits forever.
+- `--pair`'s rotation timer calls `endPairing()` as soon as the pairing window is not visible. Read the code from the log immediately; it is good for 60 s.
+
+### Answered here, still open on the phone
+
+- SHOT: the phone stores `lastScreenshot` and renders it nowhere. The web client shows it with Save PNG and Copy Image, because a browser cannot put an image on the clipboard silently.
+- `drag`: the protocol carries it and `RemoteView.isDragging` is never set true, so the phone cannot start one. The web client does — mouse button down and move, or press-and-hold then move on touch.
