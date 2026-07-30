@@ -471,19 +471,35 @@ export class Store {
       return
     }
 
-    // Already paired with this Mac: a stale link in history must not tear down a
-    // working session and burn a code that has since rotated.
-    if (this.pairedHost.value) return
-
     const address = parameters.get('host') ?? location.origin
+    let endpoint: Endpoint
     try {
       const port = Number(parameters.get('port') ?? 8787)
-      const endpoint = parseEndpoint(address, Number.isFinite(port) ? port : 8787)
-      const failure = await this.completePairing(endpoint, code)
-      if (failure) this.banner.value = failure
+      endpoint = parseEndpoint(address, Number.isFinite(port) ? port : 8787)
     } catch (error) {
       this.banner.value = (error as Error).message
+      return
     }
+
+    const paired = this.pairedHost.value
+    if (paired) {
+      // Already paired. Two cases, and the difference matters.
+      //
+      // Same address: a stale link in history, or a reload. Ignore it — pairing again
+      // would tear down a working session and burn a code that has since rotated.
+      if (paired.origin === endpoint.origin) return
+
+      // Different address: the Mac moved, and scanning the QR again is exactly what
+      // anyone would do about it. Follow it rather than trading keys — the key and the
+      // device id do not depend on where the Mac is, and this is the fix for a
+      // Cloudflare quick tunnel whose hostname changes on every host restart.
+      const problem = await this.repoint(endpoint)
+      this.banner.value = problem ?? null
+      return
+    }
+
+    const failure = await this.completePairing(endpoint, code)
+    if (failure) this.banner.value = failure
   }
 
   private connectionChanged(state: ConnectionState): void {
