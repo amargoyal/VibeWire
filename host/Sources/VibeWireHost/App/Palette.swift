@@ -24,14 +24,39 @@ enum Palette {
     static let screen = NSColor(srgbRed: 0x0F / 255, green: 0x11 / 255, blue: 0x14 / 255, alpha: 1)
     static let raised = NSColor(srgbRed: 0x18 / 255, green: 0x1A / 255, blue: 0x1F / 255, alpha: 1)
     static let raised2 = NSColor(srgbRed: 0x22 / 255, green: 0x25 / 255, blue: 0x2B / 255, alpha: 1)
+    /// `raised` measured against `deep` rather than against `screen` — the same
+    /// apparent step, on the darker ground the remote view uses. The Mac draws
+    /// no remote view and so spends neither of these today; they are stated
+    /// because a palette that is a subset of the other two clients' is a palette
+    /// that drifts the next time this window grows a surface.
+    static let chrome = NSColor(srgbRed: 0x14 / 255, green: 0x16 / 255, blue: 0x1A / 255, alpha: 1)
+    static let chrome2 = NSColor(srgbRed: 0x19 / 255, green: 0x1B / 255, blue: 0x1E / 255, alpha: 1)
 
+    /// Four steps of ink, each measured against the ground it lands on:
+    /// `text` 15.9:1, `textSecondary` 7.4:1, `textTertiary` 4.6:1 on `screen`.
+    /// `textFaint` is 3.1:1 and deliberately below the body threshold — it is
+    /// for an all-caps footnote repeating something already stated above, never
+    /// for a sentence carrying information on its own.
     static let text = NSColor(srgbRed: 0xF2 / 255, green: 0xF3 / 255, blue: 0xF6 / 255, alpha: 1)
     static let textSecondary = NSColor(srgbRed: 0xA5 / 255, green: 0xA9 / 255, blue: 0xB1 / 255, alpha: 1)
     static let textTertiary = NSColor(srgbRed: 0x77 / 255, green: 0x7C / 255, blue: 0x84 / 255, alpha: 1)
     static let textFaint = NSColor(srgbRed: 0x5F / 255, green: 0x63 / 255, blue: 0x6B / 255, alpha: 1)
+    /// Not for text at all: a dormant indicator fill, or the ink of a control
+    /// that cannot be used. Nothing a reader is meant to read lands on this.
+    static let textDisabled = NSColor(srgbRed: 0x3F / 255, green: 0x43 / 255, blue: 0x49 / 255, alpha: 1)
 
     static let hairline = NSColor(srgbRed: 0x26 / 255, green: 0x29 / 255, blue: 0x2F / 255, alpha: 1)
     static let stroke = NSColor(srgbRed: 0x2F / 255, green: 0x33 / 255, blue: 0x39 / 255, alpha: 1)
+
+    /// Ink on a filled action. Each is its own tint taken down to a near-black
+    /// of the same hue, so a filled button reads as one object rather than as
+    /// black text sitting on colour. Named here rather than left to the call
+    /// site, because "near-black of the same hue" is exactly the kind of value a
+    /// call site invents differently every time it needs one.
+    static let onGreen = NSColor(srgbRed: 0x00 / 255, green: 0x2D / 255, blue: 0x1D / 255, alpha: 1)
+    static let onAmber = NSColor(srgbRed: 0x2E / 255, green: 0x1B / 255, blue: 0x00 / 255, alpha: 1)
+    static let onAccent = NSColor(srgbRed: 0x0E / 255, green: 0x14 / 255, blue: 0x2C / 255, alpha: 1)
+    static let onRed = NSColor(srgbRed: 0x23 / 255, green: 0x07 / 255, blue: 0x07 / 255, alpha: 1)
 
     /// Corners, in the same three steps every client uses: a card is 20, the
     /// control inside it is 16, the control inside *that* is 12.

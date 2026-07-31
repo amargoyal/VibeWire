@@ -286,7 +286,11 @@ final class MenuBarController: NSObject {
             for index in 0..<6 {
                 let x = 28 + CGFloat(index) * (boxWidth + boxGap)
                 let box = NSView(frame: NSRect(x: x, y: 318, width: boxWidth, height: 78))
-                box.fill(Palette.raised, radius: 14)
+                // A digit box is a control, so it takes the control corner —
+                // the same 16 the phone draws its own six boxes with, which is
+                // the whole point of the two screens being compared side by
+                // side.
+                box.fill(Palette.raised, radius: Palette.Radius.control)
                 content.addSubview(box)
 
                 let digit = NSTextField(labelWithString: "")
@@ -316,7 +320,10 @@ final class MenuBarController: NSObject {
             ].enumerated() {
                 let x = 28 + CGFloat(index) * (cardWidth + 14)
                 let card = NSView(frame: NSRect(x: x, y: 92, width: cardWidth, height: 114))
-                card.fill(Palette.raised, radius: Palette.Radius.control)
+                // These are cards — they contain the plate and its caption —
+                // so they take 20, not the 16 of a control. The plate inside
+                // stays a step tighter, which is what makes it read as nested.
+                card.fill(Palette.raised, radius: Palette.Radius.card)
                 content.addSubview(card)
 
                 let plate = NSView(frame: NSRect(x: 14, y: 14, width: 86, height: 86))
