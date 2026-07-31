@@ -74,6 +74,7 @@ typography:
     fontWeight: 400
     letterSpacing: "normal"
 rounded:
+  bar: "1pt"
   screen: "3pt"
   sm: "8pt"
   inner: "12pt"
@@ -286,7 +287,7 @@ Lines survive only where a gap cannot do the job: the divider in the wide header
 
 ## Shapes
 
-A corner ladder taken from the containment depth rather than from a t-shirt scale: **card 20**, **control 16**, **inner 12**, **small 8**, **screen 3**. A drawer takes **28** on its top corners only, larger than a card's so it reads as arriving from off-screen rather than as a card that grew. The screen radius is deliberately tight — a 22 pt rectangle with a 16 pt corner reads as a pill, not as a monitor.
+A corner ladder taken from the containment depth rather than from a t-shirt scale: **card 20**, **control 16**, **inner 12**, **small 8**, **screen 3**, **bar 1**. The last two are not containers: `screen` is the outline of a monitor drawn small, and `bar` is the tip of a 3 pt bar in the signal strength and the RTT trace — square-ended, a row of twenty of them is a picket fence. A drawer takes **28** on its top corners only, larger than a card's so it reads as arriving from off-screen rather than as a card that grew. The screen radius is deliberately tight — a 22 pt rectangle with a 16 pt corner reads as a pill, not as a monitor.
 
 **Grouped rows use two radii.** The outer corners of the run take 16; the seams between rows take 4. That is what makes a run of rows read as one object while each row keeps its own 2 pt gap and its own tap target. The rule lives in CSS `:first-child` / `:last-child` and in a `GroupPosition` enum on iOS, so a row never has to be told where in the list it sits.
 

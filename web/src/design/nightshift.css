@@ -153,6 +153,11 @@
   --radius-inner: 12px;
   --radius-small: 8px;
   --radius-pill: 999px;
+  /* The tip of a 3px bar: signal strength, the RTT trace, the sensitivity
+     ticks. Small enough that it reads as a softened end rather than as a
+     rounded shape, which is the whole of its job — a square-ended 3px bar in a
+     row of nine is a picket fence. */
+  --radius-bar: 1px;
   /* A drawer's top corners, larger than a card's so it reads as arriving from
      off-screen rather than as a card that grew. */
   --radius-drawer: 28px;
@@ -490,7 +495,7 @@ textarea {
 
 .bars > i {
   width: 3px;
-  border-radius: 1px;
+  border-radius: var(--radius-bar);
   background: var(--ns-stroke);
   display: block;
 }
@@ -504,7 +509,7 @@ textarea {
 
 .spark > i {
   width: 3px;
-  border-radius: 1px;
+  border-radius: var(--radius-bar);
   display: block;
   background: currentColor;
   opacity: 0.35;
