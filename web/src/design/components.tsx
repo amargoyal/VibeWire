@@ -748,6 +748,19 @@ export function spokenGlyph(glyph: string): string {
   }
 }
 
+/**
+ * "TAP" on glass, "CLICK" with a mouse.
+ *
+ * The same instrument runs under a thumb and under a trackpad, and a laptop being
+ * told to tap is the small wrongness that says a page was written for something
+ * else and handed over. Read from the pointer the device reports rather than from
+ * a user-agent string, and read at render, because a tablet can gain a trackpad
+ * between one screen and the next.
+ */
+export function tapVerb(): string {
+  return matchMedia('(pointer: coarse)').matches ? 'TAP' : 'CLICK'
+}
+
 // MARK: - Sheets
 
 /** What a keyboard can land on. Order is document order, which is tab order. */
@@ -779,15 +792,16 @@ const sheetStack: Array<{ node: HTMLElement | null; dismiss?: () => void }> = []
  * and focus returns to whatever opened the sheet when it closes, so the next Tab
  * carries on from where it was rather than from the top of the document.
  *
- * `focus` picks where the keyboard lands. It is `last` on a destructive sheet,
- * where the first control is the irreversible one and a stray Return on an
- * auto-focused button is exactly the accident the sheet exists to prevent.
+ * Focus lands on the sheet itself, never on the first control inside it. Focusing
+ * a button draws a ring on it the moment the sheet opens — which reads as an error
+ * on a DONE that nobody has touched — and on a destructive sheet it puts Return on
+ * the irreversible answer. The dialog takes focus; the first Tab reaches the first
+ * control, which is where it should have come from.
  *
  * Returns the ref to put on the dialog element.
  */
 export function useSheet<T extends HTMLElement = HTMLDivElement>(
   onDismiss?: () => void,
-  { focus = 'first' }: { focus?: 'first' | 'last' } = {},
 ): RefObject<T> {
   const container = useRef<T | null>(null)
   const dismiss = useRef(onDismiss)
@@ -800,13 +814,8 @@ export function useSheet<T extends HTMLElement = HTMLDivElement>(
     sheetStack.push(entry)
 
     if (node) {
-      const focusables = focusablesIn(node)
-      const target = focus === 'last' ? focusables[focusables.length - 1] : focusables[0]
-      if (target) target.focus()
-      else {
-        node.tabIndex = -1
-        node.focus()
-      }
+      node.tabIndex = -1
+      node.focus({ preventScroll: true })
     }
 
     const onKey = (event: KeyboardEvent) => {

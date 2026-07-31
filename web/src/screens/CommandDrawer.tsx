@@ -28,6 +28,7 @@ import {
   KeyCap,
   MODIFIERS,
   modifierGlyph,
+  tapVerb,
   Tile,
   useSheet,
 } from '../design/components'
@@ -176,7 +177,7 @@ export function CommandDrawer() {
               tracking="0.16em"
               color={held.length ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
             >
-              {held.length ? 'HELD UNTIL RELEASED' : 'TAP TO LATCH'}
+              {held.length ? 'HELD UNTIL RELEASED' : `${tapVerb()} TO LATCH`}
             </Caps>
             <span class="spacer" />
             <Caps size="var(--fs-9)" tracking="0.12em">

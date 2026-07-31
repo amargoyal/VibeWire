@@ -43,6 +43,7 @@ import {
   Segmented,
   SheetDismiss,
   SectionLabel,
+  tapVerb,
   TimelineMark,
   type TimelineState,
   useSheet,
@@ -113,7 +114,9 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
       aria-modal="true"
       aria-label="Claude"
     >
-      <ScreenBody>
+      <div class="wide-shell">
+        <div class="column wide-column claude" style={{ paddingBottom: 0 }}>
+          <div class="claude__head">
         {/* The one thing the system does not know: which Mac this is talking to,
             and how far away it is. */}
         <div class="row" style={{ minHeight: '40px', paddingTop: '6px', flex: '0 0 auto' }}>
@@ -191,11 +194,22 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             <SessionHeader onPick={() => (store.showSessionPicker.value = true)} />
           </div>
         ) : null}
+          </div>
 
-        <div
-          ref={transcript}
-          style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingTop: '22px' }}
-        >
+          {/* What the session is doing, as opposed to what was said. On a laptop it
+              moves to a rail of its own; on a phone it stays where it was, under the
+              conversation, because there is only one column to put it in. */}
+          <div class="claude__rail wide-only">
+            <SessionWork
+              toolCalls={toolCalls}
+              changedFiles={changedFiles}
+              expanded={filesExpanded}
+              onToggleFiles={() => setFilesExpanded((current) => !current)}
+              dimmed={permission != null}
+            />
+          </div>
+
+        <div ref={transcript} class="claude__talk">
           <div class="stack" style={{ gap: '20px' }}>
             {/* Everything that is not the question dims while one is pending. */}
             <div
@@ -213,21 +227,14 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
                 <TurnView key={turn.id} turn={turn} />
               ))}
 
-              {toolCalls.length ? (
-                <div class="timeline">
-                  {toolCalls.map((call) => (
-                    <ToolRow key={call.id} call={call} />
-                  ))}
-                </div>
-              ) : null}
-
-              {changedFiles.length ? (
-                <FileList
-                  files={changedFiles}
+              <div class="narrow-only stack" style={{ gap: '20px' }}>
+                <SessionWork
+                  toolCalls={toolCalls}
+                  changedFiles={changedFiles}
                   expanded={filesExpanded}
-                  onToggle={() => setFilesExpanded((current) => !current)}
+                  onToggleFiles={() => setFilesExpanded((current) => !current)}
                 />
-              ) : null}
+              </div>
 
               {store.claudeStreaming.value ? (
                 <div class="row" style={{ gap: '9px' }}>
@@ -251,6 +258,7 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
           </div>
         </div>
 
+        <div class="claude__ask">
         {/* Follow-ups as two thumb chips rather than another typing session. */}
         {suggestions.length ? (
           <div class="row" style={{ gap: '8px', marginTop: '12px', flex: '0 0 auto' }}>
@@ -373,7 +381,9 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             </button>
           )}
         </div>
-      </ScreenBody>
+        </div>
+        </div>
+      </div>
 
       {store.showSessionPicker.value ? (
         <SessionPicker onClose={() => (store.showSessionPicker.value = false)} />
@@ -391,7 +401,7 @@ function SessionHeader({ onPick }: { onPick: () => void }) {
     // of them shows up on the Mac.
     if (store.claudeIsLive.value) return 'LIVE · SHARED WITH YOUR TERMINAL'
     if (store.claudeOpening.value) return 'STARTING · SEND A MESSAGE TO BEGIN'
-    if (store.claudeSessionId.value == null) return 'NO SESSION · TAP TO PICK'
+    if (store.claudeSessionId.value == null) return `NO SESSION · ${tapVerb()} TO PICK`
     // The subscription flag is the load-bearing fact: it is what proves this is not
     // quietly billing per token.
     return store.claudeUsingSubscription.value === true
@@ -634,6 +644,53 @@ function ToolRow({ call }: { call: ToolCall }) {
  * every new turn, so the bottom was always this list — the conversation was pushed
  * out of sight and sending a message appeared to do nothing.
  */
+/**
+ * What the session is doing, as opposed to what it said: the tool timeline and the
+ * files it has changed.
+ *
+ * On a phone this is one column, so it stays under the conversation where it has
+ * always been. Past 900 px it moves to a rail beside it — the same move Home makes
+ * with its readings — and the two stop competing for one strip of screen.
+ */
+function SessionWork({
+  toolCalls,
+  changedFiles,
+  expanded,
+  onToggleFiles,
+  dimmed = false,
+}: {
+  toolCalls: ToolCall[]
+  changedFiles: ChangedFile[]
+  expanded: boolean
+  onToggleFiles: () => void
+  dimmed?: boolean
+}) {
+  if (!toolCalls.length && !changedFiles.length) return null
+  return (
+    <div
+      class="stack"
+      style={{
+        gap: '20px',
+        opacity: dimmed ? 0.5 : 1,
+        transition: 'opacity var(--state-change) ease-out',
+      }}
+      aria-hidden={dimmed ? 'true' : undefined}
+    >
+      {toolCalls.length ? (
+        <div class="timeline">
+          {toolCalls.map((call) => (
+            <ToolRow key={call.id} call={call} />
+          ))}
+        </div>
+      ) : null}
+
+      {changedFiles.length ? (
+        <FileList files={changedFiles} expanded={expanded} onToggle={onToggleFiles} />
+      ) : null}
+    </div>
+  )
+}
+
 function FileList({
   files,
   expanded,
@@ -655,7 +712,7 @@ function FileList({
           {`${files.length} CHANGED FILE${files.length === 1 ? '' : 'S'}`}
         </Caps>
         <Caps size="var(--fs-9)" tracking="0.16em" color="var(--ns-accent)">
-          {expanded ? 'HIDE' : 'SHOW · TAP FOR THE DIFF'}
+          {expanded ? 'HIDE' : `SHOW · ${tapVerb()} FOR THE DIFF`}
         </Caps>
       </button>
 

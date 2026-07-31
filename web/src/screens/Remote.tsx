@@ -46,6 +46,7 @@ import {
   MODIFIERS,
   Segmented,
   Spinner,
+  tapVerb,
   Tile,
   VideoCaption,
 } from '../design/components'
@@ -972,7 +973,7 @@ function SideBySidePanes() {
               <VideoCaption>
                 {focused
                   ? `${display.name.toUpperCase()} · ${display.width} × ${display.height}`
-                  : `${display.name.toUpperCase()} · TAP TO TAKE INPUT`}
+                  : `${display.name.toUpperCase()} · ${tapVerb()} TO TAKE INPUT`}
               </VideoCaption>
             </div>
           </div>
@@ -1038,7 +1039,7 @@ function ZoomBadge() {
         {store.zoomScale.value.toFixed(1)}×
       </span>
       <Caps size="var(--fs-10)" tracking="0.2em" color="var(--ns-accent)">
-        DOUBLE-TAP FITS
+        {`DOUBLE-${tapVerb()} FITS`}
       </Caps>
     </div>
   )

@@ -853,7 +853,8 @@ textarea {
    is the sheet: a half sheet is 74dvh tall, and a 100dvh child put its composer —
    the only way to answer — a quarter of a screen below the edge, with nothing to
    scroll it back into view. */
-.sheet > .screen {
+.sheet > .screen,
+.sheet > .wide-shell {
   min-height: 0;
   flex: 1 1 auto;
 }
@@ -1093,6 +1094,29 @@ textarea {
   gap: 14px;
 }
 
+/* The Claude panel: one column on a phone — what was said, then what is being
+   done, then the composer — and a grid past 900px. */
+.claude {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.claude__head,
+.claude__ask {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.claude__talk {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 22px;
+}
+
 /* The way forward sits at the bottom of the screen whatever the content above it
    came to. */
 .home__acts {
@@ -1276,4 +1300,50 @@ textarea {
     flex: 0 0 auto;
   }
 
+  /* The Claude panel takes the same split as Home: the conversation on the left,
+     what the session is *doing* on a rail to the right. On a phone those two share
+     one scroller and the tool list pushes the last thing said off the top. */
+  .claude {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head head'
+      'talk rail'
+      'ask  rail';
+    column-gap: 22px;
+  }
+
+  .claude__head {
+    grid-area: head;
+  }
+
+  .claude__talk {
+    grid-area: talk;
+  }
+
+  .claude__ask {
+    grid-area: ask;
+    /* A laptop window has an edge where a phone has a home indicator, and 10px of
+       it under the composer reads as a crop rather than as a margin. */
+    padding-bottom: 12px;
+  }
+
+  .claude__rail {
+    grid-area: rail;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    /* Starts level with the first thing said, because it is a second column of the
+       same conversation, not a header. */
+    padding-top: 22px;
+    overflow-y: auto;
+  }
+
+  /* The column is wide now; a line of prose is not. Everything in the transcript
+     stops at the reading measure, so a two-sentence answer does not run 900 px
+     across a laptop and lose the eye on the way back. */
+  .claude__talk > .stack {
+    max-width: var(--measure);
+  }
 }

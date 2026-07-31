@@ -35,6 +35,7 @@ import {
   Readout,
   SectionLabel,
   Sparkline,
+  tapVerb,
   VideoCaption,
 } from '../design/components'
 import { parseEndpoint } from '../net/endpoint'
@@ -317,7 +318,7 @@ function Hero({ posture }: { posture: Posture }) {
     if (age < 60) return { text: `LAST FRAME · ${Math.round(age)}S AGO`, tone: 'var(--ns-green)' }
     if (age < 3600)
       return { text: `LAST FRAME · ${Math.floor(age / 60)}M AGO`, tone: 'var(--ns-text-secondary)' }
-    return { text: `${Math.floor(age / 3600)}H OLD · TAP TO OPEN`, tone: 'var(--ns-amber)' }
+    return { text: `${Math.floor(age / 3600)}H OLD · ${tapVerb()} TO OPEN`, tone: 'var(--ns-amber)' }
   })()
 
   const openable = posture === 'awake' || posture === 'weak'
@@ -1090,7 +1091,7 @@ function Footer({
         <>
           <PrimaryAction
             title="Try again"
-            detail={`AUTO-RETRY IN ${retryCountdown}S · TAP TO GO NOW`}
+            detail={`AUTO-RETRY IN ${retryCountdown}S · ${tapVerb()} TO GO NOW`}
             glyph="↻"
             tint="var(--ns-accent)"
             ink="var(--ns-on-accent)"

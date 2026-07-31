@@ -382,7 +382,9 @@ function TrackpadSection() {
             <span
               style={{
                 width: '4px',
-                borderRadius: '2px',
+                // Half of the width, so the tick is a capsule: the pill token,
+                // not a hand-typed 2 that happens to land there.
+                borderRadius: 'var(--radius-pill)',
                 height: `${10 + (tick - 1) * 4}px`,
                 background:
                   tick <= settings.sensitivity ? 'var(--ns-accent)' : 'var(--ns-raised-2)',
@@ -577,11 +579,8 @@ function SettingRow({
  */
 function RevokeConfirm({ target }: { target: RevokeTarget }) {
   const isEverything = target.kind === 'everything'
-  // Escape answers with the safe answer, and so does the key the sheet opens on:
-  // focus starts on KEEP IT PAIRED, not on the button that deletes a key.
-  const sheet = useSheet<HTMLDivElement>(() => (store.revokeTarget.value = null), {
-    focus: 'last',
-  })
+  // Escape answers the question with the safe answer, the same as KEEP IT PAIRED.
+  const sheet = useSheet<HTMLDivElement>(() => (store.revokeTarget.value = null))
 
   const title = isEverything
     ? `REVOKE ALL ${target.count} DEVICES`
