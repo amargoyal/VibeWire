@@ -61,6 +61,18 @@ actor PairingService {
         return active
     }
 
+    /// Seconds until the host will accept a code again, or nil if it accepts
+    /// them now.
+    ///
+    /// Exposed so the pairing window can say so. The lockout does not stop the
+    /// code rotating, so without this the Mac keeps counting down to a rotation
+    /// while refusing every attempt for a minute — which is the one reading a
+    /// user in that state would act on, and the only one not on screen.
+    var lockoutRemaining: Int? {
+        guard let lockedUntil, Date() < lockedUntil else { return nil }
+        return max(0, Int(lockedUntil.timeIntervalSinceNow.rounded()))
+    }
+
     /// Called on a timer while the sheet is open.
     func rotateIfNeeded() {
         guard let active else { return }

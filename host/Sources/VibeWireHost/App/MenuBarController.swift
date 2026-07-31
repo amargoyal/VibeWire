@@ -47,6 +47,9 @@ final class MenuBarController: NSObject {
     /// how far it reaches.
     private var browserBlurb: NSTextField?
     private var countdownField: NSTextField?
+    /// The dot beside the listening line. Held because whether this Mac has an
+    /// address anything else can reach is measured once a second, not once.
+    private var servingDot: NSView?
     private var rotationTimer: Timer?
     private var lastLoggedBrowserURL: String?
 
@@ -126,18 +129,28 @@ final class MenuBarController: NSObject {
 
         Task { [weak self] in
             guard let self else { return }
-            let devices = (try? await trust.all()) ?? []
+            // A keychain that could not be read and a Mac with nothing paired
+            // to it are different facts. `TrustStore` is careful to keep them
+            // apart — its own note explains that caching a failed read as an
+            // empty set once made every paired phone come back `unknown device`
+            // for the rest of the process — and folding the throw into `[]`
+            // here spent that care to print "None yet" about devices that are
+            // still paired.
+            let devices = try? await trust.all()
             await MainActor.run {
-                if devices.isEmpty {
-                    let none = NSMenuItem(title: "   None yet", action: nil, keyEquivalent: "")
-                    none.isEnabled = false
-                    menu.insertItem(none, at: menu.index(of: devicesHeader) + 1)
-                } else {
-                    for (offset, device) in devices.enumerated() {
-                        let item = NSMenuItem(title: "   \(device.name)", action: nil, keyEquivalent: "")
-                        item.isEnabled = false
-                        menu.insertItem(item, at: menu.index(of: devicesHeader) + 1 + offset)
-                    }
+                let lines: [String]
+                switch devices {
+                case .none:
+                    lines = ["   Keychain did not answer"]
+                case .some(let list) where list.isEmpty:
+                    lines = ["   None yet"]
+                case .some(let list):
+                    lines = list.map { "   \($0.name)" }
+                }
+                for (offset, title) in lines.enumerated() {
+                    let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                    item.isEnabled = false
+                    menu.insertItem(item, at: menu.index(of: devicesHeader) + 1 + offset)
                 }
             }
         }
@@ -166,10 +179,16 @@ final class MenuBarController: NSObject {
         name.font = .systemFont(ofSize: 13, weight: .semibold)
         container.addSubview(name)
 
+        // Text Tertiary for the dormant fill, and not the Text Disabled that
+        // DESIGN.md assigns to dormant indicators, because that assignment is
+        // written for grounds this app draws. Here the ground is the system's
+        // own menu material, which the host cannot pin: measured across the
+        // range that material covers, Text Disabled lands at 1.71:1 on a dark
+        // menu over a black desktop and 1.14:1 over a white one. That is not a
+        // dim indicator, it is no indicator. Text Tertiary holds 2.7:1 to 4.1:1
+        // across the same range.
         let dot = NSView(frame: NSRect(x: 16, y: 71, width: 7, height: 7))
-        dot.wantsLayer = true
-        dot.layer?.cornerRadius = 3.5
-        dot.layer?.backgroundColor = (serving == nil ? Palette.textTertiary : Palette.green).cgColor
+        dot.fill(serving == nil ? Palette.textTertiary : Palette.green, radius: 3.5)
         container.addSubview(dot)
 
         let state = NSTextField(labelWithString: serving == nil ? "STARTING" : "SERVING")
@@ -179,23 +198,35 @@ final class MenuBarController: NSObject {
         state.textColor = serving == nil ? Palette.textTertiary : Palette.green
         container.addSubview(state)
 
+        // An unmeasured value and a measured zero are different facts, and the
+        // interface is not allowed to blur them. Until the router has answered
+        // these print the em dash the rest of the instrument uses for "not
+        // reported" — `pathWord` already did, one line below, and a `0` beside
+        // it claimed a reading nobody had taken.
         let values: [(String, String)] = [
-            ("CLIENT", (serving?.clientAttached ?? false) ? "1" : "0"),
-            ("SCREENS", "\(serving?.streams ?? 0)"),
+            ("CLIENT", serving.map { $0.clientAttached ? "1" : "0" } ?? "—"),
+            ("SCREENS", serving.map { "\($0.streams)" } ?? "—"),
             ("PATH", pathWord(lastStatus)),
         ]
 
         for (index, value) in values.enumerated() {
+            // A 46pt Raised 2 box takes the inner corner. The ladder is read
+            // off the system's own Raised 2 components rather than guessed: the
+            // 70pt tile takes `control`, the 46pt key cap and the 44pt field
+            // both take `inner`, and this is 46pt. The literal 9 it replaces sat
+            // between two rungs and belonged to neither.
             let tile = NSView(
                 frame: NSRect(x: 14 + CGFloat(index) * 82, y: 12, width: 78, height: 46)
             )
-            tile.wantsLayer = true
-            tile.layer?.cornerRadius = 9
-            tile.layer?.backgroundColor = Palette.raised2.cgColor
+            tile.fill(Palette.raised2, radius: Palette.Radius.inner)
 
             let label = NSTextField(labelWithString: value.0)
             label.frame = NSRect(x: 10, y: 27, width: 60, height: 12)
-            label.font = .monospacedSystemFont(ofSize: 8, weight: .regular)
+            // 9pt, which is the floor everywhere in this system and the size the
+            // `label` token states. 8pt was below both, and on Raised 2 it was
+            // also carrying 3.7:1 — under the threshold at a size chosen to be
+            // under it.
+            label.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             label.textColor = Palette.textTertiary
             tile.addSubview(label)
 
@@ -205,7 +236,10 @@ final class MenuBarController: NSObject {
                 ofSize: value.1.count > 3 ? 11 : 14,
                 weight: .regular
             )
-            reading.textColor = Palette.text
+            // An em dash standing in for a value the host has not reported is
+            // set in Text Tertiary, so it reads as a held space rather than as
+            // a reading.
+            reading.textColor = value.1 == "—" ? Palette.textTertiary : Palette.text
             tile.addSubview(reading)
 
             container.addSubview(tile)
@@ -327,6 +361,11 @@ final class MenuBarController: NSObject {
                 content.addSubview(card)
 
                 let plate = NSView(frame: NSRect(x: 14, y: 14, width: 86, height: 86))
+                // The one raw colour on any host surface, and it is not an ink:
+                // a QR needs a white quiet zone to decode, so this is a value a
+                // scanner requires rather than one the palette chose. Naming it
+                // in the palette would invite it to be spent somewhere it is
+                // only a colour.
                 plate.fill(.white, radius: Palette.Radius.small)
                 card.addSubview(plate)
 
@@ -361,6 +400,7 @@ final class MenuBarController: NSObject {
             let servingDot = NSView(frame: NSRect(x: 28, y: 54, width: 7, height: 7))
             servingDot.fill(Palette.green, radius: 3.5)
             content.addSubview(servingDot)
+            self.servingDot = servingDot
 
             let listening = NSTextField(labelWithString: "")
             listening.frame = NSRect(x: 44, y: 50, width: 420, height: 16)
@@ -390,6 +430,10 @@ final class MenuBarController: NSObject {
         for (index, field) in digitFields.enumerated() {
             field.stringValue = index < digits.count ? String(digits[index]) : ""
         }
+        // Restated on every tick rather than only at build time, because
+        // `codeSpent()` and `lockedOut(secondsRemaining:)` both repaint this
+        // field, and a fresh code from the menu bar has to take it back.
+        countdownField?.textColor = Palette.amber
         countdownField?.stringValue = "ROTATES IN \(code.secondsRemaining)S"
         rotationDial?.fraction = Double(code.secondsRemaining) / 60
 
@@ -409,16 +453,27 @@ final class MenuBarController: NSObject {
             //
             // This only works because SocketForwarder owns the port. An
             // NWListener never sees Tailscale traffic; see that file.
-            let host = status.tailscaleAddress
+            let reachable = status.tailscaleAddress
                 ?? status.lanAddress
                 ?? status.tailscaleDNSName
-                ?? "127.0.0.1"
+            // Loopback is not a fourth address, it is the absence of one: it is
+            // what this Mac calls itself and no phone can act on it. The QR is
+            // still drawn with it, because an empty square says less than a
+            // scannable one, but the dot and the line below now say the picture
+            // will not work rather than leaving it to be found out by scanning.
+            let host = reachable ?? "127.0.0.1"
             let port = Config.loadSettings().port
             // The QR carries everything the phone needs to skip typing.
             let payload = "vibewire://pair?host=\(host)&port=\(port)&code=\(code.value)"
             qrView?.image = Self.qrImage(from: payload)
 
-            updateBrowserQR(code: code, status: status, lanHost: host, port: port)
+            updateBrowserQR(
+                code: code,
+                status: status,
+                lanHost: host,
+                isReachable: reachable != nil,
+                port: port
+            )
         }
     }
 
@@ -436,6 +491,7 @@ final class MenuBarController: NSObject {
         code: PairingService.ActiveCode,
         status: TransportManager.Status,
         lanHost: String,
+        isReachable: Bool,
         port: UInt16
     ) {
         // Stated once, from the same status the QR was built from, so the line
@@ -443,15 +499,53 @@ final class MenuBarController: NSObject {
         // Whichever address of this Mac the phone has the best chance of reaching.
         // The tunnel wins when it is up, because it works from cellular and a tailnet
         // address does not.
+        //
+        // `reach` is set as a sentence rather than in caps, because it is the
+        // tail of a 12pt sans blurb — caps in this system mean a value the
+        // machine measured, set in mono, and the Title Case this used to print
+        // was neither of those things.
         let origin: String
         let reach: String
         if let tunnel = status.cloudflareHostname, status.cloudflareRunning {
             origin = tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel
-            reach = "WORKS ON CELLULAR"
+            reach = "Works on cellular."
         } else {
             origin = "http://\(lanHost):\(port)"
-            reach = status.tailscaleAddress == nil ? "SAME NETWORK ONLY" : "ON THE TAILNET"
+            if !isReachable {
+                // "Same network only" was the sentence this used to print here,
+                // and on a Mac with no address at all it was a claim: a phone on
+                // the same Wi-Fi cannot reach a loopback address either.
+                reach = "No address to reach it on."
+            } else if status.tailscaleAddress == nil {
+                reach = "Same network only."
+            } else {
+                reach = "On the tailnet."
+            }
         }
+
+        // The condition this window reports about itself. A host listening on a
+        // port with no address anything can route to is a measured degradation
+        // — not a failure, the listener is up — which is what sodium is for.
+        servingDot?.fill(isReachable ? Palette.green : Palette.amber, radius: 3.5)
+
+        // Written before the browser QR is built, because every failure below
+        // returns early and this line is not about the browser QR — it is what
+        // the host is doing. A Mac with no web bundle is an ordinary host, the
+        // protocol does not depend on one, and it used to leave this line empty
+        // for the life of the window: a lit dot with nothing beside it.
+        //
+        // The precise version of the reach sentence, in mono, where a measured
+        // value belongs — the sans blurb beside it says the short form. All four
+        // segments together measure 412pt of the field's 420, so this line is
+        // full: another segment needs a wider field, not a shorter word.
+        listeningField?.stringValue = [
+            "LISTENING ON :\(port)",
+            isReachable ? nil : "NO ADDRESS BUT LOOPBACK",
+            status.tailscaleRunning ? "TAILSCALE UP" : "TAILSCALE DOWN",
+            status.cloudflareRunning ? "TUNNEL ON" : "TUNNEL OFF",
+        ]
+        .compactMap { $0 }
+        .joined(separator: " · ")
 
         let url: String
         let caption: String
@@ -473,7 +567,15 @@ final class MenuBarController: NSObject {
                 URLQueryItem(name: "host", value: origin),
                 URLQueryItem(name: "code", value: code.value),
             ]
-            guard let built = components.url?.absoluteString else { return }
+            // Its two siblings above and below both name their failure; a bare
+            // return here left the last good QR on screen for a card that can no
+            // longer be built, which is the one outcome worse than an empty one.
+            guard let built = components.url?.absoluteString else {
+                browserQRView?.image = nil
+                browserCaption?.stringValue = "ANY BROWSER"
+                browserBlurb?.stringValue = "webClientURL would not build a URL with this Mac's address in it."
+                return
+            }
             url = built
             caption = "ANY BROWSER · PUBLISHED SITE"
         } else {
@@ -492,14 +594,8 @@ final class MenuBarController: NSObject {
         }
         browserQRView?.image = Self.qrImage(from: url)
         browserCaption?.stringValue = caption
-        browserBlurb?.stringValue = "Scan with the phone's own camera. Pairs on load. \(reach.capitalized)."
+        browserBlurb?.stringValue = "Scan with the phone's own camera. Pairs on load. \(reach)"
 
-        listeningField?.stringValue = [
-            "LISTENING ON :\(port)",
-            status.tailscaleRunning ? "TAILSCALE UP" : "TAILSCALE DOWN",
-            status.cloudflareRunning ? "TUNNEL ON" : "TUNNEL OFF",
-        ]
-        .joined(separator: " · ")
         // Printed as well as drawn: this is the one string worth being able to paste
         // into another machine, and reading it off a QR is not pasting.
         //
@@ -510,6 +606,31 @@ final class MenuBarController: NSObject {
             lastLoggedBrowserURL = url
             Log.info(.app, "browser pairing url \(url)")
         }
+    }
+
+    /// A device took the code, so there is no longer one to show.
+    ///
+    /// The digits are cleared rather than left standing, because six digits and
+    /// a stopped countdown are exactly what someone reads out to a second phone
+    /// — and the host will refuse them, having ended the window on the first
+    /// success. Jade, because this is the Mac reporting that the thing worked.
+    private func codeSpent() {
+        for field in digitFields { field.stringValue = "" }
+        rotationDial?.fraction = 0
+        countdownField?.textColor = Palette.green
+        countdownField?.stringValue = "PAIRED · CODE USED"
+    }
+
+    /// Five wrong codes buys a 60 s lockout (PROTOCOL §1.1), during which the
+    /// host refuses the very code this window is showing.
+    ///
+    /// Clay and the count, because the code on screen is still rotating and
+    /// still correct — what changed is that the host will not take it, and
+    /// "ROTATES IN 43S" through a lockout is the window implying a working
+    /// state it has measured the opposite of.
+    private func lockedOut(secondsRemaining: Int) {
+        countdownField?.textColor = Palette.red
+        countdownField?.stringValue = "LOCKED \(secondsRemaining)S · \(Config.maxPairAttempts) WRONG"
     }
 
     private func startRotationTimer() {
@@ -525,8 +646,19 @@ final class MenuBarController: NSObject {
                     return
                 }
                 await self.pairing.rotateIfNeeded()
-                if let current = await self.pairing.currentCode() {
-                    self.update(for: current)
+                guard let current = await self.pairing.currentCode() else {
+                    // No code while the window is still open means `pair()`
+                    // consumed it, and `pair()` only does that on a successful
+                    // handshake. Until now this branch did nothing at all: the
+                    // six digits stayed on screen and the countdown stopped
+                    // where it was, so the most common outcome this window has
+                    // left a dead code lit and said nothing about it.
+                    self.codeSpent()
+                    return
+                }
+                self.update(for: current)
+                if let remaining = await self.pairing.lockoutRemaining {
+                    self.lockedOut(secondsRemaining: remaining)
                 }
             }
         }

@@ -50,14 +50,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         router.server = server
         server.onFatal = { detail in
             Task { @MainActor in
-                self.presentFatal("VibeWire's listener stopped.\n\n\(detail)")
+                // The host had started — it had been serving, possibly for
+                // hours. Headlining that as "could not start" collapses two
+                // states with two different answers into one sentence, which is
+                // the defect this product has already paid for once.
+                self.presentFatal(
+                    headline: "VibeWire stopped serving",
+                    detail: "The listener on port \(settings.port) closed.\n\n\(detail)"
+                )
             }
         }
 
         do {
             try server.start()
         } catch {
-            presentFatal("VibeWire could not open port \(settings.port).\n\n\(error)")
+            presentFatal(
+                headline: "VibeWire could not start",
+                detail: "VibeWire could not open port \(settings.port).\n\n\(error)"
+            )
             return
         }
 
@@ -169,11 +179,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !screen { DisplayCatalog.requestScreenRecordingPermission() }
     }
 
-    private func presentFatal(_ message: String) {
+    /// The headline is a parameter because the two ways this app dies are not
+    /// the same event: a port that would not open at launch, and a listener
+    /// that closed after serving. One is answered by finding what holds the
+    /// port, the other by reopening the app.
+    private func presentFatal(headline: String, detail: String) {
         let alert = NSAlert()
         alert.alertStyle = .critical
-        alert.messageText = "VibeWire could not start"
-        alert.informativeText = message
+        alert.messageText = headline
+        alert.informativeText = detail
         alert.runModal()
         NSApp.terminate(nil)
     }
