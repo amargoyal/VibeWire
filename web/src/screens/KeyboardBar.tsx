@@ -469,6 +469,7 @@ function ComboEditor({
   const [selected, setSelected] = useState<string[]>(['cmd'])
   const [letter, setLetter] = useState('')
   const sheet = useSheet<HTMLDivElement>(onClose)
+  const ready = letter.trim().length > 0 && selected.length > 0
 
   return (
     <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label="New combo">
@@ -518,6 +519,27 @@ function ComboEditor({
           }}
         />
 
+        {/* What the cap will say, drawn as the cap will draw it. The editor asked
+            for three separate decisions and showed the result of none of them
+            until the combo was already in the row. */}
+        <div
+          class="row"
+          style={{ gap: '10px', marginTop: '18px', minHeight: '44px', flex: '0 0 auto' }}
+        >
+          <Caps size="var(--fs-9)" tracking="0.16em">
+            SENDS
+          </Caps>
+          <span
+            class="mono"
+            style={{
+              fontSize: 'var(--fs-19)',
+              color: ready ? 'var(--ns-text)' : 'var(--ns-text-tertiary)',
+            }}
+          >
+            {ready ? comboLabel([...[...selected].sort(), letter.trim().toLowerCase()]) : '—'}
+          </span>
+        </div>
+
         <span class="spacer" />
 
         <div style={{ paddingBottom: 'calc(24px + var(--safe-bottom))' }}>
@@ -527,7 +549,7 @@ function ComboEditor({
             glyph="＋"
             tint="var(--ns-accent)"
             ink="var(--ns-on-accent)"
-            enabled={letter.trim().length > 0 && selected.length > 0}
+            enabled={ready}
             onClick={() => onAdd([...[...selected].sort(), letter.trim().toLowerCase()])}
           />
         </div>
