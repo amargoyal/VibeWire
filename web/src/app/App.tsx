@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks'
 
-import { store } from './store'
+import { store, type Banner } from './store'
 import {
   Caps,
   Display,
@@ -89,7 +89,7 @@ export function App() {
       {route === 'pairing' ? <Pairing /> : route === 'home' ? <Home /> : <Remote />}
 
       {store.banner.value ? (
-        <Banner text={store.banner.value} onDismiss={() => (store.banner.value = null)} />
+        <BannerView banner={store.banner.value} onDismiss={() => (store.banner.value = null)} />
       ) : null}
 
       {presented === 'settings' ? (
@@ -141,7 +141,7 @@ function Booting() {
  * Errors are stated, not swallowed. Amber because a banner is always a degraded
  * condition, never a lost one — a lost condition gets a whole screen.
  */
-function Banner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
+function BannerView({ banner, onDismiss }: { banner: Banner; onDismiss: () => void }) {
   return (
     <div
       role="alert"
@@ -181,8 +181,32 @@ function Banner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
             color: 'var(--ns-on-amber-wash)',
           }}
         >
-          {text}
+          {banner.text}
         </p>
+
+        {/* Only where the host said so. It marks its own errors — a capture that
+            failed is worth trying again, a refused request is not — and offering
+            a retry for something that cannot succeed is worse than offering
+            nothing, because it costs a tap to find that out. */}
+        {banner.retriable ? (
+          <button
+            onClick={() => {
+              store.banner.value = null
+              store.retry()
+            }}
+            style={{
+              minHeight: 'var(--target)',
+              paddingInline: '12px',
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-amber)">
+              TRY AGAIN
+            </Caps>
+          </button>
+        ) : null}
         <button
           onClick={onDismiss}
           aria-label="Dismiss message"
@@ -363,7 +387,7 @@ function ClipboardSheet() {
               // swallows the whole call where the API is absent, and this button
               // is the answer to that very case.
               if (!navigator.clipboard?.writeText) {
-                store.banner.value = 'This browser has no clipboard here. Select the text and copy it.'
+                store.banner.value = { text: 'This browser has no clipboard here. Select the text and copy it.' }
                 return
               }
               void navigator.clipboard
@@ -373,7 +397,7 @@ function ClipboardSheet() {
                   store.note('Copied.')
                 })
                 .catch(() => {
-                  store.banner.value = 'Still refused. Select the text and copy it.'
+                  store.banner.value = { text: 'Still refused. Select the text and copy it.' }
                 })
             }}
           />
@@ -388,8 +412,9 @@ async function copyImage(dataUrl: string): Promise<void> {
     const blob = await (await fetch(dataUrl)).blob()
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
   } catch {
-    store.banner.value =
-      'This browser would not put an image on the clipboard. Save the PNG instead.'
+    store.banner.value = {
+        text: 'This browser would not put an image on the clipboard. Save the PNG instead.',
+      }
   }
 }
 
@@ -406,8 +431,10 @@ function UnsupportedNotice() {
   if (dismissed || decoderSupport() === 'ok') return null
 
   return (
-    <Banner
-      text="This browser has no WebCodecs H.264 decoder, so the Mac's picture will not appear. Pointer, keyboard, clipboard and Claude all still work. Chrome, Edge and Safari 17+ can show the picture."
+    <BannerView
+      banner={{
+        text: "This browser has no WebCodecs H.264 decoder, so the Mac's picture will not appear. Pointer, keyboard, clipboard and Claude all still work. Chrome, Edge and Safari 17+ can show the picture.",
+      }}
       onDismiss={() => setDismissed(true)}
     />
   )

@@ -188,6 +188,11 @@ class PointerBudget {
   }
 }
 
+export interface Banner {
+  text: string
+  retriable?: boolean
+}
+
 let turnSequence = 0
 
 /** Long enough to read a line and see which copy it was, short enough not to sit
@@ -365,7 +370,18 @@ export class Store {
   claudeRateLimitNote = signal<string | null>(null)
 
   // Errors surfaced to the user
-  banner = signal<string | null>(null)
+  /**
+   * The one sentence the app says out of band, and whether anything can be done
+   * about it.
+   *
+   * An object rather than a string because the channel carries two kinds of
+   * message and used to make them look identical: a fault waits to be read, a
+   * receipt clears itself (see `note`), and a fault the host has marked retriable
+   * can offer the retry instead of leaving the reader to find it on another
+   * screen. `retriable` comes off the wire — the host sets it per error code —
+   * so this is reported rather than guessed.
+   */
+  banner = signal<Banner | null>(null)
 
   /** A one-second tick, so the handful of readouts that genuinely age — the retry
    *  countdown, the stall clock, how long a permission has waited — can follow it
@@ -544,7 +560,7 @@ export class Store {
     const code = parameters.get('code')
     if (!code) return
     if (code.length !== 6 || !/^\d{6}$/.test(code)) {
-      this.banner.value = 'That pairing link does not carry a six-digit code.'
+      this.banner.value = { text: 'That pairing link does not carry a six-digit code.' }
       return
     }
 
@@ -554,7 +570,7 @@ export class Store {
       const port = Number(parameters.get('port') ?? 8787)
       endpoint = parseEndpoint(address, Number.isFinite(port) ? port : 8787)
     } catch (error) {
-      this.banner.value = (error as Error).message
+      this.banner.value = { text: (error as Error).message }
       return
     }
 
@@ -571,12 +587,12 @@ export class Store {
       // device id do not depend on where the Mac is, and this is the fix for a
       // Cloudflare quick tunnel whose hostname changes on every host restart.
       const problem = await this.repoint(endpoint)
-      this.banner.value = problem ?? null
+      this.banner.value = problem ? { text: problem } : null
       return
     }
 
     const failure = await this.completePairing(endpoint, code)
-    if (failure) this.banner.value = failure
+    if (failure) this.banner.value = { text: failure }
   }
 
   /**
@@ -610,12 +626,12 @@ export class Store {
    * wiped by it.
    */
   note(text: string): void {
-    this.banner.value = text
+    this.banner.value = { text }
     const mine = text
     if (this.noteTimer) clearTimeout(this.noteTimer)
     this.noteTimer = setTimeout(() => {
       this.noteTimer = null
-      if (this.banner.value === mine) this.banner.value = null
+      if (this.banner.value?.text === mine) this.banner.value = null
     }, NOTE_MILLIS)
   }
 
@@ -642,13 +658,13 @@ export class Store {
         break
       case 'failed':
         this.streamState.value = { kind: 'failed', reason: state.reason }
-        this.banner.value = `Lost the Mac. ${state.reason}`
+        this.banner.value = { text: `Lost the Mac. ${state.reason}` }
         this.claudeWentQuiet()
         break
       case 'unauthorized':
         // Retrying cannot help: the Mac no longer holds this device's key.
         this.streamState.value = { kind: 'failed', reason: 'device revoked' }
-        this.banner.value = 'This Mac no longer recognises this browser. Pair again.'
+        this.banner.value = { text: 'This Mac no longer recognises this browser. Pair again.' }
         this.claudeWentQuiet()
         void this.unpairLocally()
         break
@@ -671,10 +687,11 @@ export class Store {
           this.hostOS.value = str(payload['os']) ?? ''
           this.capabilities.value = (payload['capabilities'] as Record<string, boolean>) ?? {}
           if (this.capabilities.value['screenRecording'] === false) {
-            this.banner.value =
-              'Screen Recording is off on the Mac. Grant it in System Settings.'
+            this.banner.value = {
+                text: 'Screen Recording is off on the Mac. Grant it in System Settings.',
+              }
           } else if (this.capabilities.value['accessibility'] === false) {
-            this.banner.value = 'Accessibility is off on the Mac. Input will not reach it.'
+            this.banner.value = { text: 'Accessibility is off on the Mac. Input will not reach it.' }
           }
         })
         break
@@ -845,7 +862,13 @@ export class Store {
         break
 
       case 'error':
-        this.banner.value = str(payload['message']) ?? 'The Mac reported an error.'
+        this.banner.value = {
+          text: str(payload['message']) ?? 'The Mac reported an error.',
+          // The host marks its own errors: a capture that failed is worth trying
+          // again, a refused request is not. Both used to read identically and
+          // offer nothing.
+          retriable: payload['retriable'] === true,
+        }
         break
 
       default:
@@ -931,7 +954,7 @@ export class Store {
           this.toolCalls.value = []
           this.changedFiles.value = []
           if (this.claudeUsingSubscription.value === false) {
-            this.banner.value = 'Claude is billing through an API key, not your subscription.'
+            this.banner.value = { text: 'Claude is billing through an API key, not your subscription.' }
           }
         })
         break
@@ -1086,7 +1109,7 @@ export class Store {
         break
 
       case 'error':
-        this.banner.value = str(payload['message']) ?? 'Claude reported an error.'
+        this.banner.value = { text: str(payload['message']) ?? 'Claude reported an error.' }
         break
 
       default:
@@ -1337,8 +1360,9 @@ export class Store {
         const text = await navigator.clipboard.readText()
         if (text) this.send({ t: 'clipboardPush', text })
       } catch {
-        this.banner.value =
-          'The browser would not let this page read the clipboard, so nothing was pushed to the Mac.'
+        this.banner.value = {
+            text: 'The browser would not let this page read the clipboard, so nothing was pushed to the Mac.',
+          }
         return
       }
     }
@@ -1381,7 +1405,7 @@ export class Store {
   revoke(device: PairedDeviceEntry): void {
     this.revokeTarget.value = null
     if (!this.client.sendUnqueued({ t: 'revoke', deviceId: device.id })) {
-      this.banner.value = 'Not connected to the Mac, so nothing was revoked.'
+      this.banner.value = { text: 'Not connected to the Mac, so nothing was revoked.' }
       return
     }
     if (device.isThisDevice) void this.unpairLocally()
@@ -1390,7 +1414,7 @@ export class Store {
   revokeAll(): void {
     this.revokeTarget.value = null
     if (!this.client.sendUnqueued({ t: 'revoke', all: true })) {
-      this.banner.value = 'Not connected to the Mac, so nothing was revoked.'
+      this.banner.value = { text: 'Not connected to the Mac, so nothing was revoked.' }
       return
     }
     void this.unpairLocally()
