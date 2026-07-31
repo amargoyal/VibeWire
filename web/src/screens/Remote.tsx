@@ -317,6 +317,11 @@ export function Remote() {
     // letting them through here landed a second click on every captured click.
     if (captured) return
 
+    // The pad owns this press for as long as it lasts. Left to itself the browser
+    // would also start a selection from it, or pick the canvas up as a draggable
+    // image, and paint either one over the picture while the hold is counting.
+    event.preventDefault()
+
     ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
@@ -1249,12 +1254,13 @@ function HoldRing({ ringRef }: { ringRef: { current: HTMLDivElement | null } }) 
       style={`--hold-ms:${HOLD_TO_DRAG_MS}ms;--hold-delay:${HOLD_RING_DELAY_MS}ms`}
     >
       <svg viewBox="0 0 56 56">
-        {/* Dark backing first, or a ring drawn over a bright desktop is a ring
-            nobody can see. */}
+        {/* Dark casing first, or a ring drawn over a bright desktop is a ring
+            nobody can see. It is a stroke and not a disc: the middle of this ring
+            shows the Mac's own picture, undimmed. */}
         <circle class="hold-ring__halo" cx="28" cy="28" r="24" />
-        <circle class="hold-ring__core" cx="28" cy="28" r="9" />
         <circle class="hold-ring__track" cx="28" cy="28" r="24" />
         <circle class="hold-ring__sweep" cx="28" cy="28" r="24" />
+        <circle class="hold-ring__core" cx="28" cy="28" r="5" />
       </svg>
     </div>
   )

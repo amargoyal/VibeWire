@@ -621,11 +621,15 @@ textarea {
   height: 100%;
 }
 
-/* Dark backing, so the ring reads over a white document as well as a dark one. */
+/* A dark casing around the ring, and nothing inside it. This was a filled disc,
+   which read as a pane of glass laid over the desktop — and the desktop is the
+   one thing on this screen that may not be covered. The casing is what carries
+   the ring over a white document; the middle stays exactly as clear as the rest
+   of the picture. */
 .hold-ring__halo {
-  fill: color-mix(in srgb, var(--ns-deep) 62%, transparent);
+  fill: none;
   stroke: color-mix(in srgb, var(--ns-deep) 78%, transparent);
-  stroke-width: 5;
+  stroke-width: 6;
 }
 
 .hold-ring__track {
@@ -648,9 +652,10 @@ textarea {
   transform-origin: 50% 50%;
 }
 
-/* Only once the ring is full: the press is now carrying something. */
+/* Only once the ring is full: the press is now carrying something. A small solid
+   dot rather than a wash, so nothing here is ever a translucent surface. */
 .hold-ring__core {
-  fill: color-mix(in srgb, var(--ns-accent) 34%, transparent);
+  fill: var(--ns-accent);
   opacity: 0;
 }
 
@@ -1307,10 +1312,19 @@ textarea {
   flex-direction: column;
   overflow: hidden;
   user-select: none;
-  /* A press held for most of a second is now a gesture this screen owns. Safari
-     on iOS answers the same press with its own callout, which would arrive over
-     the picture just as the ring finishes filling. */
+  -webkit-user-select: none;
+  /* A press held for most of a second is now a gesture this screen owns, and
+     every browser has its own answer to that press: iOS Safari raises a callout,
+     Chrome and Safari paint a tap highlight over whatever was touched, and a
+     press that then moves starts a selection or drags the canvas as an image.
+     All three arrive exactly as the ring fills, over the one surface on this
+     screen that may not be covered — the Mac's picture. */
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.remote canvas {
+  -webkit-user-drag: none;
 }
 
 .remote__rail {

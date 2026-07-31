@@ -1365,11 +1365,12 @@ struct HoldRingLayer: View {
         ZStack {
             if model.phase != .off {
                 ZStack {
-                    // Dark backing, so the ring reads over a white document as
-                    // well as a dark one.
+                    // A dark casing around the ring, and nothing inside it. This
+                    // was a filled disc, which read as a pane of glass laid over
+                    // the desktop — and the desktop is the one thing on this
+                    // screen that may not be covered.
                     Circle()
-                        .fill(NS.Color.deepGround.opacity(0.62))
-                        .overlay(Circle().stroke(NS.Color.deepGround.opacity(0.78), lineWidth: 5))
+                        .stroke(NS.Color.deepGround.opacity(0.78), lineWidth: 6)
                     Circle()
                         .stroke(NS.Color.edge.opacity(0.7), lineWidth: 3)
                     Circle()
@@ -1381,11 +1382,12 @@ struct HoldRingLayer: View {
                         // Start at twelve o'clock rather than three.
                         .rotationEffect(.degrees(-90))
                     // Only once the ring is full: the press is now carrying
-                    // something.
+                    // something. A small solid dot rather than a wash, so nothing
+                    // here is ever a translucent surface.
                     if model.phase == .held {
                         Circle()
-                            .fill(NS.Color.accent.opacity(0.34))
-                            .frame(width: 18, height: 18)
+                            .fill(NS.Color.accent)
+                            .frame(width: 10, height: 10)
                     }
                 }
                 .frame(width: Self.diameter, height: Self.diameter)
