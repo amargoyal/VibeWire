@@ -917,9 +917,12 @@ export function useSheet<T extends HTMLElement = HTMLDivElement>(
       if (event.key === 'Escape') {
         if (!dismiss.current) return
         event.preventDefault()
-        // Stops the layer underneath — the keyboard bar, a pointer capture — from
-        // reading the same press as its own way out.
-        event.stopPropagation()
+        // Stops the layer underneath — the keyboard bar, another sheet — from
+        // reading the same press as its own way out. It cannot stop the *browser*
+        // exiting a pointer lock on Escape: that is a user-agent behaviour and is
+        // not cancellable, so a sheet dismissed with Escape over a captured
+        // pointer gives the pointer back too. Worth knowing rather than working
+        // around; there is no version of this where the page wins.
         dismiss.current()
         return
       }

@@ -39,6 +39,7 @@ import { bitrateMbps, store, type DisplayEntry } from '../app/store'
 import { hostKeyName, modifiersFrom, typedIntoBrowser } from '../app/keymap'
 import {
   Announce,
+  anySheetOpen,
   Caps,
   Card,
   ConditionDot,
@@ -449,6 +450,11 @@ export function Remote() {
 
     /** Keys this browser keeps, and what to do with them instead. */
     const browsersOwn = (event: KeyboardEvent): boolean => {
+      // A sheet is open over the picture, so the reader is operating the browser
+      // and not the Mac — even under a pointer capture, which does not end just
+      // because a dialog appeared. Without this, Tab inside a sheet was forwarded
+      // to the Mac and swallowed, so the sheet could not be operated at all.
+      if (anySheetOpen()) return true
       if (typedIntoBrowser(event.target)) return true
       if (captured) return false
       if (event.code === 'Tab') return true
