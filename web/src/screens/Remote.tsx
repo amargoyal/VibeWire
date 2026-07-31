@@ -36,7 +36,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { bitrateMbps, store, type DisplayEntry } from '../app/store'
-import { hostKeyName, modifiersFrom, releaseKeyboardLock } from '../app/keymap'
+import {
+  hostKeyName,
+  modifiersFrom,
+  releaseKeyboardLock,
+  typedIntoBrowser,
+} from '../app/keymap'
 import {
   Announce,
   Caps,
@@ -63,25 +68,6 @@ const TAP_SLOP = 6
 const HOLD_TO_DRAG_MS = 450
 /** The two keys that fire whatever the browser has focused. */
 const ACTIVATION_CODES = new Set(['Space', 'Enter', 'NumpadEnter'])
-
-/**
- * Whether this keystroke is being typed into the browser rather than at the Mac.
- *
- * The hidden field in `KeyboardBar` is the one text box on the page that belongs to
- * the Mac, and it marks itself; every other field — the combo editor, the Claude
- * composer, the address box — keeps its own keystrokes.
- */
-function typedIntoBrowser(target: EventTarget | null): boolean {
-  const node = target as HTMLElement | null
-  if (!node || typeof node.tagName !== 'string') return false
-  if (node.dataset?.['macKeyboard'] === 'true') return false
-  return (
-    node.tagName === 'INPUT' ||
-    node.tagName === 'TEXTAREA' ||
-    node.tagName === 'SELECT' ||
-    node.isContentEditable
-  )
-}
 
 /** Whether the keystroke landed on something the browser can activate. */
 function focusedControl(target: EventTarget | null): boolean {
@@ -1027,7 +1013,7 @@ function TeachingLegend() {
       }}
     >
       {matchMedia('(pointer: fine)').matches
-        ? 'DRAG ANYWHERE ON THE GLASS · ESC RELEASES A CAPTURE\nWHEEL SCROLLS · ⌃WHEEL ZOOMS'
+        ? 'DRAG ANYWHERE ON THE GLASS · ESC RELEASES A CAPTURE\nWHEEL SCROLLS · ⌃WHEEL ZOOMS · ? LISTS THE KEYS'
         : 'MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS'}
     </Caps>
   )

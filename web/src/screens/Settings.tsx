@@ -30,6 +30,7 @@ import {
   Toggle,
   useSheet,
 } from '../design/components'
+import { hasKeyboard, showShortcuts } from '../app/shortcuts'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const settings = store.settings.value
@@ -72,6 +73,32 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <SettingsGroup title="THIS BROWSER">
             <BrowserSection />
           </SettingsGroup>
+
+          {/* The shortcut list is opened with `?`, which is only discoverable to
+              someone who already knows it. This is the other way in, and it is
+              absent on a touch device where there is no keyboard to list. */}
+          {hasKeyboard() ? (
+            <SettingsGroup title="KEYBOARD">
+              <button
+                class="group-row"
+                onClick={() => {
+                  onClose()
+                  showShortcuts.value = true
+                }}
+                style={{ borderRadius: 'var(--radius-group-outer)', textAlign: 'left' }}
+              >
+                <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500 }}>
+                  Keys that stay on this side
+                </span>
+                <span class="spacer" />
+                <span class="cap" style={{ flex: '0 0 auto', width: '38px', minHeight: '30px' }}>
+                  <span class="mono" style={{ fontSize: 'var(--fs-13)' }}>
+                    ?
+                  </span>
+                </span>
+              </button>
+            </SettingsGroup>
+          ) : null}
 
           <button
             class="outlined"

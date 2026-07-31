@@ -25,6 +25,7 @@ import { Home } from '../screens/Home'
 import { Pairing } from '../screens/Pairing'
 import { Remote } from '../screens/Remote'
 import { Settings } from '../screens/Settings'
+import { showShortcuts, ShortcutsSheet, useShortcuts } from './shortcuts'
 
 /**
  * How long a hidden tab keeps its socket.
@@ -70,6 +71,8 @@ export function App() {
     }
   }, [])
 
+  useShortcuts()
+
   const route = store.route.value
   const presented = store.presented.value
 
@@ -97,6 +100,8 @@ export function App() {
       ) : null}
 
       {store.screenshot.value ? <ScreenshotSheet /> : null}
+
+      {showShortcuts.value ? <ShortcutsSheet /> : null}
 
       <UnsupportedNotice />
     </>

@@ -82,6 +82,27 @@ export function modifiersFrom(event: KeyboardEvent): string[] {
 }
 
 /**
+ * Whether this keystroke is being typed into the browser rather than at the Mac.
+ *
+ * The hidden field in `KeyboardBar` is the one text box on the page that belongs
+ * to the Mac, and it marks itself with `data-mac-keyboard`; every other field —
+ * the combo editor, the Claude composer, the address box — keeps its own
+ * keystrokes. Both the Mac-forwarding handler and the app's own shortcuts ask
+ * this before claiming a key.
+ */
+export function typedIntoBrowser(target: EventTarget | null): boolean {
+  const node = target as HTMLElement | null
+  if (!node || typeof node.tagName !== 'string') return false
+  if (node.dataset?.['macKeyboard'] === 'true') return false
+  return (
+    node.tagName === 'INPUT' ||
+    node.tagName === 'TEXTAREA' ||
+    node.tagName === 'SELECT' ||
+    node.isContentEditable
+  )
+}
+
+/**
  * Keys the browser will not let go of, and what to say about it.
  *
  * Without the Keyboard Lock API — Chromium only, and only in fullscreen —
