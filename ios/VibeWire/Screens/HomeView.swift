@@ -496,7 +496,18 @@ struct HomeView: View {
             SectionLabel("DISPLAYS")
 
             if model.displays.isEmpty {
-                noDisplays
+                // "The Mac answered, but reports no displays" is a claim about a
+                // machine that has answered. While the socket is still opening,
+                // or while the Mac is asleep, nothing has answered — and printing
+                // a permission diagnosis over a connection that has not completed
+                // sends the reader to System Settings to fix a problem they do not
+                // have. Before the first heartbeat the heading stands over a
+                // dashed rule and the condition strip carries the state.
+                if posture == .awake || posture == .weak {
+                    noDisplays
+                } else {
+                    DashedRule().padding(.vertical, 14)
+                }
             } else {
                 HStack(spacing: 8) {
                     ForEach(model.displays) { display in

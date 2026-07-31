@@ -633,6 +633,23 @@ function Displays({ posture }: { posture: Posture }) {
   const displays = store.displays.value
 
   if (displays.length === 0) {
+    // "The Mac answered, but reports no displays" is a claim about a machine
+    // that has answered. While the socket is still opening, or while the Mac is
+    // asleep, nothing has answered — and printing a permission diagnosis over a
+    // connection that has not completed sends the reader to System Settings to
+    // fix a problem they do not have. This screen does not get to say the Mac
+    // said something it has not said, so before the first heartbeat the heading
+    // stands over a dashed rule and the condition strip carries the state.
+    if (posture !== 'awake' && posture !== 'weak') {
+      return (
+        <div class="stack" style={{ gap: '10px' }}>
+          <SectionLabel>DISPLAYS</SectionLabel>
+          <div style={{ paddingBlock: '14px' }}>
+            <DashedRule />
+          </div>
+        </div>
+      )
+    }
     return (
       <div class="stack" style={{ gap: '10px' }}>
         <SectionLabel>DISPLAYS</SectionLabel>
