@@ -180,6 +180,18 @@ final class AppModel {
     var presented: Presentation?
     var showHub = false
     var showKeyboard = false
+    /// The shot the Mac sent, on screen.
+    ///
+    /// The same shape as the two flags above and read in the same place — inside
+    /// `RemoteView`'s ZStack — because a screenshot can only be asked for from
+    /// the remote screen, and that is already where a panel over that screen is
+    /// presented from.
+    ///
+    /// A second value beside `lastScreenshot` rather than `lastScreenshot != nil`
+    /// doing both jobs: the image is the last shot this phone received and
+    /// outlives the panel that showed it, and closing a sheet is not a reason to
+    /// throw a picture away.
+    var showScreenshot = false
     /// What the 07B confirm sheet is asking about. Revoking everything is the
     /// most destructive thing in the app and used to be the only revoke with no
     /// confirmation at all, because the sheet could only describe one device.
@@ -575,7 +587,13 @@ final class AppModel {
                let image = UIImage(data: data) {
                 lastScreenshot = image
                 UIPasteboard.general.image = image
-                banner = "Screenshot is on this phone's clipboard. Paste it anywhere."
+                // The banner that used to be the whole of this tile's result is
+                // gone with the panel arriving. It said the shot was on the
+                // clipboard — true, and now stated inside the panel next to the
+                // two things that can be done with it — and said nothing at all
+                // about the picture, which nothing rendered. It would also come
+                // up at the bottom edge, directly over the two actions.
+                withAnimation(NS.Motion.stateChange) { showScreenshot = true }
             }
 
         case "lastFrame":
@@ -888,6 +906,11 @@ final class AppModel {
         // first drawn — a card describing the stream that just ended has no
         // business on the one that is starting.
         decodeFailures.removeAll()
+        // The same reason the decode failures go: a panel describing the
+        // session that just ended has no business on the one that is starting.
+        // `stopStream` clears this too, but a revoke or a dropped socket leaves
+        // the remote screen without passing through it.
+        showScreenshot = false
         streamState = .starting
         route = .remote
         send([
@@ -903,6 +926,10 @@ final class AppModel {
         streamState = .stopped
         showHub = false
         showKeyboard = false
+        // A shot that is still in flight when the stream is stopped would
+        // otherwise raise its panel over Home, or wait there and open itself
+        // over the next session's picture.
+        showScreenshot = false
         releaseModifiers()
         route = .home
     }

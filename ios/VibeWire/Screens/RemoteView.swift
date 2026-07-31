@@ -95,6 +95,20 @@ struct RemoteView: View {
                 // this line nothing read it, so KEYS in the rail, KEYS in the
                 // landscape dock and KEYS in the drawer all did nothing at all.
                 if model.showKeyboard { KeyboardBarView() }
+
+                // 03G — the shot the Mac sent back. Last in the stack, so it is
+                // over the drawer and the keyboard bar rather than under them:
+                // it arrives seconds after the tap that asked for it, by which
+                // time either of those may be open, and a panel half-covered by
+                // the control that summoned it is not a panel.
+                //
+                // In both orientations, unlike the drawer. The drawer is
+                // portrait-only because the landscape dock *is* the drawer
+                // unrolled; there is no dock equivalent of this, and SHOT is one
+                // of the dock's six tiles — so leaving it out of landscape would
+                // make that tile the one control on this screen that does
+                // nothing where it is drawn.
+                if model.showScreenshot { ScreenshotSheetView() }
             }
             // Nothing layered on the glass gets to resize the glass.
             .frame(width: geometry.size.width, height: geometry.size.height)

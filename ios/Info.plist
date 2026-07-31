@@ -34,6 +34,18 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Reaching your Mac on the same Wi-Fi network.</string>
 	<!--
+	  Add-only, and only that. The screenshot panel offers "Save to Photos",
+	  which is UIImageWriteToSavedPhotosAlbum, and iOS terminates the app
+	  outright if this string is missing rather than reporting a refusal the
+	  panel could name.
+
+	  NSPhotoLibraryUsageDescription is deliberately absent: that key asks for
+	  read access to the whole library, this app never reads a photo, and asking
+	  for more than is used is how a permission prompt stops being believed.
+	-->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Saving a screenshot of your Mac’s screen to this iPhone’s photo library.</string>
+	<!--
 	  The host serves plain HTTP and WebSocket by design: over Tailscale the
 	  transport is already WireGuard, and over the relay TLS terminates at
 	  Cloudflare's edge. Either way the Ed25519 handshake authenticates the
