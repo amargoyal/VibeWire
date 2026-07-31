@@ -194,6 +194,14 @@ struct ClaudePanelView: View {
                         if !model.changedFiles.isEmpty { fileList }
 
                         if model.claudeStreaming { streamingIndicator }
+
+                        // The Mac has been telling the app how much of the window
+                        // is left since the panel was built, and the phone was the
+                        // one client that never said it. Amber: a limit being
+                        // approached is a degraded condition, not a fault.
+                        if let note = model.claudeRateLimitNote {
+                            MonoCaps(note, size: 9, color: NS.Color.amber, tracking: 1.6)
+                        }
                     }
                     .opacity(model.permission == nil ? 1 : 0.5)
                     .accessibilityHidden(model.permission != nil)
@@ -469,6 +477,11 @@ struct ClaudePanelView: View {
                 .accessibilityLabel("Send")
             }
         }
+        // Everything else on screen dims to half while a question is pending, so
+        // there is exactly one thing to do. The composer went on looking live.
+        .disabled(model.permission != nil)
+        .opacity(model.permission != nil ? 0.4 : 1)
+        .animation(NS.Motion.stateChange, value: model.permission?.id)
     }
 
     /// Sending with nothing open reached the host and came back as
@@ -483,11 +496,15 @@ struct ClaudePanelView: View {
     }
 
     private var composerPrompt: String {
+        // A tool is stopped waiting for an answer, and a message typed here goes
+        // nowhere until it is given. The composer says which one is missing.
+        if model.permission != nil { return "Answer the question first…" }
         guard hasSomewhereToSend else { return "Pick a session first…" }
         return model.claudeMode == .chat ? "Ask about this Mac…" : "Steer the session…"
     }
 
     private var canSend: Bool {
+        guard model.permission == nil else { return false }
         guard hasSomewhereToSend else { return false }
         return !draft.trimmingCharacters(in: .whitespaces).isEmpty
     }

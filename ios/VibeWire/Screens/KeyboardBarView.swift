@@ -70,6 +70,9 @@ struct KeyboardBarView: View {
             Button {
                 model.showKeyboard = false
                 focused = false
+                // A modifier latched here has no other indicator once the bar is
+                // gone, so closing the bar cannot leave one down.
+                model.releaseModifiers()
             } label: {
                 Text("✕")
                     .font(NS.Font.mono(13))

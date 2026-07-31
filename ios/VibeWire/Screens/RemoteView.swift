@@ -13,6 +13,11 @@ struct RemoteView: View {
 
     @State private var pointerOrigin: CGPoint?
     @State private var isDragging = false
+    /// The press that has not yet decided whether it is a tap, a slide or a drag.
+    /// A finger that stays put for `holdToDragSeconds` picks the window up; one
+    /// that travels first is steering, which is what a trackpad has always done.
+    @State private var holdToDrag: Task<Void, Never>?
+    @State private var travelSincePress: CGFloat = 0
     @State private var showTeachingOverlay = true
     @State private var pinchStart: CGFloat = 1
     @State private var showZoomBadge = false
@@ -71,6 +76,11 @@ struct RemoteView: View {
                 if case .reconnecting = model.streamState { reconnectingOverlay }
 
                 if model.showHub { CommandDrawerView() }
+
+                // 05 — the keyboard bar. Three places set `showKeyboard`; until
+                // this line nothing read it, so KEYS in the rail, KEYS in the
+                // landscape dock and KEYS in the drawer all did nothing at all.
+                if model.showKeyboard { KeyboardBarView() }
             }
             // Nothing layered on the glass gets to resize the glass.
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -272,6 +282,15 @@ struct RemoteView: View {
                 // The hub's hint text sits on this exact line, and two 8pt
                 // captions on top of each other read as neither.
                 .opacity(model.showHub ? 0 : 1)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // Something is being carried, and the only way to put it down is to
+            // lift the finger. Violet, because holding is the user's own state.
+            if isDragging {
+                VideoCaption("DRAGGING · LIFT TO DROP", color: NS.Color.accent)
+                    .padding(.trailing, 10)
+                    .padding(.bottom, 26)
+            }
         }
     }
 
@@ -736,11 +755,16 @@ struct RemoteView: View {
                 // the Mac's pointer ran off at the same time.
                 guard !isTwoFingerPanning else {
                     pointerOrigin = nil
+                    cancelHold()
                     return
                 }
                 if pointerOrigin == nil {
                     pointerOrigin = value.startLocation
+                    travelSincePress = 0
+                    startHoldToDrag()
                 }
+                travelSincePress = hypot(value.translation.width, value.translation.height)
+                if travelSincePress >= Self.tapSlop { cancelHold() }
                 let previous = pointerOrigin ?? value.startLocation
                 let dx = value.location.x - previous.x
                 let dy = value.location.y - previous.y
@@ -771,7 +795,7 @@ struct RemoteView: View {
                 // unless two fingers were pinching, where lifting them must not
                 // land a click, or the pad is moving the view rather than the
                 // Mac's pointer.
-                if travel < 6 && !isDragging && !isTwoFingerPanning && padMode == .pointer {
+                if travel < Self.tapSlop && !isDragging && !isTwoFingerPanning && padMode == .pointer {
                     model.click()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
@@ -779,8 +803,35 @@ struct RemoteView: View {
                     model.drag("end")
                     isDragging = false
                 }
+                cancelHold()
                 pointerOrigin = nil
             }
+    }
+
+    /// Below this a press is a tap, not a travel.
+    private static let tapSlop: CGFloat = 6
+    /// How long a finger has to stay put before a slide becomes a drag. The same
+    /// 450ms the browser client uses, so the two clients feel like one hand.
+    private static let holdToDragSeconds: Double = 0.45
+
+    private func startHoldToDrag() {
+        holdToDrag?.cancel()
+        holdToDrag = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.holdToDragSeconds))
+            guard !Task.isCancelled else { return }
+            guard !isDragging, !isTwoFingerPanning, padMode == .pointer else { return }
+            guard travelSincePress < Self.tapSlop else { return }
+            isDragging = true
+            model.drag("begin")
+            // Heavier than a click: picking something up is a different act from
+            // pressing it, and the finger is not looking at the screen it moved.
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+    }
+
+    private func cancelHold() {
+        holdToDrag?.cancel()
+        holdToDrag = nil
     }
 
     private var pinchGesture: some Gesture {
