@@ -36,12 +36,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { bitrateMbps, store, type DisplayEntry } from '../app/store'
-import {
-  hostKeyName,
-  modifiersFrom,
-  releaseKeyboardLock,
-  typedIntoBrowser,
-} from '../app/keymap'
+import { hostKeyName, modifiersFrom, typedIntoBrowser } from '../app/keymap'
 import {
   Announce,
   Caps,
@@ -84,7 +79,7 @@ export function Remote() {
   const [showZoomBadge, setShowZoomBadge] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [landscape, setLandscape] = useState(false)
-  const [showTeaching] = useState(() => store.sessionCount.value <= 3)
+  const [showTeaching] = useState(() => store.streamSessionCount.value <= 3)
 
   const glass = useRef<HTMLDivElement | null>(null)
   const picture = useRef<HTMLDivElement | null>(null)
@@ -491,7 +486,13 @@ export function Remote() {
       window.removeEventListener('keyup', onKeyUp)
       // Anything still held belongs to a keyboard nobody is watching any more.
       store.releaseModifiers()
-      releaseKeyboardLock()
+      // The keyboard lock is deliberately *not* released here. It belongs to the
+      // fullscreen document, is taken when fullscreen is entered and given back
+      // when it is left; this effect re-runs whenever the pointer capture or the
+      // keyboard bar toggles, which happens constantly while fullscreen never
+      // changes. Releasing it from here handed ⌘W back to the browser mid-session
+      // and nothing ever asked for it again — the tab could then be closed by the
+      // very keystroke the screen said was reaching the Mac.
     }
   }, [captured, store.showKeyboard.value])
 

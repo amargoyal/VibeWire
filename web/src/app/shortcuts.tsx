@@ -26,7 +26,15 @@ import { signal } from '@preact/signals'
 
 import { store } from './store'
 import { keyboardLocked, releaseKeyboardLock, requestKeyboardLock, typedIntoBrowser } from './keymap'
-import { Caps, Display, ScreenBody, SectionLabel, SheetDismiss, useSheet } from '../design/components'
+import {
+  anySheetOpen,
+  Caps,
+  Display,
+  ScreenBody,
+  SectionLabel,
+  SheetDismiss,
+  useSheet,
+} from '../design/components'
 
 /** Open only from `?`, and only on a machine with a keyboard to press it with. */
 export const showShortcuts = signal(false)
@@ -170,6 +178,9 @@ export function useShortcuts(): void {
 
       const binding = BINDINGS.find((candidate) => candidate.key === event.key)
       if (!binding) return
+      // A sheet is a modal context. `?` is the exception because it is the way
+      // out of the one sheet these keys open.
+      if (binding.key !== '?' && anySheetOpen()) return
       if (binding.where === 'picture' && store.route.value !== 'remote') return
       // Nothing but this list applies before there is a Mac: a Claude panel over
       // the pairing screen is a panel with nothing on the other end of it.

@@ -274,7 +274,10 @@ export class Store {
    *  which reports only the modifiers its own fingers are on. */
   private latchedModifiers: string[] = []
   private physicalModifiers: string[] = []
-  sessionCount = signal(0)
+  /** How many times a picture has gone live in this tab. Named for what it
+   *  counts: it decides whether the remote view still shows its teaching legend,
+   *  and it has nothing to do with Claude, which read it as a session count. */
+  streamSessionCount = signal(0)
 
   // Clipboard
   clipboardFromMac = signal('')
@@ -697,14 +700,24 @@ export class Store {
         // after the tap that asked for it. So the outcome is reported rather than
         // assumed. Refused, the text is shown with a button to copy it, which is a
         // gesture the browser does accept.
-        void navigator.clipboard
-          ?.writeText(text)
-          .then(() => {
-            this.banner.value = `Copied from the Mac: ${firstLine(text)}`
-          })
-          .catch(() => {
-            this.clipboardOffer.value = text
-          })
+        // Not an optional chain on the whole call: `navigator.clipboard?.write…`
+        // short-circuits to `undefined` where the API is absent, which takes both
+        // handlers with it — and it is absent on the origin this app is most
+        // often opened from, because the Mac serves the page over plain HTTP and
+        // that is not a secure context. COPY then did nothing and said nothing,
+        // which is the exact failure this branch exists to report.
+        if (navigator.clipboard?.writeText) {
+          void navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              this.banner.value = `Copied from the Mac: ${firstLine(text)}`
+            })
+            .catch(() => {
+              this.clipboardOffer.value = text
+            })
+        } else {
+          this.clipboardOffer.value = text
+        }
         break
       }
 
@@ -746,7 +759,7 @@ export class Store {
       case 'live':
         batch(() => {
           this.streamState.value = { kind: 'live' }
-          this.sessionCount.value += 1
+          this.streamSessionCount.value += 1
         })
         break
       case 'stalled':

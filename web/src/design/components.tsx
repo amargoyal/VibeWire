@@ -864,6 +864,18 @@ function focusablesIn(node: HTMLElement): HTMLElement[] {
 const sheetStack: Array<{ node: HTMLElement | null; dismiss?: () => void }> = []
 
 /**
+ * Whether anything modal is on screen.
+ *
+ * A sheet is a modal context — it dims what is behind it, traps Tab inside
+ * itself and takes Escape — so the app's bare-key shortcuts have no business
+ * firing underneath one. Without this, `,` closed the Settings sheet from inside
+ * the Settings sheet and `c` swapped it for the Claude panel mid-read.
+ */
+export function anySheetOpen(): boolean {
+  return sheetStack.length > 0
+}
+
+/**
  * Makes a `role="dialog"` behave like one.
  *
  * Three things, all of which the browser does for `<dialog>` and for nothing else:
@@ -918,8 +930,17 @@ export function useSheet<T extends HTMLElement = HTMLDivElement>(
       const first = focusables[0]
       const last = focusables[focusables.length - 1]
       const active = document.activeElement
+      // The dialog node itself counts as the near edge. On open, focus is on the
+      // dialog — which `node.contains(node)` calls inside and which is not the
+      // first focusable — so a first keystroke of Shift+Tab fell through both
+      // guards and walked to the control *before* the dialog, behind the scrim.
+      const onEdge = active === node
       const outside = !node.contains(active)
-      if (event.shiftKey ? active === first || outside : active === last || outside) {
+      if (
+        event.shiftKey
+          ? active === first || onEdge || outside
+          : active === last || outside
+      ) {
         event.preventDefault()
         event.stopPropagation()
         ;(event.shiftKey ? last : first).focus()

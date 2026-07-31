@@ -359,8 +359,15 @@ function ClipboardSheet() {
             title="COPY IT"
             height={56}
             onClick={() => {
+              // Same reason as the store's own copy path: an optional chain here
+              // swallows the whole call where the API is absent, and this button
+              // is the answer to that very case.
+              if (!navigator.clipboard?.writeText) {
+                store.banner.value = 'This browser has no clipboard here. Select the text and copy it.'
+                return
+              }
               void navigator.clipboard
-                ?.writeText(text)
+                .writeText(text)
                 .then(() => {
                   store.clipboardOffer.value = null
                   store.banner.value = 'Copied.'

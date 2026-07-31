@@ -232,11 +232,13 @@ export function Pairing() {
 
   if (exchanging) return <Exchanging digits={digits} steps={steps} />
 
-  // The dial is driven off the store's one-second tick rather than a timer of its
-  // own. It reports the host's rotation cadence, not a countdown this client
-  // started — nothing here knows when the Mac last turned the code over, so the
-  // dial says "there is about this much of a window left", which is the only
-  // honest version of the fact.
+  // Nothing here knows when the Mac last turned the code over — the rotation
+  // phase is not on the wire — so what was drawn was this tab's own age modulo
+  // sixty, counting down to zero on a code that might have fifty seconds left.
+  // An exact second count in amber is a claim; the cadence is a fact, and it is
+  // the one the reader needs, because it says how long to keep looking at the
+  // Mac. The dial turns on the same tick and reports the same cadence without
+  // pretending to know where in it this moment sits.
   const secondsLeft = CODE_ROTATION_SECONDS - (store.tick.value % CODE_ROTATION_SECONDS)
 
   // Read at render rather than once at module load: this is a fact about the
@@ -336,10 +338,7 @@ export function Pairing() {
         <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
           <RotatesIn fraction={secondsLeft / CODE_ROTATION_SECONDS} />
           <Caps size="var(--fs-9)" tracking="0.14em">
-            ROTATES IN
-          </Caps>
-          <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-amber)">
-            {`${secondsLeft}S`}
+            {`THE MAC ROTATES THIS CODE EVERY ${CODE_ROTATION_SECONDS}S`}
           </Caps>
         </div>
 
@@ -1060,12 +1059,39 @@ function parseLink(text: string): PairingLink | null {
   const questionMark = trimmed.indexOf('?')
   if (questionMark < 0) return null
   const parameters = new URLSearchParams(trimmed.slice(questionMark + 1))
-  const host = parameters.get('host')
-  if (!host) return null
   const code = parameters.get('code')
+
+  // The Mac draws two QRs, and the one meant for a browser is an ordinary URL to
+  // the host itself — `http://mac:8787/?code=482917`, with no `host` parameter,
+  // because the address is the link. Refusing a payload with no `host` rejected
+  // exactly the code this scanner was built to read, while the app's own
+  // deep-link handler had always accepted it by falling back to the origin.
+  const host = parameters.get('host') ?? hostFromURL(trimmed)
+  if (!host) return null
+
   return {
     host,
-    port: parameters.get('port'),
+    port: parameters.get('port') ?? portFromURL(trimmed),
     code: code && code.length === 6 ? code : null,
+  }
+}
+
+/** The authority of a payload that is itself a URL to the Mac. */
+function hostFromURL(text: string): string | null {
+  try {
+    const url = new URL(text)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : null
+  } catch {
+    return null
+  }
+}
+
+function portFromURL(text: string): string | null {
+  try {
+    const url = new URL(text)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return url.port || (url.protocol === 'https:' ? '443' : '80')
+  } catch {
+    return null
   }
 }

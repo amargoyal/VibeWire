@@ -1339,7 +1339,10 @@ function MovedAddress() {
  * laptop it sits beside "View screen" as the other thing worth opening.
  */
 function ClaudeHandle() {
-  const count = store.sessionCount.value
+  // Sessions the Mac reports, not streams this tab has opened. This read
+  // `sessionCount`, which counts pictures going live — so stopping and starting
+  // the stream three times made this row claim three Claude sessions.
+  const count = store.claudeSessions.value.length
   const cwd = store.claudeCwd.value
 
   const detail = (() => {
@@ -1347,7 +1350,7 @@ function ClaudeHandle() {
       const short = cwd.replace(/^\/Users\/[^/]+/, '~').toUpperCase()
       return count > 0 ? `${count} SESSION${count === 1 ? '' : 'S'} · ${short} OPEN` : `${short}`
     }
-    return count > 0 ? `${count} SESSION${count === 1 ? '' : 'S'} THIS LAUNCH` : 'NO SESSION YET'
+    return count > 0 ? `${count} SESSION${count === 1 ? '' : 'S'} ON THE MAC` : 'NO SESSION YET'
   })()
 
   return (

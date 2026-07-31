@@ -265,9 +265,12 @@ export function KeyboardBar() {
             ? `THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(
                 ' ',
               )} TOO, WHILE THIS FILLS THE SCREEN`
-            : `THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(
+            : // Deliberately not "press F": while this bar is open every key is
+              // the Mac's, including that one, so the sentence would have named a
+              // key that types an f into whatever window is frontmost over there.
+              `THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(
                 ' ',
-              )} STAY WITH THE BROWSER · F FILLS THE SCREEN AND TAKES THEM`}
+              )} STAY WITH THE BROWSER UNLESS IT IS FILLING THE SCREEN`}
         </Caps>
       )}
 
