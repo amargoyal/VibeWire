@@ -264,7 +264,25 @@ export class Store {
   zoomLocked = signal(false)
   sideBySide = signal(false)
   inputPane = signal(0)
+  /** The age the host reported, at the moment it reported it. */
   lastFrameAgeSeconds = signal<number | null>(null)
+  private lastFrameAgeAt = 0
+
+  /**
+   * That measurement, carried forward by this client's own clock.
+   *
+   * The raw value arrives once and then sits there, so the hero said LAST FRAME ·
+   * 5S AGO and was still saying it ten minutes later. The host's number is the
+   * measurement; the elapsed time since it landed is arithmetic, and stating the
+   * sum is honest in a way that freezing the first half is not.
+   */
+  frameAge = computed<number | null>(() => {
+    const base = this.lastFrameAgeSeconds.value
+    if (base == null) return null
+    // Read once a second so the readout advances rather than freezing.
+    void this.tick.value
+    return base + (performance.now() - this.lastFrameAgeAt) / 1000
+  })
 
   // Input
   /** Everything the Mac is being told is down — tapped and physical together. */
@@ -729,6 +747,7 @@ export class Store {
 
       case 'lastFrame':
         this.lastFrameAgeSeconds.value = num(payload['ageSeconds'])
+        this.lastFrameAgeAt = performance.now()
         break
 
       case 'frontmost':

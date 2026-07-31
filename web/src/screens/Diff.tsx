@@ -67,7 +67,10 @@ export function DiffView() {
   // One pass over the patch: the rows and the two counts the footer states. As
   // separate computed values this split the whole patch three times per render, on a
   // view the host re-sends after every tool result while Claude is editing.
-  const lines = patch.length ? patch.split('\n') : []
+  // `git diff` ends with a newline, and splitting on it leaves an empty final
+  // element — drawn as a blank row at the foot of every patch and counted in the
+  // total, so a 40-line diff reported 41.
+  const lines = patch.length ? patch.replace(/\n$/, '').split('\n') : []
   let added = 0
   let removed = 0
   for (const line of lines) {

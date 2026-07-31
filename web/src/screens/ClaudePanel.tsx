@@ -261,10 +261,15 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
 
         {/* A tool has stopped and is waiting to be answered. Everything on screen
             dims to say so, which says nothing at all to a reader who is not
-            looking at it. */}
-        {permission ? (
-          <Announce>{`${permission.toolName} is waiting for permission to run.`}</Announce>
-        ) : null}
+            looking at it.
+
+            Held open with an empty string rather than mounted with the sentence
+            already inside it: a live region that arrives carrying its own text is
+            not reliably spoken, because there was no change for the reader to be
+            told about — the element simply appeared. */}
+        <Announce>
+          {permission ? `${permission.toolName} is waiting for permission to run.` : ''}
+        </Announce>
 
         <div class="claude__ask">
         {/* Follow-ups as two thumb chips rather than another typing session. */}
@@ -772,10 +777,17 @@ function FileList({
   )
 }
 
-/** File changes get counts and a four-bar ratio. */
+/**
+ * File changes get counts and a four-bar ratio.
+ *
+ * Nothing to divide is not a ratio. With no lines either way the maths gave zero
+ * green bars of four, which draws a file with every line removed — a picture of a
+ * deletion, for a file that has not been touched or has not been counted yet.
+ * Four dormant bars say the same thing the em dash says elsewhere.
+ */
 export function RatioBars({ added, removed }: { added: number; removed: number }) {
-  const total = Math.max(1, added + removed)
-  const green = Math.round((added / total) * 4)
+  const counted = added + removed
+  const green = counted === 0 ? 0 : Math.round((added / counted) * 4)
   return (
     <span class="row" style={{ gap: '2px', flex: '0 0 auto' }} aria-hidden="true">
       {[0, 1, 2, 3].map((index) => (
@@ -784,7 +796,12 @@ export function RatioBars({ added, removed }: { added: number; removed: number }
           style={{
             width: '3px',
             height: '12px',
-            background: index < green ? 'var(--ns-green)' : 'var(--ns-red)',
+            background:
+              counted === 0
+                ? 'var(--ns-text-disabled)'
+                : index < green
+                  ? 'var(--ns-green)'
+                  : 'var(--ns-red)',
           }}
         />
       ))}

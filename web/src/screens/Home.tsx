@@ -323,7 +323,7 @@ function Hero({ posture }: { posture: Posture }) {
     (config) => config.displayId === display?.id,
   )
   const painted = carried && renderer.framesRendered > 0
-  const age = store.lastFrameAgeSeconds.value
+  const age = store.frameAge.value
   const lost = posture === 'unreachable'
   const tick = lost ? 'var(--ns-red)' : 'color-mix(in srgb, var(--ns-accent) 70%, transparent)'
 
