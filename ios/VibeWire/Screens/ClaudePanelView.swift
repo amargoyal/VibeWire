@@ -14,6 +14,26 @@ struct ClaudePanelView: View {
     @State private var permissionAge = 0
     @FocusState private var composerFocused: Bool
 
+    /// Whether the reader is at the foot of the transcript.
+    ///
+    /// The panel used to follow the foot on every turn and every tool call
+    /// regardless of where the reader was, so scrolling up to re-read something
+    /// while Claude was working yanked the page back down within seconds — and
+    /// did it continuously while a long answer streamed in. Following now
+    /// happens only while the reader is already there.
+    ///
+    /// Derived from geometry, never set by hand: `atFoot` is one comparison
+    /// between the two measurements the scroll view reports, so it cannot claim
+    /// a position the scroll view is not in.
+    @State private var atFoot = true
+    /// Those two measurements, held where they cannot invalidate the body. The
+    /// foot arrives on every frame of a scroll, and the transcript is the
+    /// tallest view in the app: kept in `@State`, a gesture would rebuild it
+    /// sixty times a second to answer a question whose answer had not changed.
+    @State private var scroll = TranscriptScroll()
+
+    private static let transcriptSpace = "claudeTranscript"
+
     var body: some View {
         ScreenBody(background: NS.Color.screenGround) {
             VStack(spacing: 0) {
@@ -224,18 +244,102 @@ struct ClaudePanelView: View {
                     Color.clear.frame(height: 1).id("bottom")
                 }
                 .padding(.top, 22)
+                // Where the foot of the transcript sits, in the coordinates of
+                // the window onto it. Measured on the stack rather than on the
+                // sentinel above it: a `LazyVStack` discards the views it has
+                // scrolled past, and a probe that stops existing reports its
+                // default — which would read as "at the foot" exactly when the
+                // reader has scrolled furthest from it.
+                .background {
+                    GeometryReader { content in
+                        Color.clear.preference(
+                            key: TranscriptFootKey.self,
+                            value: content.frame(in: .named(Self.transcriptSpace)).maxY
+                        )
+                    }
+                }
             }
-            .onChange(of: model.claudeTurns.count) { _, _ in
-                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            .coordinateSpace(.named(Self.transcriptSpace))
+            .background {
+                GeometryReader { window in
+                    Color.clear.preference(
+                        key: TranscriptHeightKey.self,
+                        value: window.size.height
+                    )
+                }
             }
-            .onChange(of: model.toolCalls.count) { _, _ in
-                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onPreferenceChange(TranscriptHeightKey.self) { height in
+                scroll.window = height
+                readFoot()
             }
+            .onPreferenceChange(TranscriptFootKey.self) { foot in
+                scroll.foot = foot
+                readFoot()
+            }
+            .onChange(of: model.claudeTurns.count) { _, _ in followFoot(proxy) }
+            .onChange(of: model.toolCalls.count) { _, _ in followFoot(proxy) }
+            .onChange(of: model.claudeStreaming) { _, _ in followFoot(proxy) }
             // A question that arrives below the fold is a question nobody
-            // answers.
+            // answers. This one scrolls wherever the reader is: it is the one
+            // thing that must be seen, which is why the panel dims everything
+            // else for it.
             .onChange(of: model.permission?.id) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
+            .overlay(alignment: .bottom) { jumpToFoot(proxy) }
+        }
+    }
+
+    /// Nothing above changes until the reader actually crosses the line, which
+    /// is the whole reason the two measurements are held off to one side.
+    private func readFoot() {
+        guard atFoot != scroll.atFoot else { return }
+        withAnimation(NS.Motion.stateChange) { atFoot = scroll.atFoot }
+    }
+
+    private func followFoot(_ proxy: ScrollViewProxy) {
+        guard atFoot else { return }
+        withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+    }
+
+    /// The way back down, and only where it is needed: a reader at the foot has
+    /// nothing to jump to, and a control that is always there is chrome sitting
+    /// over a live conversation.
+    ///
+    /// It says whether there is still more coming, because that is the
+    /// difference between catching up with an answer and going back to the end
+    /// of a finished one.
+    @ViewBuilder
+    private func jumpToFoot(_ proxy: ScrollViewProxy) -> some View {
+        if !atFoot {
+            Button {
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            } label: {
+                MonoCaps(
+                    model.claudeStreaming ? "STILL WRITING · JUMP DOWN" : "JUMP TO THE END",
+                    size: 9,
+                    color: NS.Color.accent,
+                    tracking: 1.4
+                )
+                .padding(.horizontal, 16)
+                // A capsule, which is what this system marks a transient thing
+                // with, and the full floor for a target: the ink is one line of
+                // nine-point caps.
+                .frame(minHeight: NS.Metric.minimumTarget)
+                .background(Capsule().fill(NS.Color.raised2))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.bottom, 10)
+            .accessibilityLabel("Jump to the end")
+            .accessibilityHint(
+                model.claudeStreaming
+                    ? "Claude is still writing."
+                    : "Returns to the newest message."
+            )
+            // Travel is what Reduce Motion takes; arriving in place is what it
+            // keeps.
+            .transition(.opacity)
         }
     }
 
@@ -534,6 +638,47 @@ struct ClaudePanelView: View {
             let age = model.permission?.waitedSeconds ?? 0
             if age != permissionAge { permissionAge = age }
         }
+    }
+}
+
+// MARK: - Where the transcript is scrolled to
+
+/// The foot of the transcript in the coordinates of the window onto it, and how
+/// tall that window is. The difference between them is the only thing the panel
+/// needs.
+private final class TranscriptScroll {
+    var foot: CGFloat = 0
+    var window: CGFloat = 0
+
+    /// A line's worth of slack, so a reader who is at the foot stays there
+    /// through a re-render that changes the content's height by a point or two.
+    /// The same 48 the browser holds.
+    private static let slack: CGFloat = 48
+
+    /// True before anything has been measured, which is where a transcript
+    /// opens: at its end, with the newest thing on screen.
+    var atFoot: Bool { foot - window <= Self.slack }
+}
+
+/// The two measurements, taken in the one place SwiftUI will report them from.
+///
+/// `ScrollView`'s `onScrollGeometryChange` states this in one line and is the
+/// modern spelling of it. It arrived in iOS 18 and this app deploys to iOS 17,
+/// so it cannot be used here without either raising the floor or writing the
+/// measurement twice. This is the same measurement taken with what 17 has: a
+/// named coordinate space on the scroll view, and a probe in the background of
+/// the content that reports where its bottom edge landed inside that space.
+private struct TranscriptFootKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct TranscriptHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

@@ -53,30 +53,23 @@ struct MarkdownText: View {
             CodeBlock(language: language, code: body)
 
         case .bullet(let items):
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("•")
-                            .nsMono(size - 2)
-                            .foregroundStyle(NS.Color.accent.opacity(0.8))
-                        inline(item)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
+            MarkdownList(
+                nodes: MarkdownListNode.nest(items),
+                ordered: false,
+                size: size,
+                color: textColor
+            )
 
         case .numbered(let items):
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text("\(index + 1).")
-                            .nsMono(size - 3)
-                            .foregroundStyle(NS.Color.accent.opacity(0.8))
-                        inline(item)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
+            MarkdownList(
+                nodes: MarkdownListNode.nest(items),
+                ordered: true,
+                size: size,
+                color: textColor
+            )
+
+        case .table(let header, let rows):
+            MarkdownTable(header: header, rows: rows)
 
         case .quote(let content):
             HStack(alignment: .top, spacing: 10) {
@@ -137,6 +130,189 @@ struct MarkdownText: View {
         }
     }
 }
+
+// MARK: - Lists
+
+/// A run of list items, nested by depth, drawn as real nested lists.
+///
+/// Padding a flat run would draw the hierarchy for someone looking at it and
+/// still say "list of six" to VoiceOver — which is the one claim the
+/// indentation was not making. Each level is its own list, so a numbered run
+/// counts from one inside each level the way it reads on the page.
+///
+/// The view recurses on itself. That is safe here because the recursion is over
+/// data: `nest` bounds the depth at three, and a leaf has no children to
+/// descend into.
+private struct MarkdownList: View {
+    let nodes: [MarkdownListNode]
+    /// Numbered rather than bulleted. The marker is the only difference; the
+    /// nesting, the task state and the spoken form are identical.
+    let ordered: Bool
+    let size: CGFloat
+    let color: Color
+
+    /// An inline run has to be a `Text`, so this cannot take the font as a
+    /// modifier and read the reader's size for itself.
+    @Environment(\.dynamicTypeSize) private var type
+
+    /// One step of indent per level. Enough that the eye reads a level, small
+    /// enough that a three-deep list still has a measure left on a phone.
+    private static let step: CGFloat = 18
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(nodes.enumerated()), id: \.offset) { index, node in
+                VStack(alignment: .leading, spacing: 6) {
+                    row(node.item, number: index + 1)
+
+                    if !node.children.isEmpty {
+                        MarkdownList(
+                            nodes: node.children,
+                            ordered: ordered,
+                            size: size,
+                            color: color
+                        )
+                        .padding(.leading, Self.step)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ item: MarkdownListItem, number: Int) -> some View {
+        let line = HStack(alignment: .top, spacing: 8) {
+            marker(item, number: number)
+            Text(MarkdownText.attributed(item.text, at: type))
+                .font(NS.Font.sans(size, at: type))
+                .foregroundStyle(color)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if let done = item.done {
+            // The mark is decoration — a reader who is not looking at it gets
+            // the sentence and nothing that says whether it is done — so the
+            // state is spoken rather than only drawn.
+            line
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(done ? "Done" : "Not done")
+        } else {
+            line
+        }
+    }
+
+    /// A number, or the task vocabulary this system already has: a tick for
+    /// done, an outline for not yet, a bullet for an item that is neither.
+    ///
+    /// The browser spells the empty box `☐`, which the system monospace does
+    /// not carry — it would be drawn by whatever face iOS substituted, at
+    /// whatever width that face advances, in a column whose whole job is to
+    /// line up. `□` is in the face, so it holds the column.
+    private func marker(_ item: MarkdownListItem, number: Int) -> some View {
+        Group {
+            if ordered {
+                Text("\(number).")
+                    .nsMono(size - 3)
+                    .foregroundStyle(NS.Color.accent.opacity(0.8))
+            } else {
+                Text(item.done == nil ? "•" : (item.done == true ? "✓" : "□"))
+                    .nsMono(size - 2)
+                    // Green is the done state everywhere else in this panel —
+                    // the tick on a finished tool call is the same mark in the
+                    // same ink.
+                    .foregroundStyle(
+                        (item.done == true ? NS.Color.green : NS.Color.accent).opacity(0.8)
+                    )
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Table
+
+/// A pipe table.
+///
+/// Mono throughout, because a table in an answer is a table of values and this
+/// system sets anything measured in mono. It scrolls sideways rather than
+/// wrapping cells: a four-column table does not fit a phone at any font size,
+/// and a wrapped cell stops lining up with its heading, which is the only thing
+/// a table is for.
+private struct MarkdownTable: View {
+    let header: [String]
+    let rows: [[String]]
+
+    @Environment(\.dynamicTypeSize) private var type
+
+    /// A ragged row is ordinary in hand-written Markdown, so the grid is as
+    /// wide as the widest line rather than as wide as the heading.
+    private var columns: Int {
+        max(header.count, rows.map(\.count).max() ?? 0)
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 18, verticalSpacing: 7) {
+                GridRow {
+                    ForEach(0..<columns, id: \.self) { column in
+                        MonoCaps(cell(header, column), size: 9, tracking: 1.4)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .padding(.bottom, 7)
+                            // Drawn under each heading rather than as one rule
+                            // across the grid, which is also how the browser
+                            // draws it: a cell that spans every column takes its
+                            // width from a grid that is being asked how wide it
+                            // wants to be, and the two questions have no answer
+                            // between them.
+                            .overlay(alignment: .bottom) {
+                                Rectangle()
+                                    .fill(NS.Color.hairline)
+                                    .frame(height: NS.Metric.hairline)
+                            }
+                    }
+                }
+
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    GridRow {
+                        ForEach(0..<columns, id: \.self) { column in
+                            Text(MarkdownText.attributed(cell(row, column), at: type))
+                                .font(NS.Font.mono(12, at: type))
+                                // The first column is what the row is about; the
+                                // rest are its values, a step back.
+                                .foregroundStyle(column == 0 ? NS.Color.text : NS.Color.context)
+                                .lineLimit(1)
+                                .fixedSize()
+                                // A cell read on its own is a value with nothing
+                                // to measure it against. The heading is what a
+                                // table is for, so it is said with every cell.
+                                .accessibilityLabel(spoken(row, column))
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.deepGround)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Table")
+    }
+
+    private func cell(_ line: [String], _ column: Int) -> String {
+        line.indices.contains(column) ? line[column] : ""
+    }
+
+    private func spoken(_ row: [String], _ column: Int) -> String {
+        let value = cell(row, column)
+        let heading = cell(header, column)
+        return heading.isEmpty ? value : "\(heading): \(value)"
+    }
+}
+
+// MARK: - Code
 
 /// Monospace, own ground, scrolls sideways. Copy button, because the reason to
 /// look at a command on a phone is usually to run it somewhere else.
@@ -248,13 +424,57 @@ private struct CodeBlock: View {
 
 // MARK: - Block splitting
 
+/// One line of a list, with the two things a flat `String` threw away.
+///
+/// `depth` is how far it was indented, because Claude nests lists constantly
+/// and a nested list drawn flat says every point is a sibling of every other —
+/// which is the one claim the indentation was making. `done` is the state of a
+/// task box, where there was one; `nil` means this item is not a task.
+struct MarkdownListItem {
+    let text: String
+    let depth: Int
+    let done: Bool?
+}
+
+/// One item and whatever was indented under it.
+struct MarkdownListNode {
+    let item: MarkdownListItem
+    var children: [MarkdownListNode]
+
+    /// The flat run, grouped into the levels its indents describe.
+    static func nest(_ items: [MarkdownListItem], depth: Int = 0) -> [MarkdownListNode] {
+        var nodes: [MarkdownListNode] = []
+        var index = items.startIndex
+
+        while index < items.endIndex {
+            let item = items[index]
+            // An item deeper than its predecessors with no parent above it is a
+            // stray indent, not a level; it joins the run rather than
+            // disappearing into a child list of nothing.
+            if item.depth > depth, !nodes.isEmpty {
+                let start = index
+                while index < items.endIndex, items[index].depth > depth { index += 1 }
+                nodes[nodes.count - 1].children = nest(
+                    Array(items[start..<index]),
+                    depth: depth + 1
+                )
+                continue
+            }
+            nodes.append(MarkdownListNode(item: item, children: []))
+            index += 1
+        }
+        return nodes
+    }
+}
+
 enum MarkdownBlock {
     case paragraph(String)
     case heading(level: Int, text: String)
     case code(language: String?, body: String)
-    case bullet([String])
-    case numbered([String])
+    case bullet([MarkdownListItem])
+    case numbered([MarkdownListItem])
     case quote(String)
+    case table(header: [String], rows: [[String]])
     case rule
 
     /// One pass, line by line. Fences win over everything: while a fence is
@@ -263,9 +483,10 @@ enum MarkdownBlock {
     static func parse(_ text: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
         var paragraph: [String] = []
-        var bullets: [String] = []
-        var numbers: [String] = []
+        var bullets: [MarkdownListItem] = []
+        var numbers: [MarkdownListItem] = []
         var quote: [String] = []
+        var table: [String] = []
 
         var fenceLanguage: String?
         var fenceBody: [String] = []
@@ -285,10 +506,20 @@ enum MarkdownBlock {
             blocks.append(.quote(quote.joined(separator: "\n")))
             quote.removeAll()
         }
+        /// A run of pipe rows is a table only if the second one is the separator
+        /// that says so. Anything else — one pipe in a sentence, a fragment cut
+        /// off by the end of a streaming delta — goes back to being a paragraph,
+        /// which is what it was before this existed.
+        func flushTable() {
+            guard !table.isEmpty else { return }
+            blocks.append(parseTable(table) ?? .paragraph(table.joined(separator: "\n")))
+            table.removeAll()
+        }
         func flushAll() {
             flushParagraph()
             flushLists()
             flushQuote()
+            flushTable()
         }
 
         for rawLine in text.components(separatedBy: .newlines) {
@@ -344,11 +575,25 @@ enum MarkdownBlock {
                 continue
             }
 
+            // A row of a pipe table. Claude writes these constantly and they
+            // used to fall through to a paragraph, which renders the pipes and
+            // the dashes verbatim — a table drawn as the ASCII it was typed as,
+            // wrapped at the phone's measure into something with no columns in
+            // it.
+            if trimmed.hasPrefix("|") {
+                flushParagraph()
+                flushLists()
+                flushQuote()
+                table.append(trimmed)
+                continue
+            }
+            flushTable()
+
             if let item = bulletItem(trimmed) {
                 flushParagraph()
                 flushQuote()
                 if !numbers.isEmpty { blocks.append(.numbered(numbers)); numbers.removeAll() }
-                bullets.append(item)
+                bullets.append(listItem(item, raw: line))
                 continue
             }
 
@@ -356,7 +601,7 @@ enum MarkdownBlock {
                 flushParagraph()
                 flushQuote()
                 if !bullets.isEmpty { blocks.append(.bullet(bullets)); bullets.removeAll() }
-                numbers.append(item)
+                numbers.append(listItem(item, raw: line))
                 continue
             }
 
@@ -372,6 +617,73 @@ enum MarkdownBlock {
         }
         flushAll()
         return blocks
+    }
+
+    /// An item's text, its indent, and whether it is a task box.
+    ///
+    /// The indent has to come off the raw line, since the branch above matched
+    /// a trimmed one — which is how every nested list in this app has been
+    /// drawn flat. Two spaces is one step, which is what Claude writes; a tab
+    /// counts as one step for the same reason. Three levels is the floor of
+    /// what fits a phone's measure, so deeper indents fold into the third.
+    private static func listItem(_ text: String, raw: String) -> MarkdownListItem {
+        let indent = raw.prefix { $0 == " " || $0 == "\t" }
+        let columns = indent.reduce(0) { $0 + ($1 == "\t" ? 2 : 1) }
+        let depth = min(3, columns / 2)
+
+        guard let box = taskBox(text) else {
+            return MarkdownListItem(text: text, depth: depth, done: nil)
+        }
+        return MarkdownListItem(text: box.text, depth: depth, done: box.done)
+    }
+
+    /// `[ ] thing` and `[x] thing`, with the bullet marker already taken off.
+    /// Until now the brackets were rendered as the literal characters they are.
+    private static func taskBox(_ text: String) -> (done: Bool, text: String)? {
+        var body = Substring(text)
+        guard body.first == "[" else { return nil }
+        body = body.dropFirst()
+        guard let mark = body.first, mark == " " || mark == "x" || mark == "X" else { return nil }
+        body = body.dropFirst()
+        guard body.first == "]" else { return nil }
+        body = body.dropFirst()
+        // A box with nothing after it is not a task, it is a pair of brackets:
+        // the space is what separates the mark from the thing being marked.
+        guard body.first == " " else { return nil }
+        return (mark != " ", String(body.drop { $0 == " " }))
+    }
+
+    /// A GitHub-style pipe table, or `nil` if this run is not one.
+    ///
+    /// The separator row is the whole test: `| --- | :--: |`. Without it a line
+    /// starting with a pipe is just a line starting with a pipe — and a table
+    /// still arriving in a stream of deltas has a header and no separator yet.
+    /// Both have to come back as prose rather than as a half-built grid.
+    private static func parseTable(_ lines: [String]) -> MarkdownBlock? {
+        guard lines.count >= 2 else { return nil }
+        let separator = cells(lines[1])
+        guard !separator.isEmpty, separator.allSatisfy(isSeparatorCell) else { return nil }
+        return .table(header: cells(lines[0]), rows: lines.dropFirst(2).map(cells))
+    }
+
+    /// The cells of one row. The outer pipes are the fence, not a cell each
+    /// side, so a leading and a trailing one are dropped before the split.
+    private static func cells(_ line: String) -> [String] {
+        var body = Substring(line)
+        if body.hasPrefix("|") { body = body.dropFirst() }
+        if body.hasSuffix("|") { body = body.dropLast() }
+        return body
+            .split(separator: "|", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// `---`, `:--`, `--:`, `:-:` — a run of dashes with an optional alignment
+    /// colon at either end, and nothing else.
+    private static func isSeparatorCell(_ cell: String) -> Bool {
+        var body = Substring(cell)
+        if body.hasPrefix(":") { body = body.dropFirst() }
+        if body.hasSuffix(":") { body = body.dropLast() }
+        return !body.isEmpty && body.allSatisfy { $0 == "-" }
     }
 
     private static func bulletItem(_ line: String) -> String? {
