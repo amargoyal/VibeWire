@@ -370,7 +370,7 @@ function ClipboardSheet() {
                 .writeText(text)
                 .then(() => {
                   store.clipboardOffer.value = null
-                  store.banner.value = 'Copied.'
+                  store.note('Copied.')
                 })
                 .catch(() => {
                   store.banner.value = 'Still refused. Select the text and copy it.'

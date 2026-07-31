@@ -190,6 +190,10 @@ class PointerBudget {
 
 let turnSequence = 0
 
+/** Long enough to read a line and see which copy it was, short enough not to sit
+ *  over the picture. */
+const NOTE_MILLIS = 4200
+
 const STREAM_SESSIONS_KEY = 'vibewire.streamSessions'
 
 function readStreamSessions(): number {
@@ -311,6 +315,7 @@ export class Store {
   /** The subset a tap on a key cap is holding. Kept apart from the physical set so
    *  a ⌘ latched in the drawer survives the next keystroke on a real keyboard,
    *  which reports only the modifiers its own fingers are on. */
+  private noteTimer: ReturnType<typeof setTimeout> | null = null
   private latchedModifiers: string[] = []
   private physicalModifiers: string[] = []
   /**
@@ -591,6 +596,29 @@ export class Store {
     this.permission.value = null
   }
 
+  /**
+   * A confirmation, which clears itself.
+   *
+   * The banner carries two different kinds of sentence through one signal. A
+   * fault — the Mac was lost, Accessibility is off, the host refused something —
+   * has to stay until it is read and dismissed. A confirmation that something
+   * crossed over does not: it is the receipt for an act the reader just
+   * performed, and leaving it on the glass makes every COPY cost a second tap.
+   *
+   * Faults keep writing `banner` directly. Only the receipts come through here,
+   * and a later banner of either kind cancels this one's timer rather than being
+   * wiped by it.
+   */
+  note(text: string): void {
+    this.banner.value = text
+    const mine = text
+    if (this.noteTimer) clearTimeout(this.noteTimer)
+    this.noteTimer = setTimeout(() => {
+      this.noteTimer = null
+      if (this.banner.value === mine) this.banner.value = null
+    }, NOTE_MILLIS)
+  }
+
   private connectionChanged(state: ConnectionState): void {
     this.connection.value = state
     switch (state.kind) {
@@ -783,7 +811,7 @@ export class Store {
           void navigator.clipboard
             .writeText(text)
             .then(() => {
-              this.banner.value = `Copied from the Mac: ${firstLine(text)}`
+              this.note(`Copied from the Mac: ${firstLine(text)}`)
             })
             .catch(() => {
               this.clipboardOffer.value = text
