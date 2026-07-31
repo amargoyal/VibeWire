@@ -804,9 +804,11 @@ textarea {
   color: var(--ns-accent);
 }
 
-/* A tile in the command drawer: a glyph over a caption, 70px tall. */
+/* A tile in the command drawer: a glyph over a caption, 70px tall — a floor
+   rather than a height, because the caption under the glyph is text and a reader
+   who has raised their text size should get a taller tile, not a cropped word. */
 .tile {
-  height: 70px;
+  min-height: 70px;
   border-radius: var(--radius-control);
   background: var(--ns-raised-2);
   display: flex;

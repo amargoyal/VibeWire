@@ -754,7 +754,7 @@ function Displays({ posture }: { posture: Posture }) {
             style={{
               flex: '0.85 1 0',
               minWidth: 0,
-              height: '64px',
+              minHeight: '64px',
               borderRadius: 'var(--radius-control)',
               border: `1px dashed ${
                 store.sideBySide.value ? 'var(--ns-accent)' : 'var(--ns-stroke)'
@@ -923,7 +923,7 @@ export function DisplayChip({
       style={{
         flex: '1.15 1 0',
         minWidth: 0,
-        height: '64px',
+        minHeight: '64px',
         borderRadius: 'var(--radius-control)',
         display: 'flex',
         flexDirection: 'column',

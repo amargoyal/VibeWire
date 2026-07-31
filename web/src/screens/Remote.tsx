@@ -581,7 +581,10 @@ function PortraitLayout({
       <div
         class="row"
         style={{
-          height: '44px',
+          // A minimum, not a height. This bar holds the stream state and the
+          // codec readout, and at a raised text size a fixed 44px cropped both —
+          // on the one screen whose whole job is reporting the condition.
+          minHeight: '44px',
           flex: '0 0 auto',
           gap: '10px',
           paddingInline: 'calc(14px + var(--safe-left)) calc(14px + var(--safe-right))',
@@ -1362,7 +1365,7 @@ function LandscapeLayout({
         <div
           class="row"
           style={{
-            height: '52px',
+            minHeight: '52px',
             flex: '0 0 auto',
             gap: '12px',
             paddingInline: 'calc(22px + var(--safe-left)) 22px',
@@ -1413,7 +1416,7 @@ function LandscapeLayout({
           class="row"
           data-nopad
           style={{
-            height: '64px',
+            minHeight: '64px',
             flex: '0 0 auto',
             gap: '10px',
             paddingInline: 'calc(22px + var(--safe-left)) 22px',
