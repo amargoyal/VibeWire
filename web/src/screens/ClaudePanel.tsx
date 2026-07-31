@@ -69,10 +69,27 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
     store.listClaudeSessions()
   }, [])
 
+  // Whether the reader is at the foot of the transcript. Everything that arrives
+  // used to scroll it to the bottom unconditionally, so scrolling up to re-read
+  // something while Claude was working pulled the page out from under the eye
+  // every few seconds — and a long answer streaming in did it continuously.
+  const [pinned, setPinned] = useState(true)
+
   useEffect(() => {
     const node = transcript.current
-    if (node) node.scrollTop = node.scrollHeight
-  }, [turns.length, toolCalls.length, permission?.id])
+    if (!node) return
+    // A question is the exception: it is the one thing that must be seen, and the
+    // panel already dims everything else to say so.
+    if (pinned || permission) node.scrollTop = node.scrollHeight
+  }, [turns.length, toolCalls.length, permission?.id, store.claudeStreaming.value])
+
+  const onTranscriptScroll = (event: Event) => {
+    const node = event.currentTarget as HTMLDivElement
+    // A line's worth of slack, so a reader who is at the bottom stays pinned
+    // through a re-render that changes the content's height by a pixel.
+    const atFoot = node.scrollHeight - node.scrollTop - node.clientHeight < 48
+    setPinned((current) => (current === atFoot ? current : atFoot))
+  }
 
   // The composer gives way to the question. With the keyboard up, a prompt at the
   // end of the transcript would arrive underneath it: a tool waiting on an answer
@@ -210,7 +227,7 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             />
           </div>
 
-        <div ref={transcript} class="claude__talk">
+        <div ref={transcript} class="claude__talk" onScroll={onTranscriptScroll}>
           <div class="stack" style={{ gap: '20px' }}>
             {/* Everything that is not the question dims while one is pending. */}
             <div
@@ -275,6 +292,34 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
         <Announce>
           {permission ? `${permission.toolName} is waiting for permission to run.` : ''}
         </Announce>
+
+        {/* The way back down, and only where it is needed: a reader at the foot of
+            the transcript has nothing to jump to, and a control that is always
+            there is chrome over a live conversation. */}
+        {!pinned ? (
+          <div class="row" style={{ justifyContent: 'center', flex: '0 0 auto', height: 0 }}>
+            <button
+              class="pill"
+              onClick={() => {
+                const node = transcript.current
+                if (node) node.scrollTop = node.scrollHeight
+                setPinned(true)
+              }}
+              style={{
+                position: 'relative',
+                top: '-46px',
+                minHeight: '36px',
+                paddingInline: '14px',
+                background: 'color-mix(in srgb, var(--ns-raised-2) 94%, transparent)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-accent)">
+                {store.claudeStreaming.value ? 'STILL WRITING · JUMP DOWN' : 'JUMP TO THE END'}
+              </Caps>
+            </button>
+          </div>
+        ) : null}
 
         <div class="claude__ask">
         {/* Follow-ups as two thumb chips rather than another typing session. */}
