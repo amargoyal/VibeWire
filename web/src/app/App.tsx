@@ -101,6 +101,8 @@ export function App() {
 
       {store.screenshot.value ? <ScreenshotSheet /> : null}
 
+      {store.clipboardOffer.value != null ? <ClipboardSheet /> : null}
+
       {showShortcuts.value ? <ShortcutsSheet /> : null}
 
       <UnsupportedNotice />
@@ -290,6 +292,79 @@ function ScreenshotSheet() {
         >
           {'A BROWSER USUALLY REFUSES A CLIPBOARD IMAGE WRITE.\nIF IT DOES, SAVE THE PNG INSTEAD.'}
         </Caps>
+      </ScreenBody>
+    </div>
+  )
+}
+
+/**
+ * 16 · WHAT THE MAC COPIED, when this browser would not take it.
+ *
+ * The clipboard write happens seconds after the tap that asked for it, with no
+ * user gesture behind it, and most browsers refuse that outright. COPY used to
+ * fail exactly this silently: the tile flashed, nothing reached the clipboard, and
+ * the Mac's text was in a signal nothing rendered.
+ *
+ * A button inside this sheet *is* a gesture, so the same write succeeds from here.
+ * The text is selectable either way, because a browser that refuses twice still
+ * leaves the reader able to select it themselves.
+ */
+function ClipboardSheet() {
+  const text = store.clipboardOffer.value
+  const sheet = useSheet<HTMLDivElement>(() => (store.clipboardOffer.value = null))
+  if (text == null) return null
+
+  return (
+    <div
+      ref={sheet}
+      class="sheet sheet--half"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Text copied from the Mac"
+      style={{ zIndex: 65 }}
+    >
+      <ScreenBody>
+        <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
+          <SectionLabel>FROM THE MAC</SectionLabel>
+          <span class="spacer" />
+          <SheetDismiss title="CLOSE" onClick={() => (store.clipboardOffer.value = null)} />
+        </div>
+
+        <Caps size="var(--fs-9)" tracking="0.14em" style={{ marginTop: '12px', flex: '0 0 auto' }}>
+          {`THIS BROWSER REFUSED THE CLIPBOARD · ${text.length} CHARACTERS`}
+        </Caps>
+
+        <pre
+          class="code"
+          style={{
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflow: 'auto',
+            marginTop: '16px',
+            whiteSpace: 'pre-wrap',
+            userSelect: 'text',
+          }}
+        >
+          {text}
+        </pre>
+
+        <div style={{ marginTop: '16px', paddingBottom: 'calc(16px + var(--safe-bottom))', flex: '0 0 auto' }}>
+          <FilledAction
+            title="COPY IT"
+            height={56}
+            onClick={() => {
+              void navigator.clipboard
+                ?.writeText(text)
+                .then(() => {
+                  store.clipboardOffer.value = null
+                  store.banner.value = 'Copied.'
+                })
+                .catch(() => {
+                  store.banner.value = 'Still refused. Select the text and copy it.'
+                })
+            }}
+          />
+        </div>
       </ScreenBody>
     </div>
   )

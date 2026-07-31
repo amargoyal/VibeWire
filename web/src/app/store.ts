@@ -190,6 +190,17 @@ class PointerBudget {
 
 let turnSequence = 0
 
+/**
+ * The first line of a clipboard payload, short enough for a banner.
+ *
+ * A copied build error is forty lines and a banner is one. The first line says
+ * *which* copy arrived without turning the banner into a document.
+ */
+function firstLine(text: string): string {
+  const line = text.split('\n', 1)[0]?.trim() ?? text
+  return line.length > 48 ? `${line.slice(0, 47)}…` : line
+}
+
 export class Store {
   // Navigation
   route = signal<Route>('pairing')
@@ -267,6 +278,9 @@ export class Store {
 
   // Clipboard
   clipboardFromMac = signal('')
+  /** Text the Mac sent that this browser refused to put on the clipboard. Held so
+   *  it can be offered with a button, which is a gesture the browser accepts. */
+  clipboardOffer = signal<string | null>(null)
 
   // Claude
   claudeMode = signal<ClaudeMode>('code')
@@ -678,10 +692,19 @@ export class Store {
         const text = str(payload['text'])
         if (!text) return
         this.clipboardFromMac.value = text
-        // Best effort. Writing to the clipboard without a user gesture is refused
-        // in most browsers, and the copy is mirrored on screen either way, so a
-        // refusal is not worth a banner.
-        void navigator.clipboard?.writeText(text).catch(() => undefined)
+        // A clipboard write with no user gesture behind it is refused by most
+        // browsers, and this one has none: the text arrived over a socket seconds
+        // after the tap that asked for it. So the outcome is reported rather than
+        // assumed. Refused, the text is shown with a button to copy it, which is a
+        // gesture the browser does accept.
+        void navigator.clipboard
+          ?.writeText(text)
+          .then(() => {
+            this.banner.value = `Copied from the Mac: ${firstLine(text)}`
+          })
+          .catch(() => {
+            this.clipboardOffer.value = text
+          })
         break
       }
 

@@ -490,6 +490,10 @@ final class AppModel {
                let text = payload["text"] as? String, !text.isEmpty {
                 clipboardFromMac = text
                 UIPasteboard.general.string = text
+                // COPY put the Mac's clipboard on this phone and said nothing at
+                // all, so the tile and a tile that had failed looked identical.
+                // The first line of what arrived is the proof it arrived.
+                banner = "Copied from the Mac: \(firstLine(of: text))"
             }
 
         case "screenshot":
@@ -498,6 +502,7 @@ final class AppModel {
                let image = UIImage(data: data) {
                 lastScreenshot = image
                 UIPasteboard.general.image = image
+                banner = "Screenshot is on this phone's clipboard. Paste it anywhere."
             }
 
         case "lastFrame":
@@ -1027,6 +1032,16 @@ final class AppModel {
         ])
         self.permission = nil
     }
+}
+
+/// The first line of a clipboard payload, short enough for a banner.
+///
+/// A copied build error is forty lines; a banner is one. Naming the first line is
+/// enough to say *which* copy arrived without turning the banner into a document.
+private func firstLine(of text: String) -> String {
+    let line = text.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? text
+    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    return trimmed.count > 48 ? String(trimmed.prefix(47)) + "…" : trimmed
 }
 
 /// Pointer coalescing. Touch delivers up to 120 samples a second; the Mac only

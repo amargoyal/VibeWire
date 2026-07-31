@@ -106,6 +106,7 @@ export function Home() {
           <div class="home__rail">
             <ConditionStrip posture={posture} />
             {posture === 'unreachable' ? <Causes /> : <Displays posture={posture} />}
+            {posture === 'unreachable' ? null : <WhatTheMacIsDoing />}
           </div>
 
           <div class="home__acts">
@@ -139,13 +140,26 @@ function transportLabel(): string {
   }
 }
 
-/** The caption under the machine name: what it is, and how this client reaches it. */
-function machineLine(posture: Posture): { text: string; tone: string } {
+/**
+ * The caption under the machine name: what it is, and how this client reaches it.
+ *
+ * `withTransport` is false where the path is already stated beside it. On the wide
+ * header the condition pill carries the radio, the path and the round trip, and
+ * this line was repeating the first two of them a hand's width to the left.
+ */
+function machineLine(
+  posture: Posture,
+  { withTransport = true }: { withTransport?: boolean } = {},
+): { text: string; tone: string } {
   const link = store.link.value
   switch (posture) {
     case 'awake':
       return {
-        text: [store.hostModel.value, `MACOS ${store.hostOS.value}`, transportLabel()]
+        text: [
+          store.hostModel.value,
+          `MACOS ${store.hostOS.value}`,
+          withTransport ? transportLabel() : '',
+        ]
           .filter(Boolean)
           .join(' · '),
         tone: 'var(--ns-text-tertiary)',
@@ -196,7 +210,7 @@ function postureCondition(posture: Posture) {
 function TopBar({ posture }: { posture: Posture }) {
   const link = store.link.value
   const condition = postureCondition(posture)
-  const line = machineLine(posture)
+  const line = machineLine(posture, { withTransport: false })
 
   return (
     <header
@@ -630,6 +644,61 @@ function NoDisplays() {
  * Both forms call the same two handlers. Nothing about the selection lives in
  * either of them.
  */
+/**
+ * Three facts about the far end, on the rail a laptop window has room for.
+ *
+ * All three were already being measured and stated somewhere else — the path in
+ * the header strip, the address on the unreachable screen, the frontmost window
+ * only in the landscape dock, which means only once the picture is already open.
+ * On the screen where the question is "is it worth opening", they are the answer,
+ * and the rail below the displays was empty.
+ *
+ * Narrow layouts do not get this: a phone screen has one column and it belongs to
+ * the picture and the way in.
+ */
+function WhatTheMacIsDoing() {
+  const transport = store.transport.value
+  const frontmost = store.link.value.frontmostApp
+  const address =
+    transport.path === 'direct'
+      ? transport.tailscaleAddress ?? transport.lanAddress
+      : transport.path === 'relay'
+        ? transport.cloudflareHostname
+        : null
+
+  const rows: [string, string, string][] = [
+    [
+      'PATH',
+      transport.path === 'direct' ? 'DIRECT' : transport.path === 'relay' ? 'RELAY' : 'NONE',
+      transport.path === 'none' ? 'var(--ns-text-tertiary)' : 'var(--ns-green)',
+    ],
+    ['ADDRESS', address ?? '—', 'var(--ns-text-secondary)'],
+    // Never a guess: the host sends this and an empty string means it has not.
+    ['FRONTMOST', frontmost || '—', 'var(--ns-text-secondary)'],
+  ]
+
+  return (
+    <div class="wide-only stack" style={{ gap: '10px', marginTop: '20px' }}>
+      <SectionLabel>THE MAC</SectionLabel>
+      <Card style={{ padding: '16px' }}>
+        <div class="stack" style={{ gap: '11px' }}>
+          {rows.map(([label, value, tone]) => (
+            <div key={label} class="row">
+              <Caps size="var(--fs-9)" tracking="0.12em">
+                {label}
+              </Caps>
+              <span class="spacer" style={{ minWidth: '8px' }} />
+              <Caps size="var(--fs-9)" tracking="0.12em" color={tone} class="ellipsis">
+                {value}
+              </Caps>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 function Displays({ posture }: { posture: Posture }) {
   const displays = store.displays.value
 
