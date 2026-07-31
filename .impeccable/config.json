@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "web/src/design/nightshift.css"
+        ],
+        "createdAt": "2026-07-31T01:19:55.725Z",
+        "reason": "User confirmed: the .hero hatch is a video placeholder, not a decorative grid"
+      }
+    ]
+  }
+}
