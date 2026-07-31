@@ -574,6 +574,23 @@ export class Store {
     if (failure) this.banner.value = failure
   }
 
+  /**
+   * The socket is gone for good, so nothing Claude was doing is being reported
+   * any more.
+   *
+   * `claudeStreaming` was left true by every path that lost a connection, so the
+   * composer kept a red STOP on it and the header kept saying it was writing —
+   * about a socket that had given up. And a pending permission carries a request
+   * id on a dead connection: its two buttons send an answer into nothing, which
+   * is worse than the question disappearing, because the reader believes they
+   * answered it.
+   */
+  private claudeWentQuiet(): void {
+    this.claudeStreaming.value = false
+    this.claudeTokensPerSecond.value = 0
+    this.permission.value = null
+  }
+
   private connectionChanged(state: ConnectionState): void {
     this.connection.value = state
     switch (state.kind) {
@@ -589,15 +606,22 @@ export class Store {
           attempt: state.attempt,
           nextRetryMs: state.nextRetryMs,
         }
+        // The run itself is on the Mac and may well still be going, so this does
+        // not stop being a stream — but nothing is measuring its rate while the
+        // socket is down, and the panel already prints WORKING for a rate of
+        // zero, which is the honest word for it.
+        this.claudeTokensPerSecond.value = 0
         break
       case 'failed':
         this.streamState.value = { kind: 'failed', reason: state.reason }
         this.banner.value = `Lost the Mac. ${state.reason}`
+        this.claudeWentQuiet()
         break
       case 'unauthorized':
         // Retrying cannot help: the Mac no longer holds this device's key.
         this.streamState.value = { kind: 'failed', reason: 'device revoked' }
         this.banner.value = 'This Mac no longer recognises this browser. Pair again.'
+        this.claudeWentQuiet()
         void this.unpairLocally()
         break
       default:
