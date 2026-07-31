@@ -139,7 +139,20 @@ private struct CodeBlock: View {
     let language: String?
     let code: String
 
+    /// What the last tap did, which is an event and not a condition.
+    ///
+    /// This used to be set true and never cleared, so the chip read COPIED for
+    /// the rest of the session — reporting the last tap anyone made rather than
+    /// what this control would do now, which is the one thing a label on a
+    /// button is for. It goes back to offering the copy on its own.
     @State private var copied = false
+    @State private var clearing: Task<Void, Never>?
+
+    /// How long the chip states its answer before returning to COPY. Long
+    /// enough to be read after the thumb has moved, short enough that it is
+    /// plainly about the tap that just happened — the same 2.4s the browser's
+    /// chip holds, so the two clients answer at one speed.
+    private static let answerSeconds: Double = 2.4
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -152,9 +165,21 @@ private struct CodeBlock: View {
                 )
                 Spacer()
                 Button {
+                    // `UIPasteboard.general` is not optional and its setter
+                    // returns nothing: a write to the general pasteboard from a
+                    // foregrounded app has no failure for this view to report.
+                    //
+                    // The browser's chip carries a third REFUSED state, and it
+                    // is earned there — the Mac serves that page over plain
+                    // HTTP, a page that is not a secure context has no
+                    // `navigator.clipboard` at all, and a control that does
+                    // nothing and says nothing is the defect. Nothing on this
+                    // side can refuse, so there is no state for one. Drawing it
+                    // would be the panel holding space for a condition it can
+                    // never measure.
                     UIPasteboard.general.string = code
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation { copied = true }
+                    answerCopied()
                 } label: {
                     MonoCaps(
                         copied ? "COPIED" : "COPY",
@@ -193,6 +218,26 @@ private struct CodeBlock: View {
         .background(
             RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.deepGround)
         )
+        // A transcript scrolls answered chips out of the hierarchy while their
+        // timers are still running, and a timer that outlives its view sets a
+        // value nobody will draw.
+        .onDisappear { clearing?.cancel() }
+    }
+
+    private func answerCopied() {
+        clearing?.cancel()
+        withAnimation(NS.Motion.stateChange) { copied = true }
+        // The chip's accessibility label follows the word on it, so a reader
+        // driving this by voice asks for the label that is actually there. That
+        // is not where the confirmation lives, though: a name that changes under
+        // a control nobody is focused on is never spoken again, which is why the
+        // change is announced rather than only rewritten.
+        AccessibilityNotification.Announcement("Code copied").post()
+        clearing = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.answerSeconds))
+            guard !Task.isCancelled else { return }
+            withAnimation(NS.Motion.stateChange) { copied = false }
+        }
     }
 }
 

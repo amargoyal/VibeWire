@@ -27,7 +27,10 @@ struct PairingView: View {
     @State private var errorText: String?
     @State private var showScanner = false
     @State private var editingTarget = false
-    @State private var secondsLeft = 60
+    /// Where the dial's arc is, and nothing else. It is a second hand for the
+    /// cadence, not a countdown on this particular code — see the caption it
+    /// sits beside.
+    @State private var dialPhase = 60
     @FocusState private var codeFieldFocused: Bool
 
     /// The host rotates the pairing code on this cadence, and the dial reports
@@ -73,10 +76,23 @@ struct PairingView: View {
 
             codeBoxes.padding(.top, 34)
 
+            // Nothing on this phone knows when the Mac last turned the code
+            // over — the rotation phase is not on the wire — so `ROTATES IN 43S`
+            // was this screen's own age modulo sixty, drawn in amber next to six
+            // digits it might have been forty seconds wrong about.
+            //
+            // An exact second count is a claim; the cadence is a fact, and it is
+            // the one the reader needs, because what it answers is how long to
+            // keep looking at the Mac. The dial stays and turns on the same tick:
+            // it reports the same cadence without pretending to know where in it
+            // this moment sits.
             HStack(spacing: 9) {
-                RotatesIn(fraction: Double(secondsLeft) / Double(Self.rotationSeconds))
-                MonoCaps("ROTATES IN", size: 9, tracking: 1.4)
-                MonoCaps("\(secondsLeft)S", size: 9, color: NS.Color.amber, tracking: 1.4)
+                RotatesIn(fraction: Double(dialPhase) / Double(Self.rotationSeconds))
+                MonoCaps(
+                    "THE MAC ROTATES THIS CODE EVERY \(Self.rotationSeconds)S",
+                    size: 9,
+                    tracking: 1.4
+                )
             }
             .padding(.top, 16)
 
@@ -454,15 +470,15 @@ struct PairingView: View {
         }
     }
 
-    /// The dial reports the host's rotation cadence, not a countdown this client
-    /// started — nothing here knows when the Mac last turned the code over, so
-    /// it says "there is about this much of a window left", which is the only
-    /// honest version of the fact.
+    /// Turns the dial at the cadence the host rotates on. Nothing is being
+    /// counted down: the arc is a sixty-second sweep drawn beside a caption that
+    /// states the cadence, and the phase it starts from is arbitrary because the
+    /// real one is not on the wire.
     private func rotationLoop() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(1))
             guard !isExchanging else { continue }
-            secondsLeft = secondsLeft <= 1 ? Self.rotationSeconds : secondsLeft - 1
+            dialPhase = dialPhase <= 1 ? Self.rotationSeconds : dialPhase - 1
         }
     }
 }

@@ -617,10 +617,14 @@ struct FilledAction: View {
 }
 
 /// An outlined action, labelled in caps. 44pt minimum.
+///
+/// The outline takes `edge` rather than `stroke`: here the line is not a
+/// separator between two things, it is the control's own boundary and the only
+/// thing to find. See the ink's own note in `Nightshift.swift`.
 struct OutlinedAction: View {
     let title: String
     var tint: Color = NS.Color.textSecondary
-    var edge: Color = NS.Color.stroke
+    var edge: Color = NS.Color.edge
     var height: CGFloat = NS.Metric.minimumTarget
     let action: () -> Void
 
@@ -708,8 +712,12 @@ struct NSToggle: View {
             ZStack(alignment: isOn ? .trailing : .leading) {
                 Capsule()
                     .fill(isOn ? NS.Color.accent.opacity(0.3) : NS.Color.raised2)
+                    // Off, the track's outline is the only thing that says a
+                    // control is here at all, so it takes `edge` and its 3:1
+                    // rather than a hairline's 1.5:1. On, the violet already
+                    // carries it.
                     .overlay(
-                        Capsule().stroke(isOn ? NS.Color.accent : NS.Color.stroke, lineWidth: 1)
+                        Capsule().stroke(isOn ? NS.Color.accent : NS.Color.edge, lineWidth: 1)
                     )
                 Circle()
                     .fill(isOn ? NS.Color.accent : NS.Color.textTertiary)

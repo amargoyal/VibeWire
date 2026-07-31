@@ -885,7 +885,13 @@ struct SessionPicker: View {
                     tint: NS.Color.accent,
                     ink: NS.Color.onAccent
                 ) {
-                    model.openClaude(mode: .code)
+                    // The mode the panel is already in, not `.code`. Opened
+                    // from CHAT — whose own empty state promises "Nothing is
+                    // edited" — this was the one button on the screen, and it
+                    // silently moved the user into CODE. The segmented control
+                    // is where the mode is chosen; a button labelled "New
+                    // session" is not.
+                    model.openClaude(mode: model.claudeMode)
                     dismiss()
                 }
                 .accessibilityIdentifier("newSession")

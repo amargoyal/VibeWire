@@ -232,7 +232,6 @@ final class AppModel {
 
     // Input
     var heldModifiers: Set<String> = []
-    var scrollLock = false
     var sessionCount = 0
 
     // Clipboard / screenshot

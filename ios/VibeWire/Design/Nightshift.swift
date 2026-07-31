@@ -92,6 +92,23 @@ enum NS {
         static let hairlineDim = SwiftUI.Color(hex: 0x1D1F24)
         static let stroke = SwiftUI.Color(hex: 0x2F3339)
 
+        /// The edge of a control that has no fill, which is a different job
+        /// from a line between two things.
+        ///
+        /// On an outlined action and on a toggle in its off state the edge *is*
+        /// the control — there is nothing else on the glass to find — so it is
+        /// held to the 3:1 that non-text contrast asks for rather than to the
+        /// eye of a hairline. `stroke` measures 1.5:1 against the screen ground
+        /// and fails that by more than half. Measured against the three grounds
+        /// one of these actually sits on:
+        ///   3.65:1 on `deep` · 3.44:1 on `screen` · 3.16:1 on `raised`
+        ///
+        /// Everything else keeps `stroke`. Holding every hairline to this number
+        /// would make the system loud in the places it is deliberately quiet,
+        /// which is the whole reason there are two.
+        /// oklch(0.52 0.012 262)
+        static let edge = SwiftUI.Color(hex: 0x656970)
+
         /// Ink on a filled action. Each is its own tint taken down to a
         /// near-black of the same hue, so a filled button reads as one object
         /// rather than as black text on colour.

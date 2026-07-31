@@ -316,7 +316,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 15) {
                 HStack(spacing: 9) {
                     MonoCaps(
-                        degraded ? "THIN LINK" : "REACHABLE",
+                        linkWord(for: condition),
                         size: 10,
                         color: condition.color,
                         tracking: 1.8,
@@ -353,6 +353,35 @@ struct HomeView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
+        }
+    }
+
+    /// The word on the live strip, taken from the same `Condition` the colour
+    /// beside it takes.
+    ///
+    /// The two used to come from different derivations: the colour from
+    /// `link.condition`, the word from a single `condition == .degraded` test.
+    /// Anything that was neither reachable nor degraded therefore printed
+    /// REACHABLE in the ink of the state it actually was — and `Condition.from`
+    /// returns `lost` for a socket that is connected, with a Mac reporting
+    /// itself awake, that has not yet had a round trip come back. That is not a
+    /// hypothetical: it is the first second of every session, and on a slow path
+    /// it is several. The card said REACHABLE in clay over an RTT reading `—`.
+    ///
+    /// One value now decides both, the way `streamCondition` does on the remote
+    /// screen.
+    private func linkWord(for condition: Condition) -> String {
+        switch condition {
+        case .reachable: return "REACHABLE"
+        case .degraded: return "THIN LINK"
+        // The Mac is on the socket and says it is awake; nothing has come back
+        // yet. That is a measured absence, not a claim of health, and the strip
+        // says which — the numbers underneath are already printing em dashes.
+        case .lost: return "NO ROUND TRIP YET"
+        // Unreachable from here: `posture` only routes `.awake` and `.weak` to
+        // this strip, and both mean the host reported itself awake, which is the
+        // one thing `Condition.from` needs to return something other than idle.
+        case .idle: return "NO READING"
         }
     }
 

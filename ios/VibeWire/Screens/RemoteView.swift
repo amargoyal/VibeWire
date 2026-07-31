@@ -704,11 +704,6 @@ struct RemoteView: View {
 
     // MARK: Bottom bar
 
-    private var isStalled: Bool {
-        if case .stalled = model.streamState { return true }
-        return false
-    }
-
     /// Ends the session. The one control that is in the same place in every
     /// layout.
     private func stopButton(size: CGFloat, label: String? = nil) -> some View {
@@ -730,7 +725,7 @@ struct RemoteView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("stopStream")
-        .accessibilityLabel(isStalled ? "Stop trying to reconnect" : "Stop streaming")
+        .accessibilityLabel(picturePaused ? "Stop trying to reconnect" : "Stop streaming")
     }
 
     /// What is on screen and at what scale, stated in the band rather than over
@@ -764,12 +759,28 @@ struct RemoteView: View {
     /// ⌘ latches Command directly rather than opening the drawer to it. It is
     /// the modifier a Mac actually needs — ⌘Tab, ⌘Space, ⌘W — and putting it one
     /// tap away instead of two is the difference between using it and not.
+    ///
+    /// The paused shape is taken from `picturePaused`, which is stalled *or*
+    /// reconnecting — the same pair the card above the rail matches. Matching
+    /// only `.stalled` here meant that during a reconnect the rail kept its
+    /// live shape: POINTER / VIEW offering to steer a picture that had stopped,
+    /// a keyboard offering to type into a socket that was gone, and no way to
+    /// stop the retries, while the card directly above it said RECONNECTING.
+    /// The two states are one fact to a reader — nothing is arriving — so they
+    /// get one shape.
     @ViewBuilder
     private var rail: some View {
-        if isStalled {
+        if picturePaused {
             HStack(spacing: 8) {
                 stopButton(size: NS.Metric.railButton, label: "STOP TRYING")
-                railButton(glyph: "⌨", label: "Keyboard", enabled: false) {}
+                // Dimmed ink says "not now" to a reader looking at it and
+                // nothing at all to one who is not, so the name carries the
+                // reason the way the browser's does.
+                railButton(
+                    glyph: "⌨",
+                    label: "Keyboard, unavailable while nothing is arriving",
+                    enabled: false
+                ) {}
                 drawerButton
             }
         } else {
@@ -916,12 +927,28 @@ struct RemoteView: View {
             HStack {
                 MonoCaps("CONTROLS", size: 9, tracking: 2)
                 Spacer()
-                MonoCaps(
-                    model.scrollLock ? "LOCK" : "FREE",
-                    size: 9,
-                    color: model.scrollLock ? NS.Color.accent : NS.Color.textTertiary,
-                    tracking: 1.4
-                )
+                // LOCK / FREE used to sit here, read from `model.scrollLock` —
+                // a flag nothing in this app and nothing in `PROTOCOL.md` ever
+                // writes, so the slot could only ever print FREE. A readout
+                // with one reachable value is not a reading, and the flag went
+                // with it rather than being left for the next reader to try to
+                // wire up.
+                //
+                // What took the slot is measured, and is the one piece of state
+                // in this dock that outlives the tap that set it: a latched
+                // modifier stays down through taps, drags and the keyboard, and
+                // the 46pt caps below it are easy to miss at a glance. Violet,
+                // because a latch is the user's own doing. Nothing is printed
+                // when nothing is held — a zero here would be a reading of the
+                // same kind FREE was.
+                if !model.heldModifiers.isEmpty {
+                    MonoCaps(
+                        "\(model.heldModifiers.count) HELD",
+                        size: 9,
+                        color: NS.Color.accent,
+                        tracking: 1.4
+                    )
+                }
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
