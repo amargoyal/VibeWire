@@ -555,7 +555,13 @@ export function Remote() {
       {zoom > 1.02 ? <Minimap /> : null}
       {showZoomBadge ? <ZoomBadge /> : null}
       {stalled ? <ReconnectingCard millis={stalledMillis} landscape={landscape} /> : null}
-      {store.showHub.value ? <CommandDrawer /> : null}
+      {/* Never in landscape. The dock down the right-hand side *is* this drawer,
+          unrolled — the same six commands and the same four modifiers, already on
+          screen — so opening it there stacks a panel over its own contents and, at
+          a raised text size, over the picture as well. The rail that opens it is
+          portrait-only for the same reason; the shortcut key is what could still
+          reach it. */}
+      {store.showHub.value && !landscape ? <CommandDrawer /> : null}
       {store.showKeyboard.value ? <KeyboardBar /> : null}
       {/* Mounted for the whole session, not with the bar: iOS opens the keyboard only
           for a focus() that happens inside a tap handler, and a field that does not

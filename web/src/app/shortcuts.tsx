@@ -107,7 +107,14 @@ const BINDINGS: Binding[] = [
     label: 'Commands',
     underSheet: true,
     where: 'picture',
-    run: () => (store.showHub.value = !store.showHub.value),
+    // A landscape window already has every one of these on screen in the dock, so
+    // there is nothing for this key to open there. It still closes a drawer left
+    // open by a rotation, rather than stacking a panel over the controls it
+    // duplicates.
+    run: () => {
+      if (store.showHub.value) store.showHub.value = false
+      else if (!matchMedia('(orientation: landscape)').matches) store.showHub.value = true
+    },
   },
   {
     key: 's',

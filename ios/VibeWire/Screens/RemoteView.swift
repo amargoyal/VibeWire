@@ -83,7 +83,13 @@ struct RemoteView: View {
                 // drawer inside it, which travels its own height rather than
                 // the whole screen's. The taps that open and hide it animate
                 // the change, which is what runs it.
-                if model.showHub { CommandDrawerView() }
+                // Never in landscape. The dock down the right-hand side *is* this
+                // drawer, unrolled — the same six commands and the same four
+                // modifiers, already on screen — so opening it there stacks a
+                // panel over its own contents, and at a raised text size over the
+                // picture too. The rail that opens it is portrait-only for the
+                // same reason; this guard covers a rotation with it already up.
+                if model.showHub && !isLandscape { CommandDrawerView() }
 
                 // 05 — the keyboard bar. Three places set `showKeyboard`; until
                 // this line nothing read it, so KEYS in the rail, KEYS in the
