@@ -80,6 +80,14 @@
   --ns-hairline: oklch(0.28 0.012 262);
   --ns-hairline-dim: oklch(0.24 0.010 262);
   --ns-stroke: oklch(0.32 0.012 262);
+  /* The edge of a control that has no fill, which is a different job from a line
+     between two things. On an outlined action and on an unset toggle the edge
+     *is* the control — there is nothing else to find — so it is held to the 3:1
+     that non-text contrast asks for rather than to the eye of a hairline.
+     Measured against the three grounds one of these actually sits on:
+     3.65:1 on `deep` · 3.44:1 on `screen` · 3.16:1 on `raised`.
+     Anything filled keeps `stroke`: its boundary is decoration, not the control. */
+  --ns-edge: oklch(0.52 0.012 262);
 
   /* ── Ink on a filled action ─────────────────────────────────────────────
      Each is its own tint taken down to a near-black of the same hue, so a
@@ -665,7 +673,7 @@ textarea {
   width: 100%;
   min-height: var(--target);
   border-radius: var(--radius-control);
-  box-shadow: inset 0 0 0 1px var(--edge, var(--ns-stroke));
+  box-shadow: inset 0 0 0 1px var(--edge, var(--ns-edge));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -717,7 +725,7 @@ textarea {
   width: 52px;
   height: 32px;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 1px var(--ns-stroke);
+  box-shadow: inset 0 0 0 1px var(--ns-edge);
   background: var(--ns-raised-2);
   position: relative;
   flex: 0 0 auto;
