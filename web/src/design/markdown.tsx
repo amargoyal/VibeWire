@@ -21,12 +21,26 @@ import { Announce, Caps } from './components'
 
 // MARK: - Blocks
 
+/**
+ * One line of a list, with the two things a flat `string` threw away.
+ *
+ * `depth` is how far it was indented, because Claude nests lists constantly and a
+ * nested list drawn flat says every point is a sibling of every other — which is
+ * the one claim the indentation was making. `done` is the state of a task box,
+ * where there was one; `null` means this item is not a task.
+ */
+interface ListItem {
+  text: string
+  depth: number
+  done: boolean | null
+}
+
 type Block =
   | { kind: 'paragraph'; text: string }
   | { kind: 'heading'; level: number; text: string }
   | { kind: 'code'; language: string | null; body: string }
-  | { kind: 'bullet'; items: string[] }
-  | { kind: 'numbered'; items: string[] }
+  | { kind: 'bullet'; items: ListItem[] }
+  | { kind: 'numbered'; items: ListItem[] }
   | { kind: 'quote'; text: string }
   | { kind: 'table'; header: string[]; rows: string[][] }
   | { kind: 'rule' }
@@ -66,8 +80,8 @@ function parseTable(lines: string[]): { kind: 'table'; header: string[]; rows: s
 export function parseBlocks(text: string): Block[] {
   const blocks: Block[] = []
   let paragraph: string[] = []
-  let bullets: string[] = []
-  let numbers: string[] = []
+  let bullets: ListItem[] = []
+  let numbers: ListItem[] = []
   let quote: string[] = []
   let table: string[] = []
 
@@ -187,7 +201,7 @@ export function parseBlocks(text: string): Block[] {
         blocks.push({ kind: 'numbered', items: numbers })
         numbers = []
       }
-      bullets.push(bullet)
+      bullets.push(listItem(bullet, line))
       continue
     }
 
@@ -199,7 +213,7 @@ export function parseBlocks(text: string): Block[] {
         blocks.push({ kind: 'bullet', items: bullets })
         bullets = []
       }
-      numbers.push(numbered)
+      numbers.push(listItem(numbered, line))
       continue
     }
 
@@ -215,6 +229,25 @@ export function parseBlocks(text: string): Block[] {
   }
   flushAll()
   return blocks
+}
+
+/**
+ * An item's text, its indent, and whether it is a task box.
+ *
+ * The indent comes off the raw line, since the branch above matched a trimmed one
+ * — which is how every nested list in this app has been drawn flat, saying that
+ * every point is a sibling of every other. Two spaces is one step, which is what
+ * Claude writes; a tab counts as one step for the same reason.
+ *
+ * `- [ ] thing` and `- [x] thing` are task lists, and until now the brackets were
+ * rendered as the literal characters they are.
+ */
+function listItem(text: string, raw: string): ListItem {
+  const indent = /^[\t ]*/.exec(raw)?.[0] ?? ''
+  const depth = Math.min(3, indent.replace(/\t/g, '  ').length >> 1)
+  const box = /^\[([ xX])\]\s+(.*)$/.exec(text)
+  if (!box) return { text, depth, done: null }
+  return { text: box[2] ?? '', depth, done: (box[1] ?? ' ').toLowerCase() === 'x' }
 }
 
 function bulletItem(line: string): string | null {
@@ -320,6 +353,40 @@ export function inlineNodes(text: string): ComponentChildren[] {
   return nodes
 }
 
+/**
+ * The flat run of items, nested by depth.
+ *
+ * The indent draws the hierarchy for anyone looking at it; a single `ul` with
+ * padding says "one list of six" to anyone who is not. Grouping the run into real
+ * nested lists is what makes the two agree — and it is the same reason `role`
+ * had to be restored on the lists in the first place.
+ */
+interface ListNode {
+  item: ListItem
+  children: ListNode[]
+}
+
+function nestItems(items: ListItem[], depth = 0): ListNode[] {
+  const nodes: ListNode[] = []
+  let index = 0
+  while (index < items.length) {
+    const item = items[index]
+    if (!item) break
+    // An item deeper than its predecessors with no parent above it is a stray
+    // indent, not a level; it joins the run rather than disappearing.
+    if (item.depth > depth && nodes.length) {
+      const start = index
+      while (index < items.length && (items[index]?.depth ?? 0) > depth) index += 1
+      const last = nodes[nodes.length - 1]
+      if (last) last.children = nestItems(items.slice(start, index), depth + 1)
+      continue
+    }
+    nodes.push({ item, children: [] })
+    index += 1
+  }
+  return nodes
+}
+
 /** Only schemes a link can safely carry. Everything else renders as plain text. */
 function safeHref(raw: string): string | null {
   try {
@@ -389,26 +456,7 @@ function BlockView({ block, size }: { block: Block; size: string }) {
         // reads these items as loose text with no count and no boundaries. The
         // marker below is drawn rather than generated precisely so it can take the
         // accent and hold the baseline, so the role has to be put back by hand.
-        <ul
-          class="stack"
-          role="list"
-          style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}
-        >
-          {block.items.map((item, index) => (
-            <li key={index} class="row row--top" style={{ gap: '8px' }}>
-              <span
-                class="mono"
-                aria-hidden="true"
-                style={{ color: 'var(--ns-accent)', opacity: 0.8, lineHeight: 1.45 }}
-              >
-                •
-              </span>
-              <span class="wrap" style={{ lineHeight: 1.45 }}>
-                {inlineNodes(item)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <BulletList nodes={nestItems(block.items)} />
       )
 
     case 'numbered':
@@ -416,34 +464,7 @@ function BlockView({ block, size }: { block: Block; size: string }) {
         // Same restoration as the bullet list above, and it matters more here: the
         // drawn number is hidden, so with the role gone there is nothing left that
         // says which item of how many this is.
-        <ol
-          class="stack"
-          role="list"
-          style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}
-        >
-          {block.items.map((item, index) => (
-            <li key={index} class="row row--top" style={{ gap: '8px' }}>
-              <span
-                class="mono"
-                aria-hidden="true"
-                style={{
-                  color: 'var(--ns-accent)',
-                  opacity: 0.8,
-                  // The 9px floor is a rule about what renders, not about the
-                  // tokens: subtracting from a size that scales with the reader's
-                  // text setting can cross the floor from above.
-                  fontSize: `max(9px, calc(${size} - 3px))`,
-                  lineHeight: 1.6,
-                }}
-              >
-                {index + 1}.
-              </span>
-              <span class="wrap" style={{ lineHeight: 1.45 }}>
-                {inlineNodes(item)}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <NumberedList nodes={nestItems(block.items)} size={size} />
       )
 
     case 'quote':
@@ -528,6 +549,102 @@ function BlockView({ block, size }: { block: Block; size: string }) {
     case 'rule':
       return <div class="hairline" style={{ margin: '2px 0' }} />
   }
+}
+
+/** A bullet run, nested. The marker carries the task state where there is one. */
+function BulletList({ nodes }: { nodes: ListNode[] }) {
+  return (
+    // `role="list"` is not redundant. Safari drops the list semantics of any `ul`
+    // whose `list-style` is `none` — the assumption being that a list without
+    // markers was never meant to be heard as one — and VoiceOver then reads these
+    // as loose text with no count and no boundaries. The marker is drawn rather
+    // than generated precisely so it can take the accent and hold the baseline,
+    // so the role has to be put back by hand.
+    <ul
+      class="stack"
+      role="list"
+      style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}
+    >
+      {nodes.map((node, index) => (
+        <li key={index} class="stack" style={{ gap: '6px' }}>
+          <span class="row row--top" style={{ gap: '8px' }}>
+            <span
+              class="mono"
+              aria-hidden="true"
+              style={{
+                color: node.item.done ? 'var(--ns-green)' : 'var(--ns-accent)',
+                opacity: 0.8,
+                lineHeight: 1.45,
+              }}
+            >
+              {/* A task box, where there is one: this system already spells "done"
+                  as a tick and "not yet" as an outline, so the two states read the
+                  same here as they do on a tool call. */}
+              {node.item.done == null ? '•' : node.item.done ? '✓' : '☐'}
+            </span>
+            <span
+              class="wrap"
+              style={{ lineHeight: 1.45 }}
+              // The mark is hidden from a reader who is not looking at it, so the
+              // state has to be said rather than drawn.
+              aria-label={
+                node.item.done == null ? undefined : node.item.done ? 'Done' : 'Not done'
+              }
+            >
+              {inlineNodes(node.item.text)}
+            </span>
+          </span>
+          {node.children.length ? (
+            <span style={{ paddingLeft: '18px' }}>
+              <BulletList nodes={node.children} />
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** A numbered run, nested. Restoring the role matters more here: the drawn number
+ *  is hidden, so without it nothing says which item of how many this is. */
+function NumberedList({ nodes, size }: { nodes: ListNode[]; size: string }) {
+  return (
+    <ol
+      class="stack"
+      role="list"
+      style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}
+    >
+      {nodes.map((node, index) => (
+        <li key={index} class="stack" style={{ gap: '6px' }}>
+          <span class="row row--top" style={{ gap: '8px' }}>
+            <span
+              class="mono"
+              aria-hidden="true"
+              style={{
+                color: 'var(--ns-accent)',
+                opacity: 0.8,
+                // The 9px floor is a rule about what renders, not about the
+                // tokens: subtracting from a size that scales with the reader's
+                // text setting can cross the floor from above.
+                fontSize: `max(9px, calc(${size} - 3px))`,
+                lineHeight: 1.6,
+              }}
+            >
+              {index + 1}.
+            </span>
+            <span class="wrap" style={{ lineHeight: 1.45 }}>
+              {inlineNodes(node.item.text)}
+            </span>
+          </span>
+          {node.children.length ? (
+            <span style={{ paddingLeft: '18px' }}>
+              <NumberedList nodes={node.children} size={size} />
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  )
 }
 
 function headingSize(level: number): string {
