@@ -156,7 +156,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                     paddingInline: '18px',
                     gap: '10px',
                     flex: '0 0 auto',
-                    '--edge': 'color-mix(in srgb, var(--ns-red) 40%, transparent)',
+                    '--edge': 'color-mix(in srgb, var(--ns-red) 50%, transparent)',
                   } as Record<string, string>
                 }
               >
@@ -269,7 +269,7 @@ function PairedDevices() {
                   paddingInline: '13px',
                   flex: '0 0 auto',
                   borderRadius: 'var(--radius-inner)',
-                  '--edge': 'color-mix(in srgb, var(--ns-red) 40%, transparent)',
+                  '--edge': 'color-mix(in srgb, var(--ns-red) 50%, transparent)',
                 } as Record<string, string>
               }
             >
