@@ -666,7 +666,7 @@ export class Store {
         this.streamState.value = { kind: 'failed', reason: 'device revoked' }
         this.banner.value = { text: 'This Mac no longer recognises this browser. Pair again.' }
         this.claudeWentQuiet()
-        void this.unpairLocally()
+        this.unpairLocally()
         break
       default:
         break
@@ -1408,7 +1408,7 @@ export class Store {
       this.banner.value = { text: 'Not connected to the Mac, so nothing was revoked.' }
       return
     }
-    if (device.isThisDevice) void this.unpairLocally()
+    if (device.isThisDevice) this.unpairLocally()
   }
 
   revokeAll(): void {
@@ -1417,11 +1417,21 @@ export class Store {
       this.banner.value = { text: 'Not connected to the Mac, so nothing was revoked.' }
       return
     }
-    void this.unpairLocally()
+    this.unpairLocally()
   }
 
-  private async unpairLocally(): Promise<void> {
-    await Identity.forgetHost().catch(() => undefined)
+  private unpairLocally(): void {
+    // Everything below used to sit behind `await Identity.forgetHost()`. That is
+    // an IndexedDB round trip, and a browser can leave one pending indefinitely —
+    // a blocked upgrade, a storage prompt, an origin under pressure. When it did,
+    // nothing after it ran: revoking every device sent the message to the Mac,
+    // the sheet closed, and the screen stayed exactly where it was, still showing
+    // a paired session for keys that had just been deleted on the other end.
+    //
+    // The in-memory state is what the screen is drawn from, so it goes first and
+    // unconditionally. Forgetting the stored record is the durable half and can
+    // take as long as it likes; a reload before it lands finds the record and
+    // fails to connect, which is the state the Mac is already in.
     batch(() => {
       this.pairedHost.value = null
       this.route.value = 'pairing'
@@ -1443,6 +1453,7 @@ export class Store {
       this.claudeWentQuiet()
     })
     this.disconnect()
+    void Identity.forgetHost().catch(() => undefined)
   }
 
   // MARK: Claude
