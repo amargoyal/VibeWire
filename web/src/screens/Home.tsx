@@ -1057,6 +1057,9 @@ function Footer({
   const displays = store.displays.value
 
   const preflight = (() => {
+    // A disabled action still reads its own sub-label, and the estimate under it
+    // was still promising a first frame in 228ms for a stream that cannot start.
+    if (!displays.length) return 'NO DISPLAY TO OPEN'
     const display = displays.find((entry) => entry.selected)
     const name = display ? display.name.toUpperCase() : 'NO DISPLAY'
     const quality = store.settings.value.quality

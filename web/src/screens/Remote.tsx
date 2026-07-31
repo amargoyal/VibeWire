@@ -493,8 +493,12 @@ export function Remote() {
     }
   }, [captured, store.showKeyboard.value])
 
-  const stallSeconds =
-    streamState.kind === 'stalled' ? Math.floor(streamState.millis / 1000) : store.tick.value % 60
+  // How old the picture is, and only where that has actually been measured. While
+  // the socket is reconnecting nothing is measuring it, and this used to fall back
+  // to `tick % 60` — a number that climbs to 59, resets, and was being printed as
+  // the age of the frame on screen. A reading nobody took is the one thing this
+  // app is not allowed to show.
+  const stalledMillis = streamState.kind === 'stalled' ? streamState.millis : null
 
   const padHandlers = {
     onPointerDown,
@@ -541,7 +545,7 @@ export function Remote() {
 
       {zoom > 1.02 ? <Minimap /> : null}
       {showZoomBadge ? <ZoomBadge /> : null}
-      {stalled ? <ReconnectingCard seconds={stallSeconds} landscape={landscape} /> : null}
+      {stalled ? <ReconnectingCard millis={stalledMillis} landscape={landscape} /> : null}
       {store.showHub.value ? <CommandDrawer /> : null}
       {store.showKeyboard.value ? <KeyboardBar /> : null}
       {/* Mounted for the whole session, not with the bar: iOS opens the keyboard only
@@ -1104,12 +1108,28 @@ function Minimap() {
  * the thing being explained and covering it is what made this banner confusing on
  * the phone.
  */
-function ReconnectingCard({ seconds, landscape }: { seconds: number; landscape: boolean }) {
+function ReconnectingCard({ millis, landscape }: { millis: number | null; landscape: boolean }) {
+  const state = store.streamState.value
+  const queued = store.queuedInputCount.value
   const rows: [string, string, string][] = [
-    ['QUEUED INPUT', `${store.queuedInputCount.value} EVENTS`, 'var(--ns-text)'],
+    ['QUEUED INPUT', `${queued} EVENT${queued === 1 ? '' : 'S'}`, 'var(--ns-text)'],
     ['DROPPING TO', '540P ON RESUME', 'var(--ns-amber)'],
     ['GIVING UP AT', '30S', 'var(--ns-text)'],
   ]
+
+  // Two different states, and they know two different things. A stall is measured
+  // — the host is still there and the last frame has a known age. A reconnect is
+  // not: the socket is gone, so the honest facts are which attempt this is and
+  // when the next one goes out, both of which the state itself carries.
+  const sentence =
+    millis != null
+      ? `The picture above is ${(millis / 1000).toFixed(1)} seconds old. Keys and taps are being held, not dropped.`
+      : state.kind === 'reconnecting'
+        ? `Nothing is arriving. Try ${state.attempt}, the next in ${Math.max(
+            1,
+            Math.round(state.nextRetryMs / 1000),
+          )}s. Keys and taps are being held, not dropped.`
+        : 'Nothing is arriving. Keys and taps are being held, not dropped.'
   return (
     <div
       // Not a live region. The sentence inside it counts the seconds since the
@@ -1134,12 +1154,12 @@ function ReconnectingCard({ seconds, landscape }: { seconds: number; landscape: 
           <div class="row" style={{ gap: '10px' }}>
             <Spinner size={16} color="var(--ns-amber)" />
             <Caps size="var(--fs-11)" tracking="0.16em" color="var(--ns-amber)" weight={500}>
-              RECONNECTING
+              {/* The same word the strip at the top is using. Two names for one
+                  state on one screen reads as two states. */}
+              {millis != null ? 'STALLED' : 'RECONNECTING'}
             </Caps>
           </div>
-          <p class="prose wrap">
-            The picture above is {seconds}.0 seconds old. Keys and taps are being held, not dropped.
-          </p>
+          <p class="prose wrap">{sentence}</p>
           <div class="stack" style={{ gap: '8px' }}>
             {rows.map(([label, value, color]) => (
               <div key={label} class="row">
