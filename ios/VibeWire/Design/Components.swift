@@ -512,22 +512,25 @@ struct RotatesIn: View {
     /// 0…1
     let fraction: Double
     var size: CGFloat = 14
-    var hole: Color = NS.Color.screenGround
 
     var body: some View {
-        Circle()
-            .fill(NS.Color.raised2)
-            .overlay {
-                Circle()
-                    .trim(from: 0, to: max(0, min(1, fraction)))
-                    .fill(NS.Color.amber)
-                    .rotationEffect(.degrees(-90))
-            }
-            .overlay {
-                Circle().fill(hole).frame(width: size * 0.58, height: size * 0.58)
-            }
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
+        // A stroked arc, not a filled one. `Circle().trim().fill()` closes the
+        // arc across its own ends, so it fills a chord rather than a pie slice —
+        // which reads as a nearly-full disc at 85% and as a lens at 50%, saying
+        // the wrong thing at every value except 0 and 1. Stroking the same trim
+        // is the dial the design asks for and is honest the whole way round.
+        let ring = size * 0.21
+        return ZStack {
+            Circle()
+                .stroke(NS.Color.raised2, lineWidth: ring)
+            Circle()
+                .trim(from: 0, to: max(0, min(1, fraction)))
+                .stroke(NS.Color.amber, style: StrokeStyle(lineWidth: ring, lineCap: .butt))
+                .rotationEffect(.degrees(-90))
+        }
+        .padding(ring / 2)
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 }
 
