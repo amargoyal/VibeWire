@@ -280,13 +280,23 @@ final class InputInjector: @unchecked Sendable {
         return (cursor, activeDisplay)
     }
 
-    /// Called when the phone selects a different display so the pointer lands
-    /// somewhere sensible rather than off-screen.
+    /// Called when the client selects a display, so the pointer arrives where the
+    /// user is about to be looking.
+    ///
+    /// This used to recentre only when the cursor had ended up outside the new
+    /// display's bounds, which made the landing spot depend on where the pointer
+    /// happened to be: switch away and back, and it was wherever you left it.
+    /// From a phone that is the wrong trade. There is no second cursor to glance
+    /// at and no screen edge to feel for, so the first swipe after a switch has to
+    /// start somewhere known — and the centre is the only point on a display that
+    /// needs no explanation. Re-selecting the display already being driven leaves
+    /// the cursor alone, because that is not a switch.
     func focus(display: CGDirectDisplayID) {
         lock.lock()
+        let changed = activeDisplay != display
         activeDisplay = display
         let bounds = CGDisplayBounds(display)
-        if !bounds.contains(cursor) {
+        if changed || !bounds.contains(cursor) {
             cursor = CGPoint(x: bounds.midX, y: bounds.midY)
         }
         let point = cursor

@@ -296,7 +296,18 @@ function MachineTitle({ posture }: { posture: Posture }) {
 function Hero({ posture }: { posture: Posture }) {
   const display = store.selectedDisplay.value
   const renderer = store.selectedRenderer()
-  const painted = renderer.framesRendered > 0
+  // A renderer having painted is not enough to show its picture here.
+  //
+  // Until the host answers a `selectDisplay`, an unstreamed display resolves to
+  // stream 0 — which is the decoder the *previous* display filled, still holding
+  // its last frame. Selecting MON 2 on this screen therefore put MON 1's picture
+  // under MON 2's caption: the one lie this screen is built to not tell. So the
+  // hero shows a picture only when a `videoConfig` actually maps the selected
+  // display to a stream, and otherwise says it has no frame yet.
+  const carried = Object.values(store.videoConfigs.value).some(
+    (config) => config.displayId === display?.id,
+  )
+  const painted = carried && renderer.framesRendered > 0
   const age = store.lastFrameAgeSeconds.value
   const lost = posture === 'unreachable'
   const tick = lost ? 'var(--ns-red)' : 'color-mix(in srgb, var(--ns-accent) 70%, transparent)'

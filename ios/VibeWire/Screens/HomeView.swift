@@ -213,8 +213,20 @@ struct HomeView: View {
     /// the Mac is displaying.
     private var hero: some View {
         let lost = posture == .unreachable
-        let renderer = model.renderer(forDisplay: model.displays.first(where: \.selected)?.id ?? 0)
-        let painted = renderer.framesRendered > 0
+        let selected = model.displays.first(where: \.selected)
+        let renderer = model.renderer(forDisplay: selected?.id ?? 0)
+        // A renderer having painted is not enough to show its picture here.
+        //
+        // Until the host answers a `selectDisplay`, an unstreamed display resolves
+        // to stream 0 — which is the decoder the *previous* display filled, still
+        // holding its last frame. Selecting the second monitor on this screen would
+        // otherwise put the first one's picture under the second one's caption: the
+        // one lie this screen is built to not tell. So the hero shows a picture only
+        // when a `videoConfig` actually maps the selected display to a stream.
+        let carried = selected.map { display in
+            model.videoConfigs.values.contains { $0.displayId == display.id }
+        } ?? false
+        let painted = carried && renderer.framesRendered > 0
         let openable = posture == .awake || posture == .weak
 
         return Button {
