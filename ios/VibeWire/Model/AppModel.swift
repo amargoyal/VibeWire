@@ -328,6 +328,48 @@ final class AppModel {
         await client.probe(host: host, port: port)
     }
 
+    /// The Mac moved. Same Mac, same key, new address.
+    ///
+    /// Pairing binds a device id to a public key, and neither of those depends on
+    /// where the Mac is — so an address that stops answering is not a reason to
+    /// trade keys again. `Identity.PairedHost` stores exactly one address, so
+    /// until this existed a Mac that changed IP was unreachable from this phone
+    /// until it was paired again: six digits off the menu bar, a new device row on
+    /// the Mac, and the old one left behind. A Cloudflare quick tunnel takes a
+    /// fresh hostname on every host restart, which is that price several times a
+    /// day.
+    ///
+    /// Probes before committing, and leaves the stored address alone if nothing
+    /// answers: replacing a working address with a typo is a worse outcome than
+    /// the problem being solved.
+    func repoint(host address: String, port: Int) async -> String? {
+        guard var moved = pairedHost else {
+            return "Nothing is paired, so there is no address to change."
+        }
+
+        guard await client.probe(host: address, port: port) != nil else {
+            return "No answer from \(address). The address is unchanged."
+        }
+
+        moved.host = address
+        moved.port = port
+        do {
+            try Identity.save(moved)
+        } catch {
+            return error.localizedDescription
+        }
+        pairedHost = moved
+
+        // Retire the old socket explicitly. Its backoff has usually given up by
+        // the time anyone reaches for this, and `connect` declines to open a
+        // second socket for a device that already has one — so without this the
+        // new address would be stored and never dialled.
+        await client.disconnect()
+        banner = nil
+        await connectIfPaired()
+        return nil
+    }
+
     /// `vibewire://pair?host=…&port=…&code=…` — the payload behind the QR the
     /// Mac shows. Handled here rather than in the pairing view so it works from
     /// a cold launch as well as from the scanner.

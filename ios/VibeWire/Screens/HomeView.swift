@@ -672,6 +672,7 @@ struct HomeView: View {
                 retryCountdown = 22
                 model.retry()
             }
+            MovedAddress()
         }
     }
 
@@ -752,6 +753,145 @@ struct HomeView: View {
                 retryCountdown = 22
                 model.retry()
             }
+        }
+    }
+}
+
+/// The Mac moved.
+///
+/// Sits under "Try again" because it is the second question to ask, not the
+/// first: a Mac that is asleep and a Mac that changed address look identical
+/// from this screen, and retrying is cheaper than typing. But when the address
+/// really has changed — and a Cloudflare quick tunnel takes a new hostname on
+/// every host restart — no amount of retrying the old one will work, and the
+/// only other way out of that used to be revoking the pairing.
+///
+/// Deliberately not a primary action, and deliberately not automatic: the app
+/// does not go looking for a Mac at an address nobody gave it.
+struct MovedAddress: View {
+    @Environment(AppModel.self) private var model
+    @State private var open = false
+    @State private var address = ""
+    @State private var port = "8787"
+    @State private var failure: String?
+    @State private var checking = false
+
+    var body: some View {
+        if open { card } else { handle }
+    }
+
+    private var handle: some View {
+        Button {
+            // Prefilled with the address that stopped answering, because the part
+            // that changed is usually the tail of it.
+            address = model.pairedHost?.host ?? ""
+            port = model.pairedHost.map { String($0.port) } ?? "8787"
+            failure = nil
+            withAnimation(NS.Motion.stateChange) { open = true }
+        } label: {
+            HStack(spacing: 8) {
+                MonoCaps("THE MAC MOVED ·", size: 9, tracking: 1.2)
+                MonoCaps("CHANGE THE ADDRESS", size: 9, color: NS.Color.accent, tracking: 1.2)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: NS.Metric.minimumTarget)
+            // Caption text is ink with gaps in it, so without this only the
+            // glyphs themselves answered a tap.
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("The Mac moved")
+        .accessibilityHint("Changes the address this phone dials, keeping the pairing.")
+    }
+
+    private var card: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                MonoCaps("NEW ADDRESS FOR THIS MAC", size: 9, tracking: 1.6)
+
+                Text("The key stays. This is the same Mac at a different address, so there is nothing to pair again — no code, no trip to the menu bar.")
+                    .font(NS.Font.sans(13))
+                    .foregroundStyle(NS.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // The same two fields the pairing card takes, because this client
+                // stores an address and a port rather than one origin, and a host
+                // that moved may well have moved to a different port too.
+                HStack(spacing: 8) {
+                    TextField("192.168.1.24 or mac.tailnet.ts.net", text: $address)
+                        .font(NS.Font.mono(13))
+                        .foregroundStyle(NS.Color.text)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: NS.Metric.minimumTarget)
+                        .background(
+                            RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                                .fill(NS.Color.raised2)
+                        )
+                        .accessibilityLabel("The Mac’s new address")
+
+                    TextField("8787", text: $port)
+                        .font(NS.Font.mono(13))
+                        .foregroundStyle(NS.Color.text)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 72)
+                        .frame(minHeight: NS.Metric.minimumTarget)
+                        .background(
+                            RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                                .fill(NS.Color.raised2)
+                        )
+                        .accessibilityLabel("Port")
+                }
+
+                // The refusal names the address it tried, because the usual cause
+                // is a character of it, and the line above stays true: the stored
+                // address has not been touched.
+                if let failure {
+                    Text(failure)
+                        .font(NS.Font.sans(13))
+                        .foregroundStyle(NS.Color.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 9) {
+                    OutlinedAction(title: "CANCEL", height: 46) {
+                        withAnimation(NS.Motion.stateChange) { open = false }
+                    }
+                    OutlinedAction(
+                        title: checking ? "CHECKING…" : "USE IT",
+                        tint: NS.Color.accent,
+                        edge: NS.Color.accent.opacity(0.5),
+                        height: 46
+                    ) {
+                        Task { await submit() }
+                    }
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private func submit() async {
+        // A second tap while the probe is in flight would run two of them and
+        // report whichever finished last.
+        guard !checking else { return }
+        let trimmed = address.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let portValue = Int(port) else {
+            failure = "Enter the Mac's new address and port."
+            return
+        }
+
+        checking = true
+        failure = nil
+        let problem = await model.repoint(host: trimmed, port: portValue)
+        checking = false
+        if let problem {
+            failure = problem
+        } else {
+            withAnimation(NS.Motion.stateChange) { open = false }
         }
     }
 }

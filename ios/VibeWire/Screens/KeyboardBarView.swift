@@ -268,7 +268,17 @@ struct ComboEditor: View {
     var body: some View {
         ScreenBody(scrolls: true) {
             VStack(alignment: .leading, spacing: 20) {
-                MonoCaps("NEW COMBO", size: 10, tracking: 2).padding(.top, 24)
+                // The editor had no way out but the swipe, which this sheet's own
+                // scroll view swallows anywhere but its top edge — and the key
+                // field below raises the system keyboard over everything beneath
+                // it. CLOSE is the exit that does not depend on where the finger
+                // lands, and it is the one the browser has.
+                HStack {
+                    MonoCaps("NEW COMBO", size: 10, tracking: 2)
+                    Spacer()
+                    SheetDismiss("CLOSE") { dismiss() }
+                }
+                .padding(.top, 24)
 
                 HStack(spacing: 8) {
                     ForEach(ModifierSpec.all, id: \.name) { spec in

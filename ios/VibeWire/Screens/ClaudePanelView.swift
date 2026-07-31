@@ -769,32 +769,6 @@ struct SessionPicker: View {
                 }
                 .padding(.top, 24)
 
-                // The picker could only resume, so a Mac with no sessions on it
-                // was a dead end: the empty state said so and offered nothing.
-                // The host already accepts an open without a session id.
-                Button {
-                    model.openClaude(mode: model.claudeMode)
-                    dismiss()
-                } label: {
-                    HStack(spacing: 10) {
-                        Text("+")
-                            .font(NS.Font.mono(15))
-                            .foregroundStyle(NS.Color.accent)
-                        MonoCaps("START A NEW SESSION", size: 11, color: NS.Color.accent, tracking: 1.4)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 52)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(NS.Color.accent.opacity(0.4), lineWidth: 1)
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("newSession")
-                .padding(.top, 18)
-
                 if model.claudeSessions.isEmpty {
                     MonoCaps("NO SESSIONS FOUND ON THE MAC", size: 11, tracking: 1.2)
                         .padding(.top, 24)
@@ -803,6 +777,13 @@ struct SessionPicker: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(model.claudeSessions) { session in
+                            // Which one is already open. Every row offers the same
+                            // verb, so without this the session being looked at is
+                            // indistinguishable from the twenty behind it — and
+                            // re-opening the current one restarts a conversation
+                            // that was already running.
+                            let current = session.id == model.claudeSessionId
+
                             Button {
                                 model.openClaude(
                                     mode: .code,
@@ -835,18 +816,43 @@ struct SessionPicker: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(14)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(NS.Color.raised))
+                                .background(
+                                    RoundedRectangle(cornerRadius: NS.Metric.radiusSmall)
+                                        .fill(NS.Color.raised)
+                                )
+                                // The accent at 35%, the same edge the browser
+                                // draws: the current session is the user's own
+                                // selection, and violet is the colour that says
+                                // so. An edge rather than a fill, because a row
+                                // this one is about to be tapped into must not
+                                // read as already answered.
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(NS.Color.hairlineDim, lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: NS.Metric.radiusSmall)
+                                        .stroke(
+                                            current
+                                                ? NS.Color.accent.opacity(0.35)
+                                                : NS.Color.hairlineDim,
+                                            lineWidth: NS.Metric.hairline
+                                        )
                                 )
                             }
                             .buttonStyle(.plain)
+                            // An outline alone says nothing to VoiceOver, and this
+                            // is the row it most needs to name.
+                            .accessibilityAddTraits(current ? [.isButton, .isSelected] : .isButton)
                         }
                     }
                     .padding(.top, 16)
                 }
 
+                // The picker could only resume, so a Mac with no sessions on it
+                // was a dead end: the empty state said so and offered nothing.
+                // The host already accepts an open without a session id.
+                //
+                // One of these, at the bottom, where every other screen puts the
+                // way forward. There was a second START A NEW SESSION above the
+                // list saying the same thing, which made the list read as the
+                // thing between two choices rather than as the choice.
                 PrimaryAction(
                     title: "New session",
                     detail: "STARTS IN THE LAST PROJECT",
@@ -857,6 +863,7 @@ struct SessionPicker: View {
                     model.openClaude(mode: .code)
                     dismiss()
                 }
+                .accessibilityIdentifier("newSession")
                 .padding(.bottom, 24)
             }
         }
