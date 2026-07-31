@@ -988,13 +988,22 @@ export function DisplayChip({
 
 /**
  * "Built-in Liquid Retina XDR" in a 64px chip is one long ellipsis, so the chip
- * takes the word that distinguishes it from the other one on the desk. The full
+ * takes the part that distinguishes it from the other one on the desk. The full
  * name and resolution are on the hero's own caption and in the aria label.
+ *
+ * Taking the first word alone was wrong in the most ordinary case there is: two
+ * screens called MON 1 and MON 2 both came back MON, so the control whose entire
+ * job is telling them apart drew the same label twice. A short name is kept
+ * whole, and where one has to be cut, a trailing index survives the cut — it is
+ * usually the only thing separating two of the same model.
  */
 function shortDisplayName(display: DisplayEntry): string {
   const name = display.name.toUpperCase()
+  if (name.length <= 12) return name
   if (name.includes('BUILT-IN')) return 'BUILT-IN'
-  return name.split(' ')[0]
+  const head = name.split(' ')[0]
+  const index = /\s(\d+)$/.exec(name)
+  return index ? `${head} ${index[1]}` : head
 }
 
 /** Causes ranked by likelihood rather than alphabetised. */
