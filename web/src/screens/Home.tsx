@@ -1350,11 +1350,14 @@ function ClaudeHandle() {
       }}
       aria-label="Claude Code"
       aria-description={detail}
+      // The width lives in the stylesheet, not here: past 900px this sits beside
+      // the primary action rather than under it, and an inline width: 100% is not
+      // something a container query can argue with — which is how the way *in* to
+      // the Mac ended up narrower than the row beside it.
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: '13px',
-        width: '100%',
         minHeight: '62px',
         paddingInline: '18px',
         paddingBlock: '10px',

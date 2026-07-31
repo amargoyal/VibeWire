@@ -1145,6 +1145,12 @@ textarea {
   padding-top: 22px;
 }
 
+/* Full width under the primary action on a phone; a fixed column beside it past
+   900px, where the container query below overrides this. */
+.home__claude {
+  width: 100%;
+}
+
 /* The way forward sits at the bottom of the screen whatever the content above it
    came to. */
 .home__acts {
@@ -1324,7 +1330,9 @@ textarea {
   }
 
   .home__acts > .home__claude {
-    width: 210px;
+    /* Wide enough for the longest thing it says — a session count and a working
+       directory — and no wider, because the button beside it is the way in. */
+    width: 300px;
     flex: 0 0 auto;
   }
 
