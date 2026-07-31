@@ -175,8 +175,14 @@ export function KeyboardBar() {
       <div class="stack" style={{ gap: '5px', paddingInline: '8px' }}>
         {/* Row one: hardware a touch device lacks. Arrows stay a single grouped cap
             so the shape is findable by feel — a flat row of four identical keys
-            never is. */}
-        <div class="row" style={{ gap: '5px' }}>
+            never is.
+
+            It wraps because it has to: esc, tab and four 44px modifiers already
+            come to about 250px, and on a 320px phone the arrow cluster was drawn
+            past the right edge of the screen with its right arrow cut in half. A
+            key that is half off the glass is not a key. Given a line of its own it
+            is the widest target in the bar instead. */}
+        <div class="row" style={{ gap: '5px', flexWrap: 'wrap' }}>
           <TextKey label="esc" code="escape" />
           <TextKey label="tab" code="tab" />
           {MODIFIERS.map((spec) => (
@@ -286,7 +292,9 @@ function TypingIntoBanner({ onClose }: { onClose: () => void }) {
       aria-label={`Typing into ${app || 'an unknown window'}`}
       style={{
         gap: '11px',
-        height: '50px',
+        // A minimum, not a height: this row holds text, and a reader who has
+        // raised their text size gets a taller banner rather than a clipped one.
+        minHeight: '50px',
         paddingLeft: '14px',
         borderRadius: 'var(--radius-control)',
         background: 'color-mix(in srgb, var(--ns-accent) 10%, transparent)',
@@ -294,17 +302,35 @@ function TypingIntoBanner({ onClose }: { onClose: () => void }) {
       }}
     >
       <Caret height={18} />
-      <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-accent)">
+      <Caps
+        size="var(--fs-9)"
+        tracking="0.14em"
+        color="var(--ns-accent)"
+        // Two words, and on a 320px phone they were breaking into two lines and
+        // taking the banner's height with them. The window name shortens instead;
+        // it is the part that can afford to.
+        style={{ whiteSpace: 'nowrap', flex: '0 0 auto' }}
+      >
         TYPING INTO
       </Caps>
       <span
         class="ellipsis"
-        style={{ fontSize: 'var(--fs-14)', fontWeight: 500, letterSpacing: '-0.01em' }}
+        style={{
+          fontSize: 'var(--fs-14)',
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          flex: '1 1 auto',
+          minWidth: 0,
+        }}
       >
         {app || 'Unknown window'}
       </span>
       <span class="spacer" />
-      <Caps size="var(--fs-9)" tracking="0.12em">
+      <Caps
+        size="var(--fs-9)"
+        tracking="0.12em"
+        style={{ whiteSpace: 'nowrap', flex: '0 0 auto' }}
+      >
         {display ? display.name.toUpperCase() : ''}
       </Caps>
       <button
@@ -352,7 +378,9 @@ function ArrowCluster() {
       style={{
         gap: 0,
         flex: '1 1 auto',
-        minWidth: 0,
+        // Its children are fixed-width, so shrinking clips them rather than
+        // squeezing them. Below this it takes a line of its own.
+        minWidth: '132px',
         height: '46px',
         borderRadius: 'var(--radius-inner)',
         background: 'var(--ns-chrome)',
