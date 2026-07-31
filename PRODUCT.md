@@ -44,7 +44,7 @@ The general remote-desktop category treats the Mac as a picture to poke at. Vibe
 **Shipping today (host `0.9.4`, phone `0.9.4`, web `0.9.4`)**
 
 - Screen: up to two displays, single or side-by-side; H.264 with a 1080/720/540 ladder plus `auto`; 60 fps target; per-display renderer.
-- Input: relative trackpad with 8 sensitivity ticks, click/drag/scroll with natural-scroll toggle, pinch zoom, modifier keys (held and latched), key rows, combos, and batched text from the system keyboard.
+- Input: relative trackpad with 8 sensitivity ticks, click, double click, scroll with natural-scroll toggle, hold-to-drag behind a ring that fills beside the press, double-tap-and-hold for the drag that stretches a selection, pinch zoom, modifier keys (held and latched), key rows, combos, and batched text from the system keyboard.
 - Utilities: clipboard both directions, screenshot to the phone, lock the Mac, wake the Mac, frontmost app/window readout.
 - Claude Code panel: session list from `~/.claude/projects`, open or resume, streaming assistant deltas, tool call states, permission allow/deny with once/always scope, changed files, live per-file diff, usage and rate-limit readouts.
 - Settings: quality, cellular cap (default on, 3 MB/s ceiling), sensitivity, natural scrolling, Face ID each session (default on), relay-over-internet toggle (default off), paired device list with revoke-one and revoke-all.

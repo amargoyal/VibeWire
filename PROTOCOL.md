@@ -178,7 +178,7 @@ Requests carrying `id` get exactly one reply with the same `id`.
 | `setQuality` | `{ ladder: "auto"\|"1080"\|"720"\|"540", cellularCapMbps }` | 07A |
 | `pointer` | `{ phase, dx, dy, display, sensitivity }` relative trackpad delta | 03A pad |
 | `click` | `{ button, count, display }` | tap |
-| `drag` | `{ phase: "begin"\|"move"\|"end", dx, dy }` | drag |
+| `drag` | `{ phase: "begin"\|"move"\|"end", dx, dy, count }` | hold-to-drag, double-tap-and-hold |
 | `scroll` | `{ dx, dy, momentum, natural }` | two-finger |
 | `zoom` | `{ scale, anchorX, anchorY, locked }` | pinch (03B) |
 | `modifiers` | `{ held: ["cmd","shift"], latched: true }` | 04B caps |
@@ -194,6 +194,14 @@ Requests carrying `id` get exactly one reply with the same `id`.
 | `revoke` | `{ deviceId }` or `{ all: true }` | 07A/07B |
 | `setting` | `{ key, value }` | 07A |
 | `ping` | `{ tMicros }` | rtt sampling |
+
+`drag.count` is the click the button goes down on, and it is optional — absent or
+`1` is an ordinary press-and-drag, `2` is a double-click that never let go (the
+gesture that selects a word and stretches it). The host carries that number on
+every event of the drag, down through move to up, because AppKit reads the click
+count off each event and a drag that changes it mid-gesture stops being a
+double-click. Additive, still `protocolVersion = 1`: a client that never sends
+the field behaves exactly as before.
 
 ## 5. Claude sub-protocol
 

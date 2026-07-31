@@ -23,7 +23,14 @@
  *  - **A real drag.** Captured, the mouse button is the Mac's mouse button: down,
  *    move, up is a drag. Uncaptured — and on touch — it is press-and-hold then
  *    move, because a finger sliding on a trackpad has always meant "move the
- *    pointer" and an uncaptured mouse is a trackpad.
+ *    pointer" and an uncaptured mouse is a trackpad. The hold is drawn: a ring
+ *    fills under the press for as long as the hold takes, then stays, riding the
+ *    finger, for as long as the Mac's button is down.
+ *  - **A double click, and a double click that held on.** Two taps land a real
+ *    double click on the Mac; hold the second one and the button stays down, so
+ *    the drag that follows is the one that selects a word and stretches it. The
+ *    one-finger double tap that used to snap the view back to fit gave the
+ *    gesture up to the Mac and moved to two fingers, tapped twice.
  *  - **Wheel and ⌃wheel.** A scroll wheel scrolls the Mac; the pinch a trackpad
  *    reports as ⌃wheel zooms, the same as a two-finger pinch on glass.
  *
@@ -62,8 +69,23 @@ type PadMode = 'pointer' | 'pan'
 
 /** Below this a press is a tap, not a travel. */
 const TAP_SLOP = 6
-/** How long a finger has to stay put before a slide becomes a drag. */
-const HOLD_TO_DRAG_MS = 450
+/**
+ * How long a finger has to stay put before a slide becomes a drag.
+ *
+ * Longer than the 450ms it used to be, because the hold is no longer invisible:
+ * a ring fills under the finger for exactly this long, and at 450ms it was full
+ * before the eye found it — a countdown nobody can read is not a countdown. A
+ * full second was tried and is too slow for something done this often.
+ */
+const HOLD_TO_DRAG_MS = 700
+/** How long the ring waits before it draws at all, so an ordinary tap — down and
+ *  up inside 90ms — never flashes one. */
+const HOLD_RING_DELAY_MS = 90
+/** Two presses closer together in time than this, and landing nearer than
+ *  `DOUBLE_TAP_SLOP`, are one double tap. Inside macOS's own double-click
+ *  interval, which defaults to 500ms. */
+const DOUBLE_TAP_MS = 300
+const DOUBLE_TAP_SLOP = 32
 /** The two keys that fire whatever the browser has focused. */
 const ACTIVATION_CODES = new Set(['Space', 'Enter', 'NumpadEnter'])
 
@@ -181,17 +203,88 @@ export function Remote() {
     // The one-finger press that has not yet decided whether it is a tap.
     single: null as { id: number; type: string; x: number; y: number } | null,
     lastTapAt: 0,
+    lastTapPoint: { x: 0, y: 0 },
+    // When the second finger landed, and when the last two-finger tap lifted:
+    // together they are how two fingers, tapped twice, put the view back to fit.
+    pinchAt: 0,
+    twoFingerTapAt: 0,
+    // The last click a captured mouse landed, for the same double-click test on
+    // hardware that has a real button rather than a finger.
+    lastClickAt: 0,
   })
 
-  const beginDrag = () => {
-    if (dragging) return
+  // MARK: The hold ring
+  //
+  // A press on its way to becoming a drag is otherwise invisible: the finger is
+  // still, the Mac's cursor has not moved, and nothing says a clock is running.
+  // The ring is that clock. It fills where the finger is; when it is full the
+  // button is down on the Mac and the ring stays, riding under the finger, until
+  // the finger lifts.
+  //
+  // Driven straight through the DOM rather than through state, on purpose: the
+  // held ring follows every `pointermove`, and re-rendering this screen at the
+  // rate a finger reports would put a diff of the whole picture between the
+  // finger and the Mac.
+  const ring = useRef<HTMLDivElement | null>(null)
+  // How far the ring sits from the press. A fingertip covers about 40px of glass
+  // and the ring is 56px wide, so a ring drawn *at* the touch is a ring under the
+  // finger — it goes above the finger instead, and only for a finger. A mouse
+  // cursor hides nothing, so there it stays exactly where the pointer is.
+  const ringLift = useRef(0)
+
+  const moveRing = (x: number, y: number) => {
+    const node = ring.current
+    if (node) node.style.transform = `translate(${x}px, ${y + ringLift.current}px)`
+  }
+
+  const armRing = (x: number, y: number) => {
+    const node = ring.current
+    if (!node) return
+    moveRing(x, y)
+    // Taking the phase off and reading the layout back between is what restarts
+    // the fill from empty. Without the read the browser coalesces both writes and
+    // the second press inherits however full the first one left it.
+    node.dataset.phase = 'off'
+    void node.offsetWidth
+    node.dataset.phase = 'arming'
+  }
+
+  const holdRing = (x?: number, y?: number) => {
+    const node = ring.current
+    if (!node) return
+    if (x !== undefined && y !== undefined) moveRing(x, y)
+    node.dataset.phase = 'held'
+  }
+
+  const hideRing = () => {
+    const node = ring.current
+    if (node) node.dataset.phase = 'off'
+  }
+
+  // Whether the Mac's button is down, kept where the handlers can read it back
+  // the instant it changes. The state above is for what the screen says; this is
+  // for what the gestures decide, and the two cannot be the same value: a double
+  // tap can go down and up inside one frame, and a handler reading a `dragging`
+  // that had not re-rendered yet would take the lift for a fresh tap and leave
+  // the Mac holding a button nothing ever let go of.
+  const draggingNow = useRef(false)
+
+  /** `count` is the click the button goes down on: 2 is a double tap that held
+   *  on, which is how a word is selected and then stretched. */
+  const beginDrag = (count = 1) => {
+    if (draggingNow.current) return
+    draggingNow.current = true
     setDragging(true)
-    store.drag('begin')
-    navigator.vibrate?.(8)
+    store.drag('begin', 0, 0, count)
+    // Heavier than a click: picking something up is a different act from pressing
+    // it, and the finger is over the thing it just took.
+    navigator.vibrate?.(count > 1 ? [6, 22, 10] : 8)
   }
 
   const endDrag = () => {
-    if (!dragging) return
+    hideRing()
+    if (!draggingNow.current) return
+    draggingNow.current = false
     setDragging(false)
     store.drag('end')
   }
@@ -219,13 +312,19 @@ export function Remote() {
   const onPointerDown = (event: PointerEvent) => {
     // Controls layered on the glass keep their taps.
     if ((event.target as HTMLElement).closest('button, input, textarea, a, [data-nopad]')) return
+    // Under a pointer lock the mouse belongs to the document handlers below, which
+    // read `movementX`. Pointer events keep firing at a frozen `clientX`, so
+    // letting them through here landed a second click on every captured click.
+    if (captured) return
 
     ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
     if (pointers.current.size === 2) {
       clearHold()
+      hideRing()
       gesture.current.pinching = true
+      gesture.current.pinchAt = performance.now()
       gesture.current.startDistance = distanceOf()
       gesture.current.startZoom = store.zoomScale.value
       gesture.current.startPan = pan
@@ -245,12 +344,44 @@ export function Remote() {
     }
 
     clearHold()
+
+    // Where the ring will sit for this press. Above the finger, so the finger is
+    // not standing on the one thing it is meant to be watching — and below it
+    // instead when the press is near the top edge, where above is off the glass.
+    ringLift.current = event.pointerType === 'mouse' ? 0 : event.clientY > 96 ? -52 : 52
+
+    // The second press of a double tap needs no clock — the first tap already
+    // said what this is. The Mac gets the second click on the way *down* and the
+    // button stays held, so lifting straight away is an ordinary double click and
+    // moving instead drags with it: the gesture that selects a word and then
+    // stretches the selection, or picks up what the second click chose.
+    const since = performance.now() - gesture.current.lastTapAt
+    const near = Math.hypot(
+      event.clientX - gesture.current.lastTapPoint.x,
+      event.clientY - gesture.current.lastTapPoint.y,
+    )
+    if (since < DOUBLE_TAP_MS && near < DOUBLE_TAP_SLOP && padMode === 'pointer') {
+      gesture.current.lastTapAt = 0
+      holdRing(event.clientX, event.clientY)
+      beginDrag(2)
+      return
+    }
+
+    if (padMode !== 'pointer') return
+
+    armRing(event.clientX, event.clientY)
     gesture.current.holdTimer = setTimeout(() => {
-      if (gesture.current.travel < TAP_SLOP && padMode === 'pointer') beginDrag()
+      if (gesture.current.travel >= TAP_SLOP || padMode !== 'pointer') {
+        hideRing()
+        return
+      }
+      holdRing()
+      beginDrag()
     }, HOLD_TO_DRAG_MS)
   }
 
   const onPointerMove = (event: PointerEvent) => {
+    if (captured) return
     const previous = pointers.current.get(event.pointerId)
     // A pointer we are not tracking is a mouse hovering with no button down, and it
     // steers nothing. Hover-steering was the obvious first cut and it is wrong:
@@ -294,7 +425,14 @@ export function Remote() {
       return
     }
 
-    if (gesture.current.travel >= TAP_SLOP) clearHold()
+    if (gesture.current.travel >= TAP_SLOP) {
+      clearHold()
+      // A press that travelled is steering, not deciding. The ring goes with the
+      // decision it was counting down to — unless the count already finished, in
+      // which case this travel *is* the drag and the ring rides along.
+      if (!draggingNow.current) hideRing()
+    }
+    if (draggingNow.current) moveRing(event.clientX, event.clientY)
 
     if (padMode === 'pan') {
       // The finger carries the picture, so it tracks the finger rather than
@@ -303,14 +441,16 @@ export function Remote() {
       return
     }
 
-    if (dragging) store.drag('move', dx, dy)
+    if (draggingNow.current) store.drag('move', dx, dy)
     else store.movePointer(dx, dy)
   }
 
   const onPointerUp = (event: PointerEvent) => {
+    if (captured) return
     const wasTracking = pointers.current.delete(event.pointerId)
     if (!wasTracking) return
     clearHold()
+    hideRing()
 
     if (pointers.current.size >= 1) {
       // Still a multi-touch gesture in progress; re-baseline what is left so the
@@ -326,22 +466,41 @@ export function Remote() {
     gesture.current.pinching = false
     setShowZoomBadge(false)
 
-    if (dragging) {
+    if (draggingNow.current) {
+      // Whatever this drag went down on, it is finished, and the tap it may have
+      // started as is spent — a third press is a fresh gesture, not a triple
+      // click that nothing here has ever claimed to send.
+      gesture.current.lastTapAt = 0
       endDrag()
       return
     }
 
-    // A short press that did not travel is a click — unless two fingers were
-    // pinching, where lifting them must not land a click, or the pad is moving the
-    // view rather than the Mac's pointer.
-    if (gesture.current.travel < TAP_SLOP && !wasPinching && padMode === 'pointer') {
-      const now = performance.now()
-      if (now - gesture.current.lastTapAt < 300) {
-        gesture.current.lastTapAt = 0
-        resetView()
-        return
+    // Two fingers down and straight back up, twice, puts the view back to fit.
+    // This is where the one-finger double tap used to live; that gesture now
+    // belongs to the Mac, because a double click is the commoner act and the only
+    // one the desktop under the glass cannot do without. Two fingers were already
+    // the pair that means "the view", so it kept the meaning and changed hands.
+    if (wasPinching) {
+      const quick = performance.now() - gesture.current.pinchAt < DOUBLE_TAP_MS
+      if (quick && gesture.current.travel < TAP_SLOP * 2) {
+        const now = performance.now()
+        if (now - gesture.current.twoFingerTapAt < DOUBLE_TAP_MS + 120) {
+          gesture.current.twoFingerTapAt = 0
+          resetView()
+        } else {
+          gesture.current.twoFingerTapAt = now
+        }
       }
-      gesture.current.lastTapAt = now
+      return
+    }
+
+    // A short press that did not travel is a click — unless the pad is moving the
+    // view rather than the Mac's pointer. Where it landed is kept as well as when,
+    // because a second tap somewhere else on the glass is a second click there,
+    // not a double click here.
+    if (gesture.current.travel < TAP_SLOP && padMode === 'pointer') {
+      gesture.current.lastTapAt = performance.now()
+      gesture.current.lastTapPoint = { x: event.clientX, y: event.clientY }
       store.click()
       navigator.vibrate?.(5)
     }
@@ -376,7 +535,14 @@ export function Remote() {
   }
 
   useEffect(() => {
-    const onChange = () => setCaptured(document.pointerLockElement === glass.current)
+    const onChange = () => {
+      const held = document.pointerLockElement === glass.current
+      setCaptured(held)
+      // Escape ends a capture wherever the button happens to be, and the browser
+      // sends no mouseup for a button that was down when it went. Letting go here
+      // is the difference between a released drag and a Mac left holding one.
+      if (!held) endDrag()
+    }
     document.addEventListener('pointerlockchange', onChange)
     return () => document.removeEventListener('pointerlockchange', onChange)
   }, [])
@@ -386,24 +552,36 @@ export function Remote() {
     const onMove = (event: MouseEvent) => {
       if (padMode !== 'pointer') return
       if (event.buttons > 0) {
-        if (!dragging) beginDrag()
+        if (!draggingNow.current) beginDrag()
         store.drag('move', event.movementX, event.movementY)
       } else {
-        if (dragging) endDrag()
+        if (draggingNow.current) endDrag()
         store.movePointer(event.movementX, event.movementY)
       }
     }
     const onDown = (event: MouseEvent) => {
       event.preventDefault()
       gesture.current.travel = 0
+      // The second press of a double click goes down as a double click and stays
+      // down, exactly as the second tap does on glass: release it and the Mac has
+      // been double-clicked, move it and the second click is dragging. Sending a
+      // `click` of count two on the way up instead would put a stray single click
+      // between the two the Mac is meant to see.
+      if (event.button !== 0) return
+      if (performance.now() - gesture.current.lastClickAt < DOUBLE_TAP_MS) {
+        gesture.current.lastClickAt = 0
+        beginDrag(2)
+      }
     }
     const onUp = (event: MouseEvent) => {
       event.preventDefault()
-      if (dragging) {
+      if (draggingNow.current) {
+        gesture.current.lastClickAt = 0
         endDrag()
         return
       }
       store.click(1, event.button === 2 ? 'right' : 'left')
+      gesture.current.lastClickAt = event.button === 0 ? performance.now() : 0
     }
     const onContext = (event: Event) => event.preventDefault()
 
@@ -551,6 +729,8 @@ export function Remote() {
           dragging={dragging}
         />
       )}
+
+      <HoldRing ringRef={ring} />
 
       {zoom > 1.02 ? <Minimap /> : null}
       {showZoomBadge ? <ZoomBadge /> : null}
@@ -1044,9 +1224,39 @@ function TeachingLegend() {
       }}
     >
       {matchMedia('(pointer: fine)').matches
-        ? 'DRAG ANYWHERE ON THE GLASS · ESC RELEASES A CAPTURE\nWHEEL SCROLLS · ⌃WHEEL ZOOMS · ? LISTS THE KEYS'
-        : 'MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS'}
+        ? 'DRAG ANYWHERE ON THE GLASS · HOLD TO PICK UP\nDOUBLE-CLICK REACHES THE MAC · ESC RELEASES A CAPTURE\nWHEEL SCROLLS · ⌃WHEEL ZOOMS · ? LISTS THE KEYS'
+        : 'MOVE ANYWHERE ON THE GLASS · HOLD TO DRAG\nDOUBLE-TAP CLICKS TWICE · HOLD THE SECOND TO DRAG IT\nTWO FINGERS SCROLL · PINCH ZOOMS · TWO-FINGER DOUBLE-TAP FITS'}
     </Caps>
+  )
+}
+
+/**
+ * The clock under a held press, drawn where the press is.
+ *
+ * Mounted for the whole session and moved by hand rather than rendered per
+ * gesture: it has to follow a finger that is dragging, and this screen is not a
+ * thing to re-render at the rate a finger reports. Every phase it can be in is a
+ * `data-phase` the stylesheet answers — empty, filling, or full and carrying
+ * something.
+ */
+function HoldRing({ ringRef }: { ringRef: { current: HTMLDivElement | null } }) {
+  return (
+    <div
+      ref={ringRef}
+      class="hold-ring"
+      data-phase="off"
+      aria-hidden="true"
+      style={`--hold-ms:${HOLD_TO_DRAG_MS}ms;--hold-delay:${HOLD_RING_DELAY_MS}ms`}
+    >
+      <svg viewBox="0 0 56 56">
+        {/* Dark backing first, or a ring drawn over a bright desktop is a ring
+            nobody can see. */}
+        <circle class="hold-ring__halo" cx="28" cy="28" r="24" />
+        <circle class="hold-ring__core" cx="28" cy="28" r="9" />
+        <circle class="hold-ring__track" cx="28" cy="28" r="24" />
+        <circle class="hold-ring__sweep" cx="28" cy="28" r="24" />
+      </svg>
+    </div>
   )
 }
 
@@ -1069,7 +1279,11 @@ function ZoomBadge() {
         {store.zoomScale.value.toFixed(1)}×
       </span>
       <Caps size="var(--fs-10)" tracking="0.2em" color="var(--ns-accent)">
-        {`DOUBLE-${tapVerb()} FITS`}
+        {/* One finger belongs to the Mac now, double taps included, so the way
+            back to fit is stated in the pair of fingers that already means "the
+            view" — and on hardware with no second finger, the wheel that zoomed
+            in is the way back out. */}
+        {tapVerb() === 'TAP' ? 'TWO-FINGER DOUBLE-TAP FITS' : '⌃WHEEL ZOOMS BACK OUT'}
       </Caps>
     </div>
   )

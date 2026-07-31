@@ -23,6 +23,12 @@ final class InputInjector: @unchecked Sendable {
     private var activeDisplay: CGDirectDisplayID = CGMainDisplayID()
     private var latchedModifiers: Set<ModifierKey> = []
     private var isDragging = false
+    /// The click count the current drag went down with — 1 for an ordinary drag,
+    /// 2 when the phone double-tapped and then held. Every event of that drag has
+    /// to carry the same number: AppKit reads the count off the event, so a
+    /// `down(2)` followed by `dragged(1)` is a double-click that immediately stops
+    /// being one, and the word it just selected is dropped on the first move.
+    private var dragClickCount = 1
     private var sensitivity: Int = 5
     private var naturalScrolling = true
     private var scrollAccumulator: (x: Double, y: Double) = (0, 0)
@@ -68,11 +74,12 @@ final class InputInjector: @unchecked Sendable {
         next = Self.clamp(next, to: activeDisplay)
         cursor = next
         let dragging = isDragging
+        let count = dragClickCount
         let modifiers = latchedModifiers
         lock.unlock()
 
         let type: CGEventType = dragging ? .leftMouseDragged : .mouseMoved
-        post(mouse: type, at: next, button: .left, clickCount: dragging ? 1 : 0, modifiers: modifiers)
+        post(mouse: type, at: next, button: .left, clickCount: dragging ? count : 0, modifiers: modifiers)
     }
 
     func click(button: MouseButton, count: Int, display: CGDirectDisplayID?) {
@@ -97,15 +104,20 @@ final class InputInjector: @unchecked Sendable {
         }
     }
 
-    func drag(phase: GesturePhase, dx: Double, dy: Double) {
+    /// `count` is the click the button goes down on: 1 is a press-and-drag, 2 is a
+    /// double-click that never let go — the gesture that selects a word and then
+    /// stretches the selection, or picks up the thing the second click chose.
+    func drag(phase: GesturePhase, dx: Double, dy: Double, count: Int = 1) {
         switch phase {
         case .begin:
             lock.lock()
             isDragging = true
+            dragClickCount = max(1, min(3, count))
+            let clicks = dragClickCount
             let point = cursor
             let modifiers = latchedModifiers
             lock.unlock()
-            post(mouse: .leftMouseDown, at: point, button: .left, clickCount: 1, modifiers: modifiers)
+            post(mouse: .leftMouseDown, at: point, button: .left, clickCount: clicks, modifiers: modifiers)
 
         case .move:
             movePointer(dx: dx, dy: dy, display: nil)
@@ -113,10 +125,12 @@ final class InputInjector: @unchecked Sendable {
         case .end:
             lock.lock()
             isDragging = false
+            let clicks = dragClickCount
+            dragClickCount = 1
             let point = cursor
             let modifiers = latchedModifiers
             lock.unlock()
-            post(mouse: .leftMouseUp, at: point, button: .left, clickCount: 1, modifiers: modifiers)
+            post(mouse: .leftMouseUp, at: point, button: .left, clickCount: clicks, modifiers: modifiers)
         }
     }
 

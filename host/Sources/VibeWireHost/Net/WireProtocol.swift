@@ -18,7 +18,7 @@ enum InboundMessage {
     case setQuality(ladder: HostSettings.QualityLadder, cellularCapMbps: Double?)
     case pointer(PointerEvent)
     case click(button: MouseButton, count: Int, display: UInt32?)
-    case drag(phase: GesturePhase, dx: Double, dy: Double)
+    case drag(phase: GesturePhase, dx: Double, dy: Double, count: Int)
     case scroll(dx: Double, dy: Double, momentum: Bool)
     case zoom(scale: Double, anchorX: Double, anchorY: Double, locked: Bool)
     case modifiers(held: Set<ModifierKey>, latched: Bool)
@@ -159,7 +159,14 @@ extension InboundMessage {
             )
 
         case "drag":
-            message = .drag(phase: phase(), dx: double("dx"), dy: double("dy"))
+            // `count` is additive and optional: a client that never sends it drags
+            // on a single click, which is what every version-1 client did.
+            message = .drag(
+                phase: phase(),
+                dx: double("dx"),
+                dy: double("dy"),
+                count: int("count") ?? 1
+            )
 
         case "scroll":
             message = .scroll(

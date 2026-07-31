@@ -1264,8 +1264,10 @@ export class Store {
     this.send(message)
   }
 
-  drag(phase: 'begin' | 'move' | 'end', dx = 0, dy = 0): void {
-    this.send({ t: 'drag', phase, dx, dy })
+  /** `count` is the click the button goes down on: 2 is a double-tap that held on
+   *  and is now dragging, which is how a word is selected and then stretched. */
+  drag(phase: 'begin' | 'move' | 'end', dx = 0, dy = 0, count = 1): void {
+    this.send({ t: 'drag', phase, dx, dy, count })
   }
 
   scroll(dx: number, dy: number, momentum = false): void {

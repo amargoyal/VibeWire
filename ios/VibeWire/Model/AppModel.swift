@@ -965,8 +965,10 @@ final class AppModel {
         ])
     }
 
-    func drag(_ phase: String, dx: CGFloat = 0, dy: CGFloat = 0) {
-        send(["t": "drag", "phase": phase, "dx": dx, "dy": dy])
+    /// `count` is the click the button goes down on: 2 is a double tap that held
+    /// on and is now dragging, which is how a word is selected and stretched.
+    func drag(_ phase: String, dx: CGFloat = 0, dy: CGFloat = 0, count: Int = 1) {
+        send(["t": "drag", "phase": phase, "dx": dx, "dy": dy, "count": count])
     }
 
     func scroll(dx: CGFloat, dy: CGFloat, momentum: Bool = false) {

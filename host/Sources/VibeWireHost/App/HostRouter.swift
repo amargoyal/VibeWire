@@ -382,8 +382,8 @@ final class HostRouter: Router, @unchecked Sendable {
                 display: display.map { CGDirectDisplayID($0) }
             )
 
-        case .drag(let phase, let dx, let dy):
-            injector.drag(phase: phase, dx: dx, dy: dy)
+        case .drag(let phase, let dx, let dy, let count):
+            injector.drag(phase: phase, dx: dx, dy: dy, count: count)
 
         case .scroll(let dx, let dy, let momentum):
             injector.scroll(dx: dx, dy: dy, momentum: momentum)

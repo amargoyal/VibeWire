@@ -593,6 +593,105 @@ textarea {
   height: 58%;
 }
 
+/* The clock under a press that is on its way to becoming a drag, drawn where the
+   press is. It fills for exactly as long as the hold takes; when it is full the
+   Mac's button is down and the ring stays, riding under the finger, until the
+   finger lifts.
+
+   Like the spinner and the pairing dial, this one keeps filling under Reduce
+   Motion: a countdown that has stopped moving says the hold stopped counting,
+   which is the one thing this ring exists to deny. Nothing here travels, scales
+   or springs, which is what that rule is actually about. */
+.hold-ring {
+  position: fixed;
+  /* Centred on its own origin, so the transform only has to carry where the
+     press is and never has to know how big the ring is. */
+  left: -28px;
+  top: -28px;
+  width: 56px;
+  height: 56px;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.hold-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Dark backing, so the ring reads over a white document as well as a dark one. */
+.hold-ring__halo {
+  fill: color-mix(in srgb, var(--ns-deep) 62%, transparent);
+  stroke: color-mix(in srgb, var(--ns-deep) 78%, transparent);
+  stroke-width: 5;
+}
+
+.hold-ring__track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ns-edge) 70%, transparent);
+  stroke-width: 3;
+}
+
+/* The fill itself. `stroke-dasharray` is the circumference of r=24, and the
+   offset walks it from a full gap to none. */
+.hold-ring__sweep {
+  fill: none;
+  stroke: var(--ns-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 150.8;
+  stroke-dashoffset: 150.8;
+  /* Start at twelve o'clock rather than three. */
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* Only once the ring is full: the press is now carrying something. */
+.hold-ring__core {
+  fill: color-mix(in srgb, var(--ns-accent) 34%, transparent);
+  opacity: 0;
+}
+
+.hold-ring[data-phase='arming'] {
+  animation: ns-hold-show 120ms ease-out var(--hold-delay, 90ms) both;
+}
+
+.hold-ring[data-phase='arming'] .hold-ring__sweep {
+  animation: ns-hold-fill calc(var(--hold-ms, 700ms) - var(--hold-delay, 90ms))
+    linear var(--hold-delay, 90ms) both;
+}
+
+/* Held: full ring, filled centre, and no animation left running — the countdown
+   is over and what it was counting to has happened. */
+.hold-ring[data-phase='held'] {
+  opacity: 1;
+}
+
+.hold-ring[data-phase='held'] .hold-ring__sweep {
+  stroke-dashoffset: 0;
+}
+
+.hold-ring[data-phase='held'] .hold-ring__core {
+  opacity: 1;
+}
+
+@keyframes ns-hold-show {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ns-hold-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* ── Controls ─────────────────────────────────────────────────────────── */
 
 /* The primary action. Carries its own preflight in the sub-label, because the
@@ -1208,6 +1307,10 @@ textarea {
   flex-direction: column;
   overflow: hidden;
   user-select: none;
+  /* A press held for most of a second is now a gesture this screen owns. Safari
+     on iOS answers the same press with its own callout, which would arrive over
+     the picture just as the ring finishes filling. */
+  -webkit-touch-callout: none;
 }
 
 .remote__rail {

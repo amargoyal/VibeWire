@@ -576,6 +576,95 @@ struct TwoFingerPan: UIViewRepresentable {
     }
 }
 
+/// Two fingers, tapped twice: the view goes back to fit.
+///
+/// SwiftUI's `onTapGesture(count:)` cannot ask for two fingers, and one finger
+/// no longer has a double tap to spare — that gesture belongs to the Mac now,
+/// which needs a real double click far more than the picture needs a shortcut
+/// back to 1.0×. Installed exactly as `TwoFingerPan` is, on the window, without
+/// swallowing the touch: the trackpad in front must keep working for one finger.
+struct TwoFingerDoubleTap: UIViewRepresentable {
+    let onTap: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onTap: onTap)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        installWhenReady(on: view, coordinator: context.coordinator)
+        return view
+    }
+
+    private func installWhenReady(on view: UIView, coordinator: Coordinator) {
+        DispatchQueue.main.async {
+            guard coordinator.recognizer == nil else { return }
+            guard let target = view.window else {
+                // The view is not in a window yet on the first pass.
+                installWhenReady(on: view, coordinator: coordinator)
+                return
+            }
+            let recognizer = UITapGestureRecognizer(
+                target: coordinator,
+                action: #selector(Coordinator.handle(_:))
+            )
+            recognizer.numberOfTouchesRequired = 2
+            recognizer.numberOfTapsRequired = 2
+            recognizer.cancelsTouchesInView = false
+            recognizer.delaysTouchesBegan = false
+            recognizer.delaysTouchesEnded = false
+            recognizer.delegate = coordinator
+            target.addGestureRecognizer(recognizer)
+            coordinator.recognizer = recognizer
+            coordinator.host = view
+        }
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onTap = onTap
+        context.coordinator.host = uiView
+    }
+
+    /// The recognizer outlives the representable's view because it is installed
+    /// on the window, so it has to be taken off by hand.
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        if let recognizer = coordinator.recognizer {
+            recognizer.view?.removeGestureRecognizer(recognizer)
+        }
+        coordinator.recognizer = nil
+        coordinator.host = nil
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var onTap: () -> Void
+        weak var recognizer: UITapGestureRecognizer?
+        /// The representable's own view, used only to test whether the tap
+        /// landed on the pad.
+        weak var host: UIView?
+
+        init(onTap: @escaping () -> Void) {
+            self.onTap = onTap
+        }
+
+        @objc func handle(_ recognizer: UITapGestureRecognizer) {
+            guard recognizer.state == .ended else { return }
+            guard let host, let window = recognizer.view else { return }
+            let frame = host.convert(host.bounds, to: window)
+            guard frame.contains(recognizer.location(in: window)) else { return }
+            onTap()
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
+    }
+}
+
 final class VideoSurfaceView: UIView {
     private var attached: AVSampleBufferDisplayLayer?
 

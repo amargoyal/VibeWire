@@ -111,6 +111,14 @@ not a choice.
   VibeWire client than a phone.
 - **A real drag.** Button down, move, button up. On touch it is press-and-hold then
   move, since a finger sliding on a trackpad has always meant "move the pointer".
+  The hold is drawn: a ring fills beside the press — above the finger, which would
+  otherwise be standing on it — and once full it stays, riding along, for as long as
+  the Mac's button is down.
+- **A double click, and a double click that held on.** Two taps land a real double
+  click; hold the second one and the button stays down, so the move that follows is
+  the drag that selects a word and stretches it. The one-finger double tap that used
+  to snap the picture back to fit gave the gesture up to the Mac — two fingers,
+  tapped twice, do that now.
 - **A real keyboard.** Captured keydown goes straight through, modifiers included, so
   ⌘⇧Z arrives as ⌘⇧Z.
 - **Wheel and ⌃wheel.** Scroll wheel scrolls the Mac; the pinch a trackpad reports as

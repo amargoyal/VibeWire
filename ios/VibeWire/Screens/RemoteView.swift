@@ -18,6 +18,14 @@ struct RemoteView: View {
     /// that travels first is steering, which is what a trackpad has always done.
     @State private var holdToDrag: Task<Void, Never>?
     @State private var travelSincePress: CGFloat = 0
+    /// When and where the last tap lifted. A press that lands soon enough after
+    /// one, and near enough to it, is the second half of a double tap.
+    @State private var lastTapAt: Date?
+    @State private var lastTapPoint: CGPoint = .zero
+    /// The clock drawn under a press on its way to becoming a drag. Its own
+    /// object rather than this view's state, so a ring following a dragging
+    /// finger re-renders one small overlay and not the whole picture.
+    @State private var ring = HoldRingModel()
     @State private var showTeachingOverlay = true
     @State private var pinchStart: CGFloat = 1
     @State private var showZoomBadge = false
@@ -210,13 +218,20 @@ struct RemoteView: View {
                 }
             )
         )
-        .onTapGesture(count: 2) { resetView() }
+        // Two fingers down and straight back up, twice, puts the view back to
+        // fit. This is where the one-finger double tap used to live; that
+        // gesture now belongs to the Mac, because a double click is the commoner
+        // act and the only one the desktop under the glass cannot do without.
+        // Two fingers were already the pair that means "the view", so the
+        // meaning kept its owner and changed hands.
+        .background(TwoFingerDoubleTap { resetView() })
         .overlay(alignment: .topTrailing) {
             if model.zoomScale > 1.02 { minimap.padding(.top, 66).padding(.trailing, 20) }
         }
         .overlay {
             if showZoomBadge { zoomBadge }
         }
+        .overlay { HoldRingLayer(model: ring) }
     }
 
     private var statusStrip: some View {
@@ -512,7 +527,7 @@ struct RemoteView: View {
 
     private var teachingLegend: some View {
         MonoCaps(
-            "MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS",
+            "MOVE ANYWHERE ON THE GLASS · HOLD TO DRAG\nDOUBLE-TAP CLICKS TWICE · HOLD THE SECOND TO DRAG IT\nTWO FINGERS SCROLL · PINCH ZOOMS · TWO-FINGER DOUBLE-TAP FITS",
             size: 9,
             tracking: 1.6
         )
@@ -528,7 +543,10 @@ struct RemoteView: View {
             Text(String(format: "%.1f×", model.zoomScale))
                 .nsMono(46, weight: .medium)
                 .foregroundStyle(NS.Color.text)
-            MonoCaps("DOUBLE-TAP FITS", size: 10, color: NS.Color.accent, tracking: 2)
+            // One finger belongs to the Mac now, double taps included, so the way
+            // back to fit is stated in the pair of fingers that already means
+            // "the view".
+            MonoCaps("TWO-FINGER DOUBLE-TAP FITS", size: 10, color: NS.Color.accent, tracking: 2)
         }
         .allowsHitTesting(false)
         .transition(.opacity)
@@ -894,6 +912,11 @@ struct RemoteView: View {
                     }
                 )
             )
+            // The same pair of fingers, tapped twice, fits the picture here too:
+            // a gesture that exists in one orientation and not the other is a
+            // gesture nobody trusts.
+            .background(TwoFingerDoubleTap { resetView() })
+            .overlay { HoldRingLayer(model: ring) }
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
@@ -940,15 +963,23 @@ struct RemoteView: View {
                 guard !isTwoFingerPanning else {
                     pointerOrigin = nil
                     cancelHold()
+                    ring.hide()
                     return
                 }
                 if pointerOrigin == nil {
                     pointerOrigin = value.startLocation
                     travelSincePress = 0
-                    startHoldToDrag()
+                    beginPress(at: value.startLocation)
                 }
                 travelSincePress = hypot(value.translation.width, value.translation.height)
-                if travelSincePress >= Self.tapSlop { cancelHold() }
+                if travelSincePress >= Self.tapSlop {
+                    cancelHold()
+                    // A press that travelled is steering, not deciding — unless
+                    // the count already finished, in which case this travel *is*
+                    // the drag and the ring rides along with it.
+                    if !isDragging { ring.hide() }
+                }
+                if isDragging { ring.point = value.location }
                 let previous = pointerOrigin ?? value.startLocation
                 let dx = value.location.x - previous.x
                 let dy = value.location.y - previous.y
@@ -975,37 +1006,84 @@ struct RemoteView: View {
                     value.translation.width,
                     value.translation.height
                 )
-                // A short press that did not travel is a click, not a move —
-                // unless two fingers were pinching, where lifting them must not
-                // land a click, or the pad is moving the view rather than the
-                // Mac's pointer.
-                if travel < Self.tapSlop && !isDragging && !isTwoFingerPanning && padMode == .pointer {
+                if isDragging {
+                    // Whatever this drag went down on is finished, and the tap it
+                    // may have started as is spent: a third press is a fresh
+                    // gesture, not a triple click nothing here claims to send.
+                    model.drag("end")
+                    isDragging = false
+                    lastTapAt = nil
+                } else if travel < Self.tapSlop && !isTwoFingerPanning && padMode == .pointer {
+                    // A short press that did not travel is a click, not a move —
+                    // unless two fingers were pinching, where lifting them must
+                    // not land a click, or the pad is moving the view rather than
+                    // the Mac's pointer. Where it landed is kept as well as when,
+                    // because a second tap somewhere else is a second click
+                    // there, not a double click here.
+                    lastTapAt = Date()
+                    lastTapPoint = value.location
                     model.click()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
-                if isDragging {
-                    model.drag("end")
-                    isDragging = false
-                }
                 cancelHold()
+                ring.hide()
                 pointerOrigin = nil
             }
+    }
+
+    /// The press has just landed: either it is the second half of a double tap,
+    /// which is already decided, or it starts the clock that turns a press into
+    /// a drag.
+    private func beginPress(at point: CGPoint) {
+        // The second press of a double tap needs no clock — the first tap
+        // already said what this is. The Mac gets the second click on the way
+        // *down* and the button stays held, so lifting straight away is an
+        // ordinary double click and moving instead drags with it: the gesture
+        // that selects a word and then stretches the selection.
+        if padMode == .pointer,
+           let last = lastTapAt,
+           Date().timeIntervalSince(last) < Self.doubleTapSeconds,
+           hypot(point.x - lastTapPoint.x, point.y - lastTapPoint.y) < Self.doubleTapSlop {
+            lastTapAt = nil
+            ring.hold(at: point)
+            isDragging = true
+            model.drag("begin", count: 2)
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            return
+        }
+        guard padMode == .pointer else { return }
+        ring.arm(at: point, seconds: Self.holdToDragSeconds)
+        startHoldToDrag()
     }
 
     /// Below this a press is a tap, not a travel.
     private static let tapSlop: CGFloat = 6
     /// How long a finger has to stay put before a slide becomes a drag. The same
-    /// 450ms the browser client uses, so the two clients feel like one hand.
-    private static let holdToDragSeconds: Double = 0.45
+    /// 700ms the browser client uses, so the two clients feel like one hand —
+    /// longer than the 450ms it was, because the hold is now drawn and at 450ms
+    /// the ring was full before the eye found it.
+    private static let holdToDragSeconds: Double = 0.7
+    /// Two presses closer together than this, landing nearer than
+    /// `doubleTapSlop`, are one double tap. Inside macOS's own double-click
+    /// interval, which defaults to half a second.
+    private static let doubleTapSeconds: Double = 0.3
+    private static let doubleTapSlop: CGFloat = 32
 
     private func startHoldToDrag() {
         holdToDrag?.cancel()
         holdToDrag = Task { @MainActor in
             try? await Task.sleep(for: .seconds(Self.holdToDragSeconds))
             guard !Task.isCancelled else { return }
-            guard !isDragging, !isTwoFingerPanning, padMode == .pointer else { return }
-            guard travelSincePress < Self.tapSlop else { return }
+            guard !isDragging, !isTwoFingerPanning, padMode == .pointer else {
+                ring.hide()
+                return
+            }
+            guard travelSincePress < Self.tapSlop else {
+                ring.hide()
+                return
+            }
             isDragging = true
+            ring.hold()
             model.drag("begin")
             // Heavier than a click: picking something up is a different act from
             // pressing it, and the finger is not looking at the screen it moved.
@@ -1211,6 +1289,129 @@ struct RemoteView: View {
                 if queued != queuedCount { queuedCount = queued }
             } else if queuedCount != 0 {
                 queuedCount = 0
+            }
+        }
+    }
+}
+
+/// Where the hold ring is and what it is doing. An `@Observable` object rather
+/// than view state on purpose: the held ring follows a dragging finger, and this
+/// screen is not a thing to rebuild at the rate a finger reports. Only the layer
+/// that reads these reads them.
+@MainActor
+@Observable
+final class HoldRingModel {
+    enum Phase: Equatable {
+        /// Nothing is pressed, or the press was answered and let go.
+        case off
+        /// A press is being held and the clock is running, for this long. The
+        /// press number is what makes two identical holds two different values:
+        /// without it a second press in a row is `==` the first, the layer sees
+        /// no change, and the ring carries on from wherever the last fill got
+        /// to instead of starting again from empty.
+        case arming(seconds: Double, press: Int)
+        /// The clock finished: the Mac's button is down and this ring is riding
+        /// under the finger that put it there.
+        case held
+    }
+
+    var phase: Phase = .off
+    var point: CGPoint = .zero
+    private var presses = 0
+
+    func arm(at point: CGPoint, seconds: Double) {
+        self.point = point
+        presses += 1
+        phase = .arming(seconds: seconds, press: presses)
+    }
+
+    func hold(at point: CGPoint? = nil) {
+        if let point { self.point = point }
+        phase = .held
+    }
+
+    func hide() {
+        guard phase != .off else { return }
+        phase = .off
+    }
+}
+
+/// The clock under a press that is on its way to becoming a drag, drawn where
+/// the press is. It fills for exactly as long as the hold takes; when it is full
+/// the Mac's button is down and the ring stays, riding under the finger, until
+/// the finger lifts.
+///
+/// Like the spinner and the pairing dial, this keeps filling under Reduce
+/// Motion: a countdown that has stopped moving says the hold stopped counting,
+/// which is the one thing this ring exists to deny. Nothing here travels, scales
+/// or springs, which is what that rule is actually about.
+struct HoldRingLayer: View {
+    let model: HoldRingModel
+
+    /// How much of the ring is drawn, 0 to 1.
+    @State private var sweep: CGFloat = 0
+    /// Held back for a moment so an ordinary tap — down and up inside 90ms —
+    /// never flashes a ring.
+    @State private var shown = false
+
+    private static let diameter: CGFloat = 56
+    private static let showDelay: Double = 0.09
+    /// A fingertip covers about 40pt of glass, so a ring drawn at the touch is a
+    /// ring under the finger. It rides above the finger instead — and below it
+    /// when the press is near the top edge, where above is off the screen.
+    private static let lift: CGFloat = 52
+
+    var body: some View {
+        ZStack {
+            if model.phase != .off {
+                ZStack {
+                    // Dark backing, so the ring reads over a white document as
+                    // well as a dark one.
+                    Circle()
+                        .fill(NS.Color.deepGround.opacity(0.62))
+                        .overlay(Circle().stroke(NS.Color.deepGround.opacity(0.78), lineWidth: 5))
+                    Circle()
+                        .stroke(NS.Color.edge.opacity(0.7), lineWidth: 3)
+                    Circle()
+                        .trim(from: 0, to: model.phase == .held ? 1 : sweep)
+                        .stroke(
+                            NS.Color.accent,
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                        // Start at twelve o'clock rather than three.
+                        .rotationEffect(.degrees(-90))
+                    // Only once the ring is full: the press is now carrying
+                    // something.
+                    if model.phase == .held {
+                        Circle()
+                            .fill(NS.Color.accent.opacity(0.34))
+                            .frame(width: 18, height: 18)
+                    }
+                }
+                .frame(width: Self.diameter, height: Self.diameter)
+                .opacity(shown ? 1 : 0)
+                .position(
+                    x: model.point.x,
+                    y: model.point.y + (model.point.y > 96 ? -Self.lift : Self.lift)
+                )
+            }
+        }
+        .allowsHitTesting(false)
+        .onChange(of: model.phase) { _, phase in
+            switch phase {
+            case .off:
+                shown = false
+                sweep = 0
+            case .arming(let seconds, _):
+                sweep = 0
+                shown = false
+                withAnimation(.easeOut(duration: 0.12).delay(Self.showDelay)) { shown = true }
+                withAnimation(.linear(duration: seconds - Self.showDelay).delay(Self.showDelay)) {
+                    sweep = 1
+                }
+            case .held:
+                sweep = 1
+                withAnimation(.easeOut(duration: 0.1)) { shown = true }
             }
         }
     }
