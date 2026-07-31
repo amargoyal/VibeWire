@@ -13,6 +13,7 @@
  */
 
 import type { ComponentChildren } from 'preact'
+import { useEffect } from 'preact/hooks'
 
 import { bitrateMbps, store, type PairedDeviceEntry, type RevokeTarget } from '../app/store'
 import { decoderSupport } from '../video/renderer'
@@ -38,6 +39,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
   // While the revoke sheet is up it owns Escape; this one would otherwise close
   // underneath it and take the question with it.
   const sheet = useSheet<HTMLDivElement>(target ? undefined : onClose)
+
+  // A pending revoke belongs to this sheet. Closing it any other way — DONE, the
+  // shortcut key, a route change — used to leave the confirmation armed, so the
+  // question came back unasked the next time Settings was opened.
+  useEffect(() => () => (store.revokeTarget.value = null), [])
 
   return (
     <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label="Settings">

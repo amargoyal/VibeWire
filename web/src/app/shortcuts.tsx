@@ -44,6 +44,19 @@ interface Binding {
   label: string
   /** Where it applies, for the sheet to group by. */
   where: 'anywhere' | 'picture'
+  /**
+   * Whether this key may fire while a sheet is open.
+   *
+   * The ones that only move this client's own surfaces may: a sheet is exclusive,
+   * so swapping one for another is coherent, and a key that opens a surface has
+   * to be able to close it again — blocking every key under a sheet meant `d`
+   * opened the drawer and then could not shut it.
+   *
+   * The ones that reach the Mac may not. Pressing `s` to see what it does while
+   * reading the shortcut list screenshotted the Mac behind the sheet; `b` and the
+   * display keys restarted the stream underneath a settings panel.
+   */
+  underSheet?: boolean
   run: () => void
 }
 
@@ -51,12 +64,14 @@ const BINDINGS: Binding[] = [
   {
     key: '?',
     label: 'This list',
+    underSheet: true,
     where: 'anywhere',
     run: () => (showShortcuts.value = !showShortcuts.value),
   },
   {
     key: 'c',
     label: 'Claude',
+    underSheet: true,
     where: 'anywhere',
     run: () => {
       const open = store.presented.value === 'claude'
@@ -67,14 +82,17 @@ const BINDINGS: Binding[] = [
   {
     key: ',',
     label: 'Settings',
+    underSheet: true,
     where: 'anywhere',
     run: () => {
-      store.presented.value = store.presented.value === 'settings' ? null : 'settings'
+      const open = store.presented.value === 'settings'
+      store.presented.value = open ? null : 'settings'
     },
   },
   {
     key: 'f',
     label: 'Fill the screen',
+    underSheet: true,
     where: 'anywhere',
     run: () => void toggleFullscreen(),
   },
@@ -87,6 +105,7 @@ const BINDINGS: Binding[] = [
   {
     key: 'd',
     label: 'Commands',
+    underSheet: true,
     where: 'picture',
     run: () => (store.showHub.value = !store.showHub.value),
   },
@@ -178,9 +197,7 @@ export function useShortcuts(): void {
 
       const binding = BINDINGS.find((candidate) => candidate.key === event.key)
       if (!binding) return
-      // A sheet is a modal context. `?` is the exception because it is the way
-      // out of the one sheet these keys open.
-      if (binding.key !== '?' && anySheetOpen()) return
+      if (!binding.underSheet && anySheetOpen()) return
       if (binding.where === 'picture' && store.route.value !== 'remote') return
       // Nothing but this list applies before there is a Mac: a Claude panel over
       // the pairing screen is a panel with nothing on the other end of it.
