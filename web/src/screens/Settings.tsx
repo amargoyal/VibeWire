@@ -52,7 +52,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           }}
         >
           <div class="row" style={{ minHeight: '40px', marginTop: '12px', flex: '0 0 auto' }}>
-            <Display level={26}>Settings</Display>
+            <Display level={26} rank={2}>Settings</Display>
             <span class="spacer" />
             <SheetDismiss onClick={onClose} id="dismissSettings" />
           </div>
@@ -192,6 +192,10 @@ function PairedDevices() {
             <button
               class="outlined"
               onClick={() => (store.revokeTarget.value = { kind: 'device', device })}
+              // Every row's button is the word REVOKE, so a reader moving between
+              // them hears the same name three times and cannot tell which key is
+              // about to be deleted.
+              aria-label={`Revoke ${device.name}`}
               style={
                 {
                   width: 'auto',

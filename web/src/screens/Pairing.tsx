@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { store } from '../app/store'
 import {
+  Announce,
   Caps,
   Caret,
   Display,
@@ -575,8 +576,21 @@ const fieldStyle = {
  * like it started over.
  */
 function Exchanging({ digits, steps }: { digits: string; steps: ExchangeStep[] }) {
+  // Which step the handshake is on, spoken once as it changes. The sixth digit
+  // replaces the whole screen, so a reader who was typing lands here with the
+  // field they were in gone and nothing said about where they are.
+  const running = steps.find((step) => step.state === 'running')
+  const failed = steps.find((step) => step.state === 'failed')
+
   return (
     <ScreenBody scrolls>
+      <Announce>
+        {failed
+          ? `Handshake failed at ${failed.title.toLowerCase()}.`
+          : running
+            ? `Trading keys. ${running.title.toLowerCase()}.`
+            : 'Trading keys.'}
+      </Announce>
       <header class="row" style={{ minHeight: '34px', flex: '0 0 auto' }}>
         <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
           VibeWire

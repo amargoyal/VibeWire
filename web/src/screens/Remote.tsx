@@ -38,6 +38,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { bitrateMbps, store, type DisplayEntry } from '../app/store'
 import { hostKeyName, modifiersFrom, releaseKeyboardLock } from '../app/keymap'
 import {
+  Announce,
   Caps,
   Card,
   conditionColor,
@@ -715,8 +716,20 @@ function StatusStrip() {
 
   const tone = reconnecting ? 'var(--ns-amber)' : conditionColor[condition]
 
+  // The kind of state, never the numbers in it: the RTT and the stall counter
+  // change every second, and a live region would read them out every second.
+  const spoken = {
+    live: 'The picture is live.',
+    starting: 'Opening the picture.',
+    stalled: 'The picture has stalled.',
+    reconnecting: 'Reconnecting to the Mac.',
+    stopped: 'The picture is stopped.',
+    failed: 'The connection to the Mac was lost.',
+  }[state.kind]
+
   return (
     <>
+      <Announce>{spoken}</Announce>
       <span class="row" style={{ gap: '7px' }}>
         <span
           class={
@@ -1110,7 +1123,10 @@ function ReconnectingCard({ seconds, landscape }: { seconds: number; landscape: 
   ]
   return (
     <div
-      role="status"
+      // Not a live region. The sentence inside it counts the seconds since the
+      // last frame, and announcing "the picture above is 4.0 seconds old" once a
+      // second for thirty seconds is not a report, it is a metronome. The state
+      // itself is announced once, by the status strip.
       data-nopad
       style={{
         position: 'absolute',

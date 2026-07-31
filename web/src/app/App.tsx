@@ -221,7 +221,7 @@ function ScreenshotSheet() {
           <SheetDismiss onClick={() => (store.screenshot.value = null)} />
         </div>
 
-        <Display level={26} style={{ marginTop: '14px', flex: '0 0 auto' }}>
+        <Display level={26} rank={2} style={{ marginTop: '14px', flex: '0 0 auto' }}>
           The Mac’s screen,
           <br />
           a moment ago.

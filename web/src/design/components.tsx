@@ -90,23 +90,31 @@ export function Caps({
 /**
  * The app's one heading. `level` picks the size; there is no separate typeface,
  * weight or colour decision to make at a call site.
+ *
+ * `rank` is the *outline* level, which is a different question from the size and
+ * has to be asked separately: a sheet opening over Home put a second `h1` on the
+ * page, so a reader navigating by heading found two documents where there is one
+ * screen and one thing on top of it.
  */
 export function Display({
   children,
   level = 38,
+  rank = 1,
   color,
   style,
 }: {
   children: ComponentChildren
   level?: 38 | 36 | 30 | 26
+  rank?: 1 | 2
   color?: string
   style?: JSX.CSSProperties
 }) {
   const modifier = level === 38 ? '' : ` display--${level}`
+  const Tag = rank === 1 ? 'h1' : 'h2'
   return (
-    <h1 class={`display${modifier}`} style={{ color, ...style }}>
+    <Tag class={`display${modifier}`} style={{ color, ...style }}>
       {children}
-    </h1>
+    </Tag>
   )
 }
 
@@ -571,19 +579,62 @@ export function Segmented<T extends string | number>({
   label: string
   onGlass?: boolean
 }) {
+  const current = options.findIndex((option) => option.value === selection)
+
+  /**
+   * Arrows walk the segments, and the whole control is one stop on the way past.
+   *
+   * A tablist is one control, not four: Tab reaches the segment that is current
+   * and leaves, arrows choose. Four separately tabbable buttons meant four stops
+   * to cross the quality ladder and no way to change it without a pointer, which
+   * is the opposite of what the roles claimed.
+   */
+  const step = (from: number, delta: number, node: HTMLElement) => {
+    const next = (from + delta + options.length) % options.length
+    const target = options[next]
+    if (!target) return
+    onSelect(target.value)
+    const sibling = node.parentElement?.children[next]
+    if (sibling instanceof HTMLElement) sibling.focus()
+  }
+
   return (
     <div
       class={onGlass ? 'segmented segmented--onGlass' : 'segmented'}
       role="tablist"
       aria-label={label}
     >
-      {options.map((option) => (
+      {options.map((option, index) => (
         <button
           key={String(option.value)}
           role="tab"
           // Without this the selected segment sounds exactly like the three beside
           // it, and the control's whole job is to say which one is current.
           aria-selected={selection === option.value}
+          tabIndex={index === (current === -1 ? 0 : current) ? 0 : -1}
+          onKeyDown={(event) => {
+            const node = event.currentTarget
+            switch (event.key) {
+              case 'ArrowRight':
+              case 'ArrowDown':
+                event.preventDefault()
+                step(index, 1, node)
+                break
+              case 'ArrowLeft':
+              case 'ArrowUp':
+                event.preventDefault()
+                step(index, -1, node)
+                break
+              case 'Home':
+                event.preventDefault()
+                step(-1, 1, node)
+                break
+              case 'End':
+                event.preventDefault()
+                step(0, -1, node)
+                break
+            }
+          }}
           onClick={() => onSelect(option.value)}
         >
           <Caps
@@ -746,6 +797,27 @@ export function spokenGlyph(glyph: string): string {
     default:
       return glyph
   }
+}
+
+/**
+ * A sentence a screen reader hears when a condition changes, and nobody sees.
+ *
+ * A dot going amber and the word beside it do this job continuously, for free,
+ * for a reader who is looking at the screen. There is no equivalent for one who
+ * is not — and the states this app is most careful to distinguish (stalled,
+ * reconnecting, lost, a tool waiting on an answer) are exactly the ones that
+ * arrive unasked for.
+ *
+ * Give it the *kind* of thing that changed, never a per-second value: a counter
+ * in a live region is read out every second and buries the change it exists to
+ * report.
+ */
+export function Announce({ children }: { children: string }) {
+  return (
+    <span class="sr-only" role="status" aria-live="polite">
+      {children}
+    </span>
+  )
 }
 
 /**

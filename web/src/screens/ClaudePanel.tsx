@@ -32,6 +32,7 @@ import {
   type ToolCall,
 } from '../app/store'
 import {
+  Announce,
   Caps,
   Caret,
   Display,
@@ -137,7 +138,7 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
         </div>
 
         <div class="row" style={{ gap: '12px', paddingTop: '6px', flex: '0 0 auto' }}>
-          <Display level={26}>Claude</Display>
+          <Display level={26} rank={2}>Claude</Display>
           <span class="spacer" />
           {permission ? (
             // While something is waiting, the header states that instead of
@@ -257,6 +258,13 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             {permission ? <PermissionCard /> : null}
           </div>
         </div>
+
+        {/* A tool has stopped and is waiting to be answered. Everything on screen
+            dims to say so, which says nothing at all to a reader who is not
+            looking at it. */}
+        {permission ? (
+          <Announce>{`${permission.toolName} is waiting for permission to run.`}</Announce>
+        ) : null}
 
         <div class="claude__ask">
         {/* Follow-ups as two thumb chips rather than another typing session. */}
@@ -913,7 +921,7 @@ function SessionPicker({ onClose }: { onClose: () => void }) {
           <SheetDismiss title="CLOSE" onClick={onClose} />
         </div>
 
-        <Display level={30} style={{ marginTop: '14px', flex: '0 0 auto' }}>
+        <Display level={30} rank={2} style={{ marginTop: '14px', flex: '0 0 auto' }}>
           Pick up where
           <br />
           you left off.
