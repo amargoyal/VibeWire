@@ -425,35 +425,6 @@ export function Caret({ height = 26 }: { height?: number }) {
   return <span class="caret" aria-hidden="true" style={{ height: `${height}px` }} />
 }
 
-/**
- * The countdown to the next pairing code, drawn as a sweep rather than as a
- * number that ticks. The number is beside it — this says at a glance whether
- * there is time to finish typing.
- */
-export function RotatesIn({
-  fraction,
-  size = 14,
-  background = 'var(--ns-screen)',
-}: {
-  fraction: number
-  size?: number
-  background?: string
-}) {
-  return (
-    <span
-      class="rotates"
-      aria-hidden="true"
-      style={
-        {
-          width: `${size}px`,
-          height: `${size}px`,
-          '--sweep': `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`,
-          '--hole': background,
-        } as JSX.CSSProperties
-      }
-    />
-  )
-}
 
 // MARK: - Controls
 

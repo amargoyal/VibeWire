@@ -32,7 +32,6 @@ import {
   Caret,
   CornerTicks,
   Display,
-  RotatesIn,
   ScreenBody,
   SectionLabel,
   SheetDismiss,
@@ -233,13 +232,11 @@ export function Pairing() {
   if (exchanging) return <Exchanging digits={digits} steps={steps} />
 
   // Nothing here knows when the Mac last turned the code over — the rotation
-  // phase is not on the wire — so what was drawn was this tab's own age modulo
-  // sixty, counting down to zero on a code that might have fifty seconds left.
-  // An exact second count in amber is a claim; the cadence is a fact, and it is
-  // the one the reader needs, because it says how long to keep looking at the
-  // Mac. The dial turns on the same tick and reports the same cadence without
-  // pretending to know where in it this moment sits.
-  const secondsLeft = CODE_ROTATION_SECONDS - (store.tick.value % CODE_ROTATION_SECONDS)
+  // phase is not on the wire. What used to be drawn was this tab's own age modulo
+  // sixty: a countdown to zero on a code that might have had fifty seconds left,
+  // and a dial filling to match it. Both are claims about a phase this client
+  // cannot see. The cadence is the fact, and it is the one the reader needs,
+  // because it says how long to keep looking at the Mac.
 
   // Read at render rather than once at module load: this is a fact about the
   // engine and the origin, and the origin is the one thing on this screen that
@@ -336,7 +333,6 @@ export function Pairing() {
         </div>
 
         <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
-          <RotatesIn fraction={secondsLeft / CODE_ROTATION_SECONDS} />
           <Caps size="var(--fs-9)" tracking="0.14em">
             {`THE MAC ROTATES THIS CODE EVERY ${CODE_ROTATION_SECONDS}S`}
           </Caps>
