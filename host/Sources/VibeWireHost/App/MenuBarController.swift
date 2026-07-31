@@ -172,31 +172,70 @@ final class MenuBarController: NSObject {
     private func readoutHeader() -> NSView {
         let serving = router?.serving
 
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 268, height: 96))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 268, height: 106))
 
         let name = NSTextField(labelWithString: Host.current().localizedName ?? "This Mac")
-        name.frame = NSRect(x: 34, y: 66, width: 150, height: 18)
+        // The one mark left sitting directly on the system's menu material, and
+        // correctly so: `labelWithString:` leaves this at `labelColor`, the
+        // platform's own adaptive ink, which is legible in both appearances by
+        // construction. It is also the machine's name rather than a condition,
+        // so it was never the palette's to colour.
+        name.frame = NSRect(x: 14, y: 74, width: 150, height: 18)
         name.font = .systemFont(ofSize: 13, weight: .semibold)
         container.addSubview(name)
 
-        // Text Tertiary for the dormant fill, and not the Text Disabled that
-        // DESIGN.md assigns to dormant indicators, because that assignment is
-        // written for grounds this app draws. Here the ground is the system's
-        // own menu material, which the host cannot pin: measured across the
-        // range that material covers, Text Disabled lands at 1.71:1 on a dark
-        // menu over a black desktop and 1.14:1 over a white one. That is not a
-        // dim indicator, it is no indicator. Text Tertiary holds 2.7:1 to 4.1:1
-        // across the same range.
-        let dot = NSView(frame: NSRect(x: 16, y: 71, width: 7, height: 7))
-        dot.fill(serving == nil ? Palette.textTertiary : Palette.green, radius: 3.5)
-        container.addSubview(dot)
+        // The state chip.
+        //
+        // The dot and the word used to be painted from the palette straight onto
+        // the menu's material, and the palette is defined against grounds this
+        // app draws. The material is not one of those: the menu follows the
+        // system appearance, this app never sets `NSApp.appearance`, and on a
+        // light menu jade measured 1.10:1 to 1.47:1 — a host that does not
+        // report its state at all to anyone who has not chosen Dark.
+        //
+        // Filling a chip puts the ink back on a ground the palette was measured
+        // against, and the readings stop depending on the desktop behind them:
+        // jade on Raised is 10.93:1 and Text Tertiary on Raised is 4.15:1, in
+        // both appearances, over any wallpaper.
+        //
+        // Text Tertiary rather than the Text Disabled DESIGN.md assigns to
+        // dormant indicators: on Raised it holds 4.15:1 where Text Disabled
+        // reaches 1.75:1, and a dormant mark still has to be a mark. Moving to a
+        // ground the host draws did not rescue that ink — Raised is a dark
+        // ground too, which is the whole reason the rest of the palette works on
+        // it — so the reading taken against the menu material still stands.
+        //
+        // No edge. The chip is a ground, not a control, so there is nothing to
+        // hit and no 3:1 boundary owed. Where it is least visible it is also
+        // least needed, and by the same fact: against a dark menu over a black
+        // desktop it measures 1.02:1 because #181A1F and the material are the
+        // same colour — which is exactly the case where the bare material was
+        // already carrying jade at 10.68:1. Where the material is light the chip
+        // measures 11.98:1 to 16.11:1 against it, which is where it is for.
+        let stateWord = serving == nil ? "STARTING" : "SERVING"
+        let stateFont = NSFont.monospacedSystemFont(ofSize: 9, weight: .medium)
+        // Sized to the longer of the two words, so the chip holds still when the
+        // state changes rather than resizing under a reader's eye.
+        let wordWidth = ("STARTING" as NSString)
+            .size(withAttributes: [.font: stateFont]).width.rounded(.up)
+        // 34pt tall because a declared corner has to survive being drawn:
+        // CALayer clamps `cornerRadius` to half the shorter side, so at 32pt or
+        // under this would come out a capsule — and a capsule in this system
+        // marks something transient, which a standing condition readout is not.
+        let chipWidth = 12 + 7 + 7 + wordWidth + 12
+        let chip = NSView(frame: NSRect(x: 256 - chipWidth, y: 66, width: chipWidth, height: 34))
+        chip.fill(Palette.raised, radius: Palette.Radius.control)
+        container.addSubview(chip)
 
-        let state = NSTextField(labelWithString: serving == nil ? "STARTING" : "SERVING")
-        state.frame = NSRect(x: 168, y: 68, width: 86, height: 14)
-        state.alignment = .right
-        state.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
+        let dot = NSView(frame: NSRect(x: 12, y: 13.5, width: 7, height: 7))
+        dot.fill(serving == nil ? Palette.textTertiary : Palette.green, radius: 3.5)
+        chip.addSubview(dot)
+
+        let state = NSTextField(labelWithString: stateWord)
+        state.frame = NSRect(x: 26, y: 10, width: wordWidth, height: 14)
+        state.font = stateFont
         state.textColor = serving == nil ? Palette.textTertiary : Palette.green
-        container.addSubview(state)
+        chip.addSubview(state)
 
         // An unmeasured value and a measured zero are different facts, and the
         // interface is not allowed to blur them. Until the router has answered
