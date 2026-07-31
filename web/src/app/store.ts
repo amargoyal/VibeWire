@@ -1378,6 +1378,17 @@ export class Store {
       // host this browser no longer has a key to.
       this.presented.value = null
       this.revokeTarget.value = null
+      // The two sheets that are not presentations and so were not covered by the
+      // line above: both render whatever the route is, and both hold something
+      // the Mac sent. A revoke that leaves a picture of the Mac's screen — or the
+      // text off its clipboard — sitting over the pairing screen has severed the
+      // key and left the contents on the glass.
+      this.screenshot.value = null
+      this.clipboardOffer.value = null
+      // Controls for a machine this browser no longer has a key to.
+      this.showHub.value = false
+      this.showKeyboard.value = false
+      this.claudeWentQuiet()
     })
     this.disconnect()
   }
