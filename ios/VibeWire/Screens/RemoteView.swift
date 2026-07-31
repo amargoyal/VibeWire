@@ -128,7 +128,7 @@ struct RemoteView: View {
         .task { await queueTicker() }
         .onAppear {
             // The teaching overlay retires after three sessions; the corner
-            // ticks and cursor halo stay forever.
+            // ticks stay forever.
             showTeachingOverlay = model.sessionCount <= 3
         }
     }

@@ -160,9 +160,9 @@ Requests carrying `id` get exactly one reply with the same `id`.
 | `transport` | `direct`/`relay`, path detail, peer latency, relay name | 02A, 02D, 07A toggle |
 | `streamState` | `starting`/`live`/`stalled`/`reconnecting`/`stopped`, attempt, nextRetryMs, queuedInput, stalledMs | 03D |
 | `videoConfig` | streamId, width, height, fps, bitrate, ladderStep (`1080`/`720`/`540`) | 03A/03B readouts |
-| `cursor` | x, y, display, visible | cursor halo |
 | `clipboard` | text or image descriptor pulled from the Mac | 04A COPY ← MAC |
 | `screenshot` | png bytes as base64 + dimensions | 04A SHOT |
+| `lastFrame` | `{ ageSeconds }`, answering a `lastFrame` request | 02A hero age chip |
 | `frontmost` | app name, window title, display | 05 "TYPING INTO" |
 | `claude` | see §5 | 06A/06B/06C |
 | `devices` | paired devices with lastSeen | 07A |
