@@ -208,6 +208,22 @@ final class AppModel {
     // Streaming
     var streamState: StreamState = .stopped
     var videoConfigs: [Int: VideoConfig] = [:]
+
+    /// Streams whose frames are arriving and cannot be turned into pictures,
+    /// keyed by stream id, carrying the decoder's own reason.
+    ///
+    /// Deliberately *not* a case on `StreamState`. The host's stream state and
+    /// this phone's decoder are two independent facts, and in this failure both
+    /// are true at once: the Mac is sending, and VideoToolbox is refusing what
+    /// it sends. Folded into one enum, the next `streamState: live` from the
+    /// host — and it sends them — would erase a fault the host cannot see, and
+    /// the strip would go back to saying LIVE over a frozen frame.
+    ///
+    /// It is also not a stall. A stall means frames stopped arriving; here they
+    /// are arriving, nothing is queued, the round trip is real, and every key
+    /// and tap is still landing on the Mac. Same frozen picture, opposite cause,
+    /// different answer.
+    var decodeFailures: [Int: String] = [:]
     var zoomScale: CGFloat = 1
     var zoomLocked = false
     var sideBySide = false
@@ -262,6 +278,21 @@ final class AppModel {
     init() {
         pairedHost = Identity.loadPairedHost()
         route = pairedHost == nil ? .pairing : .home
+
+        // Frames are decoded off the main actor by design, so the renderer's
+        // verdict on them arrives off it too and hops here. This is the whole
+        // route from a VideoToolbox error to something a view can read.
+        renderers.onDecodeFailureChange = { [weak self] streamId, reason in
+            Task { @MainActor in
+                guard let self else { return }
+                if let reason {
+                    self.decodeFailures[streamId] = reason
+                } else {
+                    self.decodeFailures.removeValue(forKey: streamId)
+                }
+            }
+        }
+
         Task { await installHandlers() }
 
         // Tell the host which radio we are on so the cellular cap applies
@@ -308,6 +339,7 @@ final class AppModel {
     func disconnect() async {
         await client.disconnect()
         renderers.resetAll()
+        decodeFailures.removeAll()
         streamState = .stopped
     }
 
@@ -575,6 +607,7 @@ final class AppModel {
         case "stopped":
             streamState = .stopped
             renderers.resetAll()
+            decodeFailures.removeAll()
         default: break
         }
     }
@@ -822,6 +855,26 @@ final class AppModel {
         return renderer(forDisplay: display.id)
     }
 
+    /// Why a given display's picture cannot be decoded, if it cannot. Resolved
+    /// through the same stream id the picture is drawn from, so a failure on the
+    /// monitor that is not on screen cannot claim the one that is.
+    func decodeFailure(forDisplay id: UInt32) -> String? {
+        if let config = videoConfigs.values.first(where: { $0.displayId == id }) {
+            return decodeFailures[config.streamId]
+        }
+        if let streamId = displays.first(where: { $0.id == id })?.streamId {
+            return decodeFailures[streamId]
+        }
+        return nil
+    }
+
+    var selectedDecodeFailure: String? {
+        guard let display = displays.first(where: \.selected) else {
+            return decodeFailures[0]
+        }
+        return decodeFailure(forDisplay: display.id)
+    }
+
     func startStream() {
         // Stream ids are reassigned per start; keeping the old configs would
         // point a pane at a decoder the host is no longer filling. Resetting
@@ -831,6 +884,11 @@ final class AppModel {
         // them, so the next resolution builds a renderer for the new numbering.
         videoConfigs.removeAll()
         renderers.removeAll()
+        // The renderers report their own clearing, but that hops back through
+        // the main actor and this has to be true before the remote screen is
+        // first drawn — a card describing the stream that just ended has no
+        // business on the one that is starting.
+        decodeFailures.removeAll()
         streamState = .starting
         route = .remote
         send([
@@ -842,6 +900,7 @@ final class AppModel {
     func stopStream() {
         send(["t": "stopStream"])
         renderers.resetAll()
+        decodeFailures.removeAll()
         streamState = .stopped
         showHub = false
         showKeyboard = false

@@ -74,6 +74,11 @@ struct RemoteView: View {
                 if case .stalled = model.streamState { reconnectingOverlay }
                 if case .reconnecting = model.streamState { reconnectingOverlay }
 
+                // 03E — the same frozen picture from the opposite cause. The
+                // two can never both be up: `decodeFailure` is only read while
+                // the host says frames are still coming.
+                if cannotDecode { undecodableOverlay }
+
                 // The drawer carries its own arrival — see the `rise` on the
                 // drawer inside it, which travels its own height rather than
                 // the whole screen's. The taps that open and hide it animate
@@ -139,8 +144,10 @@ struct RemoteView: View {
             Spacer(minLength: 0)
 
             VStack(spacing: 10) {
+                // Teaching gestures over a picture that has stopped updating is
+                // noise on top of a fault, and the card below wants the space.
                 if showTeachingOverlay && model.streamState == .live
-                    && !model.sideBySide && !model.showHub {
+                    && !cannotDecode && !model.sideBySide && !model.showHub {
                     teachingLegend
                 }
                 rail
@@ -186,7 +193,7 @@ struct RemoteView: View {
                     condition: streamCondition,
                     size: 6,
                     // Nothing decorative moves next to a live video feed.
-                    animated: model.streamState != .live
+                    animated: !pictureIsLive
                 )
                 MonoCaps(liveLabel, size: 10, color: streamCondition.color, tracking: 1.4)
             }
@@ -203,6 +210,14 @@ struct RemoteView: View {
     /// it both take this, so the colour and the word can never say two different
     /// things about the same picture.
     private var streamCondition: Condition {
+        // Frames are arriving and none of them can be turned into a picture.
+        // Whatever the socket is doing, this picture is not live and the strip
+        // above it may not say it is. It takes `lost` rather than `degraded`
+        // because nothing here is thinning gracefully — there is no picture at
+        // all — and because a lost condition is drawn as a square, which is the
+        // redundant channel this app owes the one state that is not recoverable
+        // by waiting.
+        if cannotDecode { return .lost }
         switch model.streamState {
         // A live picture is only as good as the link carrying it, so here the
         // measured round trip and loss are what decide between the two.
@@ -227,6 +242,31 @@ struct RemoteView: View {
         }
     }
 
+    /// The decoder's reason for the picture on the glass being the last one that
+    /// decoded rather than the newest one sent.
+    ///
+    /// Gated on the host still reporting a running stream. Once frames stop
+    /// arriving, the fault on screen is the stall — a decode failure recorded
+    /// while they were still coming is a fact about a stream that has since
+    /// stopped, and two cards claiming one frozen frame is the collapse this
+    /// state exists to avoid. The value is not cleared here; the renderer clears
+    /// it on evidence and nothing else. It simply stops outranking the newer,
+    /// truer state.
+    private var decodeFailure: String? {
+        switch model.streamState {
+        case .live, .starting: return model.selectedDecodeFailure
+        default: return nil
+        }
+    }
+
+    private var cannotDecode: Bool { decodeFailure != nil }
+
+    /// The picture is genuinely moving, which is the only thing that earns the
+    /// suppression of the condition dot's pulse. That rule exists so nothing
+    /// decorative moves beside live video — and a frame that cannot be decoded
+    /// is not live video, whatever the host is reporting.
+    private var pictureIsLive: Bool { model.streamState == .live && !cannotDecode }
+
     /// How old the picture is, and only where that has actually been measured.
     ///
     /// A stall is measured: the host is still on the socket and reported the age
@@ -243,6 +283,9 @@ struct RemoteView: View {
     }
 
     private var liveLabel: String {
+        // Its own word, not a fourth spelling of STALLED. The two look the same
+        // on the glass and have nothing else in common.
+        if cannotDecode { return "CANNOT DECODE" }
         switch model.streamState {
         case .live:
             return "LIVE \(model.link.rttMillis.map { String(Int($0)) } ?? "—")MS"
@@ -262,6 +305,12 @@ struct RemoteView: View {
         // line describing a stream that has stopped arriving is the strip
         // claiming health it has not observed. While the picture is paused this
         // prints the em dash the panel prints for anything unmeasured.
+        //
+        // A decode failure is deliberately *not* paused here, and it is the one
+        // place these two states are told apart on the strip itself. The host is
+        // still sending at this rate, in this codec; that is measured, still
+        // true, and the evidence for the sentence on the card saying the link is
+        // fine. Blanking it would hide the one reading that explains the state.
         guard !picturePaused else { return "—" }
         guard let config = model.videoConfigs.values.sorted(by: { $0.streamId < $1.streamId }).first
         else { return "—" }
@@ -327,14 +376,16 @@ struct RemoteView: View {
 
             // Corner ticks stay forever — they mark the edge of the real pixels
             // so a zoomed picture never looks like a cropped one.
-            CornerTicks(color: stallTint ?? NS.Color.accent.opacity(0.75))
+            CornerTicks(color: frozenTint ?? NS.Color.accent.opacity(0.75))
 
-            if model.streamState == .starting {
+            // A spinner says "wait, this is coming". Once the decoder has said
+            // it cannot use what is arriving, that is a claim nothing measured.
+            if model.streamState == .starting && !cannotDecode {
                 Spinner(size: 24, color: NS.Color.accent)
             }
         }
         .overlay(alignment: .bottomLeading) {
-            VideoCaption(pictureCaption, color: stallTint ?? NS.Color.textSecondary)
+            VideoCaption(pictureCaption, color: frozenTint ?? NS.Color.textSecondary)
                 .padding(.leading, 10)
                 .padding(.bottom, 26)
                 // The hub's hint text sits on this exact line, and two 8pt
@@ -360,6 +411,11 @@ struct RemoteView: View {
     }
 
     private var pictureCaption: String {
+        // Not the same sentence as a stall's, and the difference is the point:
+        // in a stall the frame on the glass is the last one that *arrived*; here
+        // frames keep arriving and are thrown away, so it is the last one that
+        // *decoded*.
+        if cannotDecode { return "LAST DECODED FRAME" }
         // A reconnect freezes the same frame a stall does, and this named only
         // the stall — so while the socket was being redialled the caption over
         // a frozen picture went on reading `… · LIVE`.
@@ -371,10 +427,16 @@ struct RemoteView: View {
         return model.streamState == .live ? "\(geometry) · LIVE" : geometry
     }
 
-    /// Amber ticks and caption while stalled: the frozen frame keeps its
-    /// geometry but stops claiming to be live.
-    private var stallTint: Color? {
-        picturePaused ? NS.Color.amber.opacity(0.7) : nil
+    /// The ticks and the caption take the colour of whatever froze the picture:
+    /// the frozen frame keeps its geometry but stops claiming to be live.
+    ///
+    /// Two inks, not one, because these are two conditions. Amber is a measured
+    /// degradation that waiting may fix — a stall usually does resolve. Clay is
+    /// this: the bytes are all here and none of them are a picture, which
+    /// waiting fixes only if the next keyframe happens to decode.
+    private var frozenTint: Color? {
+        if cannotDecode { return NS.Color.red.opacity(0.7) }
+        return picturePaused ? NS.Color.amber.opacity(0.7) : nil
     }
 
     // MARK: 03C — side by side
@@ -402,13 +464,13 @@ struct RemoteView: View {
                                 .overlay(Rectangle().stroke(NS.Color.accent.opacity(0.5), lineWidth: 1))
                         }
                         VideoCaption(
-                            model.inputPane == index
-                                ? "\(display.name.uppercased()) · \(display.width) × \(display.height)"
-                                : "\(display.name.uppercased()) · TAP TO TAKE INPUT",
+                            paneCaption(for: display, index: index),
                             // The unfocused pane is dimmed by its own opacity
                             // already; taking the text down as well stacked two
                             // reductions on one caption.
-                            color: NS.Color.textSecondary
+                            color: model.decodeFailure(forDisplay: display.id) == nil
+                                ? NS.Color.textSecondary
+                                : NS.Color.red
                         )
                     }
                     .padding(.leading, 10)
@@ -422,6 +484,21 @@ struct RemoteView: View {
                 }
             }
         }
+    }
+
+    /// Each pane owns a stream and therefore its own decoder, so one can be
+    /// undecodable while the other is fine. Naming it here is what keeps the
+    /// two-monitor case from reproducing exactly the fault this state was added
+    /// for: a frozen pane with the geometry caption still under it.
+    private func paneCaption(for display: DisplayEntry, index: Int) -> String {
+        let name = display.name.uppercased()
+        if model.decodeFailure(forDisplay: display.id) != nil {
+            return "\(name) · CANNOT DECODE"
+        }
+        if model.inputPane == index {
+            return "\(name) · \(display.width) × \(display.height)"
+        }
+        return "\(name) · TAP TO TAKE INPUT"
     }
 
     // MARK: Overlays
@@ -539,6 +616,82 @@ struct RemoteView: View {
         return "Nothing is arriving. Keys and taps are being held, not dropped."
     }
 
+    /// 03E — frames are arriving and none of them can be turned into a picture.
+    ///
+    /// Deliberately not the stall card wearing a different word. A stall has an
+    /// age, a queue and a retry to count down, and none of the three exist here:
+    /// the socket is up, the round trip is real, and every key and tap is
+    /// landing on the Mac while this is on screen — which is the single most
+    /// useful thing this card says, because the frozen picture implies the
+    /// opposite. What it has instead of a clock is the decoder's own reason and
+    /// the one thing that clears it.
+    ///
+    /// It sits where the stall card sits, above the rail rather than over the
+    /// picture. The picture is the last thing this app should cover, and it is
+    /// still the last true frame of the Mac.
+    private var undecodableOverlay: some View {
+        VStack {
+            Spacer()
+            Card(tint: NS.Color.red) {
+                VStack(alignment: .leading, spacing: 0) {
+                    MonoCaps(
+                        "CANNOT DECODE",
+                        size: 11,
+                        color: NS.Color.red,
+                        tracking: 1.6,
+                        weight: .medium
+                    )
+
+                    Text(
+                        """
+                        The Mac is sending video this iPhone cannot decode. \
+                        The link is fine and your keys and taps are still \
+                        landing — only the picture has stopped. It clears \
+                        itself on the next keyframe that decodes; if it does \
+                        not, stop the stream and start it again.
+                        """
+                    )
+                    .font(NS.Font.sans(15))
+                    .foregroundStyle(NS.Color.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+
+                    if let reason = decodeFailure {
+                        // The decoder's own words, in mono because the machine
+                        // wrote them. Evidence, not the answer — the answer is
+                        // the sentence above.
+                        Text(reason)
+                            .font(NS.Font.mono(11))
+                            .foregroundStyle(NS.Color.textSecondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 10)
+                    }
+
+                    VStack(spacing: 8) {
+                        // Both rows are the proof of the sentence: bytes are
+                        // still coming down, and input is still going up. A
+                        // stall can say neither.
+                        overlayRow("STILL ARRIVING", arrivingRate, NS.Color.text)
+                        overlayRow("INPUT", "STILL LANDING", NS.Color.text)
+                    }
+                    .padding(.top, 14)
+                }
+                .padding(18)
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 78)
+        }
+    }
+
+    /// What the host says it is still sending, which is the reading that makes
+    /// "the link is fine" a measurement rather than a reassurance.
+    private var arrivingRate: String {
+        guard let config = model.videoConfigs.values.sorted(by: { $0.streamId < $1.streamId }).first
+        else { return "—" }
+        return String(format: "%.1f MB/S", config.bitrateMbps)
+    }
+
     @State private var queuedCount = 0
 
     private func overlayRow(_ label: String, _ value: String, _ color: Color) -> some View {
@@ -587,7 +740,7 @@ struct RemoteView: View {
     private var pictureCaptionRow: some View {
         HStack {
             if !pictureCaption.isEmpty {
-                VideoCaption(pictureCaption, color: stallTint ?? NS.Color.textSecondary)
+                VideoCaption(pictureCaption, color: frozenTint ?? NS.Color.textSecondary)
             }
             Spacer(minLength: 8)
             MonoCaps(
@@ -699,7 +852,7 @@ struct RemoteView: View {
                 // portrait. Landscape held the live accent through a stall, so
                 // the same frozen frame was marked healthy in one orientation
                 // and degraded in the other.
-                CornerTicks(color: stallTint ?? NS.Color.accent.opacity(0.75))
+                CornerTicks(color: frozenTint ?? NS.Color.accent.opacity(0.75))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -736,13 +889,13 @@ struct RemoteView: View {
                         ConditionDot(
                             condition: streamCondition,
                             size: 5,
-                            animated: model.streamState != .live
+                            animated: !pictureIsLive
                         )
                         MonoCaps(liveLabel, size: 9, color: streamCondition.color, tracking: 1.4)
                     }
                     .videoChip()
 
-                    VideoCaption(pictureCaption, size: 9, color: stallTint ?? NS.Color.textSecondary)
+                    VideoCaption(pictureCaption, size: 9, color: frozenTint ?? NS.Color.textSecondary)
                 }
                 .padding(.leading, 24)
                 .padding(.bottom, 22)

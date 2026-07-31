@@ -25,6 +25,26 @@ final class VideoRenderer: @unchecked Sendable {
     /// this resolves within a second rather than staying broken.
     private(set) var isWaitingForKeyframe = true
 
+    /// Why frames are arriving and no picture is being made from them, in the
+    /// decoder's own words — or nil while the pictures are fine.
+    ///
+    /// A different fact from every other one on this object. A stall is "nothing
+    /// is arriving"; this is "everything is arriving and none of it can be
+    /// shown", which is a different cause and a different answer. It leaves the
+    /// renderer by `onDecodeFailureChange` rather than by being polled, because
+    /// the only thread that knows is the one carrying the frames.
+    private(set) var failure: String?
+
+    /// Fires with the reason, or nil once the picture comes back, on whatever
+    /// thread the frames are on. `RendererPool` binds it when it vends the
+    /// renderer, so a receiver is told which stream is speaking.
+    var onDecodeFailureChange: (@Sendable (String?) -> Void)?
+
+    /// A keyframe went into a layer that had just failed, and nothing has
+    /// rejected it yet. Recovery is only confirmed by the frame *after* it —
+    /// see `confirmRecovery`.
+    private var recoveryArmed = false
+
     private(set) var lastFrameAt: Date?
     private(set) var framesRendered = 0
     private(set) var framesDropped = 0
@@ -51,8 +71,14 @@ final class VideoRenderer: @unchecked Sendable {
         // opposite of what a once-per-spell guard is for.
         parameterSetsChanged = false
         didReportFailure = false
+        recoveryArmed = false
+        let hadFailure = failure != nil
+        failure = nil
         lock.unlock()
         layer.flush()
+        // A failure banner that outlives its failure is its own defect, and the
+        // stream this one described is over.
+        if hadFailure { onDecodeFailureChange?(nil) }
     }
 
     func enqueue(_ frame: VideoFrame) {
@@ -135,39 +161,112 @@ final class VideoRenderer: @unchecked Sendable {
             first[kCMSampleAttachmentKey_DisplayImmediately] = true
         }
 
-        enqueueOnLayer(sampleBuffer)
+        guard enqueueOnLayer(sampleBuffer, isKeyframe: frame.isKeyframe) else {
+            framesDropped += 1
+            return
+        }
         framesRendered += 1
         lastFrameAt = Date()
     }
 
-    private func enqueueOnLayer(_ sampleBuffer: CMSampleBuffer) {
+    /// Hands the buffer over, unless the layer has already failed.
+    ///
+    /// Returns false when nothing was handed over. The buffer used to be
+    /// enqueued into a layer that had been flushed out from under it on the line
+    /// above and still counted as a rendered frame, so `framesRendered` climbed
+    /// through a spell of failure in which nothing was drawn at all.
+    private func enqueueOnLayer(_ sampleBuffer: CMSampleBuffer, isKeyframe: Bool) -> Bool {
         if #available(iOS 17.0, *) {
-            let renderer = layer.sampleBufferRenderer
-            if renderer.status == .failed {
-                reportFailure(renderer.error)
-                layer.flush()
+            let target = layer.sampleBufferRenderer
+            guard target.status != .failed else {
+                reportFailure(target.error)
+                return false
             }
-            renderer.enqueue(sampleBuffer)
+            confirmRecovery()
+            target.enqueue(sampleBuffer)
         } else {
-            if layer.status == .failed {
+            guard layer.status != .failed else {
                 reportFailure(layer.error)
-                layer.flush()
+                return false
             }
+            confirmRecovery()
             layer.enqueue(sampleBuffer)
         }
+        if isKeyframe {
+            lock.lock()
+            if failure != nil { recoveryArmed = true }
+            lock.unlock()
+        }
+        return true
+    }
+
+    /// Whether this state clears itself, and on what.
+    ///
+    /// It clears itself, because VideoToolbox routinely fails on one frame and
+    /// is perfectly well on the next keyframe, and a failure banner that
+    /// outlives its failure is its own defect. What it may not do is clear on a
+    /// timer: "it has been quiet for two seconds" is not evidence that anything
+    /// decoded, and this app does not show conditions it has not measured.
+    ///
+    /// The evidence is two frames deep, because one frame is not enough.
+    /// `reportFailure` flushes the layer and re-arms the keyframe gate, so the
+    /// next thing to reach the layer is an IDR. Getting that IDR *in* only
+    /// proves the flush cleared the status — the layer decodes asynchronously
+    /// and has not looked at it yet. It is the frame after it finding the layer
+    /// still out of `.failed` that proves the IDR actually decoded, and that is
+    /// the frame that takes the banner down.
+    private func confirmRecovery() {
+        lock.lock()
+        let recovered = recoveryArmed && failure != nil
+        if recovered {
+            recoveryArmed = false
+            failure = nil
+            // The next spell of failure is a new one and gets its own line in
+            // the log, for the same reason `reset` clears this.
+            didReportFailure = false
+        }
+        lock.unlock()
+        if recovered { onDecodeFailureChange?(nil) }
     }
 
     /// A decode failure used to be indistinguishable from "the Mac's screen is
-    /// simply dark": the layer went to `.failed`, got flushed, and said
-    /// nothing, so a black pane had no explanation. Reported once per spell of
-    /// failure rather than per frame, which at 60fps would be a torrent.
+    /// simply dark": the layer went to `.failed`, got flushed, and said nothing
+    /// but a `print` into a console nobody on a couch is reading — so a frozen
+    /// frame sat under a strip saying LIVE with a green dot beside it, and the
+    /// link really was fine, so nothing else on screen had any reason to report
+    /// a problem. It now leaves the renderer.
+    ///
+    /// Logged once per spell of failure rather than per frame, which at 60fps
+    /// would be a torrent. The observable value is written on every report,
+    /// since it is idempotent and the reason can change between frames.
     private func reportFailure(_ error: Error?) {
+        let detail = Self.describe(error)
         lock.lock()
-        let alreadyReported = didReportFailure
+        let alreadyLogged = didReportFailure
         didReportFailure = true
+        let changed = failure != detail
+        failure = detail
+        // Whatever is queued would be decoded against reference frames the
+        // flush below is about to throw away, so the pipeline restarts from the
+        // next keyframe rather than from the next frame. Flushing without this
+        // fed the layer delta frames with nothing to hang them on.
+        recoveryArmed = false
+        isWaitingForKeyframe = true
         lock.unlock()
-        guard !alreadyReported else { return }
-        print("[VibeWire] video layer failed: \(error.map { "\($0)" } ?? "no error given")")
+        layer.flush()
+        if changed { onDecodeFailureChange?(detail) }
+        guard !alreadyLogged else { return }
+        print("[VibeWire] video layer failed: \(detail)")
+    }
+
+    /// The decoder's reason, short enough to sit in a sentence on the picture.
+    /// `localizedDescription` on its own is usually "The operation could not be
+    /// completed", so the domain and code go with it — a VideoToolbox status is
+    /// looked up by its number, not by its sentence.
+    private static func describe(_ error: Error?) -> String {
+        guard let error else { return "the decoder stopped without giving a reason" }
+        let ns = error as NSError
+        return "\(ns.localizedDescription) (\(ns.domain) \(ns.code))"
     }
 
     private func ensureFormatDescription() -> CMFormatDescription? {
@@ -284,11 +383,21 @@ final class RendererPool: @unchecked Sendable {
     private var byStream: [Int: VideoRenderer] = [:]
     private let lock = NSLock()
 
+    /// The one way a decode failure gets out of the video thread: the stream it
+    /// belongs to, and the decoder's reason — nil once that stream recovers.
+    /// Fires off the main actor, so the receiver hops. Set once, before any
+    /// renderer is vended.
+    var onDecodeFailureChange: (@Sendable (Int, String?) -> Void)?
+
     func renderer(forStream streamId: Int) -> VideoRenderer {
         lock.lock()
         defer { lock.unlock() }
         if let existing = byStream[streamId] { return existing }
         let created = VideoRenderer()
+        // Bound here rather than at the call site, so a renderer cannot exist
+        // without a way to report — which is how the failure stayed a `print`.
+        let notify = onDecodeFailureChange
+        created.onDecodeFailureChange = { reason in notify?(streamId, reason) }
         byStream[streamId] = created
         return created
     }
