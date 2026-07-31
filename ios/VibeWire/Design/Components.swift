@@ -27,7 +27,7 @@ struct MonoCaps: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(NS.Font.mono(size, weight: weight))
+            .nsMono(size, weight: weight)
             .tracking(tracking)
             .foregroundStyle(color)
     }
@@ -43,6 +43,10 @@ struct DisplayTitle: View {
     var size: CGFloat = 38
     var color: Color = NS.Color.text
 
+    /// Tracking is a fraction of the *rendered* size, so this one needs the
+    /// number the face resolved to and not just the face.
+    @Environment(\.dynamicTypeSize) private var type
+
     init(_ text: String, size: CGFloat = 38, color: Color = NS.Color.text) {
         self.text = text
         self.size = size
@@ -51,8 +55,8 @@ struct DisplayTitle: View {
 
     var body: some View {
         Text(text)
-            .font(NS.Font.display(size))
-            .tracking(NS.Font.scaledSize(size) * NS.Metric.displayTracking)
+            .nsDisplay(size)
+            .tracking(NS.Font.scaledSize(size, at: type) * NS.Metric.displayTracking)
             .lineSpacing(-2)
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
@@ -94,11 +98,11 @@ struct Readout: View {
             if let value {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(value)
-                        .font(NS.Font.mono(lead ? 26 : 19))
+                        .nsMono(lead ? 26 : 19)
                         .tracking(lead ? -0.8 : -0.4)
                         .foregroundStyle(valueColor)
                     Text(unit)
-                        .font(NS.Font.mono(10))
+                        .nsMono(10)
                         .foregroundStyle(NS.Color.textTertiary)
                 }
             } else {
@@ -107,7 +111,7 @@ struct Readout: View {
                 // it is legible like one. Dimmer than a real value, never
                 // fainter than the label above it.
                 Text("—")
-                    .font(NS.Font.mono(lead ? 26 : 19))
+                    .nsMono(lead ? 26 : 19)
                     .foregroundStyle(NS.Color.textTertiary)
             }
         }
@@ -552,7 +556,7 @@ struct PrimaryAction: View {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(NS.Font.sans(19, weight: .semibold))
+                        .nsSans(19, weight: .semibold)
                         .tracking(-0.4)
                         .foregroundStyle(ink)
                     // The preflight line — what this action costs before it is
@@ -565,7 +569,7 @@ struct PrimaryAction: View {
                 }
                 Spacer(minLength: 0)
                 Text(glyph)
-                    .font(NS.Font.mono(22))
+                    .nsMono(22)
                     .foregroundStyle(ink)
             }
             .padding(.horizontal, 22)
@@ -603,7 +607,7 @@ struct FilledAction: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(NS.Font.sans(16, weight: .semibold))
+                .nsSans(16, weight: .semibold)
                 .tracking(-0.2)
                 .foregroundStyle(ink)
                 .frame(maxWidth: .infinity)
@@ -751,7 +755,7 @@ struct KeyCap: View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Text(glyph)
-                    .font(NS.Font.mono(fontSize))
+                    .nsMono(fontSize)
                     .foregroundStyle(isHeld ? NS.Color.accent : NS.Color.text)
                 if let caption {
                     MonoCaps(
@@ -834,7 +838,7 @@ struct Tile: View {
         Button(action: action) {
             VStack(spacing: 7) {
                 Text(glyph)
-                    .font(NS.Font.mono(glyphSize))
+                    .nsMono(glyphSize)
                     .foregroundStyle(accent ? NS.Color.accent : NS.Color.text)
                 MonoCaps(
                     caption,
@@ -951,7 +955,7 @@ struct TimelineMark: View {
             )
             .overlay(
                 Text(glyph)
-                    .font(NS.Font.mono(9))
+                    .nsMono(9)
                     .foregroundStyle(color)
             )
     }

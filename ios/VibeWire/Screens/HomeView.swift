@@ -116,7 +116,7 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     ConditionDot(condition: condition, size: 8)
                     Text(model.hostName)
-                        .font(NS.Font.sans(19, weight: .semibold))
+                        .nsSans(19, weight: .semibold)
                         .tracking(-0.4)
                         .foregroundStyle(NS.Color.text)
                     MonoCaps(machineLine.text, size: 10, color: machineLine.tone, tracking: 1)
@@ -396,7 +396,7 @@ struct HomeView: View {
                     MonoCaps("ASLEEP", size: 10, color: NS.Color.amber, tracking: 1.8, weight: .medium)
                 }
                 Text("The Mac is reachable but its display is off. Waking it takes a few seconds.")
-                    .font(NS.Font.sans(15))
+                    .nsSans(15)
                     .foregroundStyle(NS.Color.text)
                     .fixedSize(horizontal: false, vertical: true)
                 DashedRule()
@@ -438,7 +438,7 @@ struct HomeView: View {
         Card {
             VStack(alignment: .leading, spacing: 13) {
                 Text(reconnectSentence)
-                    .font(NS.Font.sans(15, weight: .medium))
+                    .nsSans(15, weight: .medium)
                     .foregroundStyle(NS.Color.text)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -501,11 +501,11 @@ struct HomeView: View {
         Card(tint: NS.Color.amber) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("The Mac answered, but reports no displays.")
-                    .font(NS.Font.sans(15))
+                    .nsSans(15)
                     .foregroundStyle(NS.Color.text)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Screen Recording permission is the usual cause. On the Mac: System Settings → Privacy & Security → Screen Recording → VibeWire.")
-                    .font(NS.Font.sans(13))
+                    .nsSans(13)
                     .foregroundStyle(NS.Color.onAmberWash)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -607,7 +607,7 @@ struct HomeView: View {
                     HStack(alignment: .top, spacing: 12) {
                         MonoCaps(row.0, size: 10, color: row.2, tracking: 0)
                         Text(row.1)
-                            .font(NS.Font.sans(13))
+                            .nsSans(13)
                             .foregroundStyle(
                                 row.2 == NS.Color.textTertiary ? NS.Color.textSecondary : NS.Color.text
                             )
@@ -644,7 +644,7 @@ struct HomeView: View {
 
         case .weak:
             Text("Text will be soft until the link recovers. Pointer input stays instant — only video is throttled.")
-                .font(NS.Font.sans(13))
+                .nsSans(13)
                 .foregroundStyle(NS.Color.onAmberWash)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 16)
@@ -668,13 +668,13 @@ struct HomeView: View {
 
         case .connecting:
             Text("Waiting on the Mac to answer. Nothing is being retried in a loop — the battery is not the price of an unanswered question.")
-                .font(NS.Font.sans(13))
+                .nsSans(13)
                 .foregroundStyle(NS.Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
         case .asleep:
             Text("Its display is off. Waking it is a nudge, not a restart — anything you had open stays open.")
-                .font(NS.Font.sans(13))
+                .nsSans(13)
                 .foregroundStyle(NS.Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -742,7 +742,7 @@ struct HomeView: View {
                 Circle().fill(NS.Color.accent).frame(width: 8, height: 8)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Claude Code")
-                        .font(NS.Font.sans(15, weight: .medium))
+                        .nsSans(15, weight: .medium)
                         .tracking(-0.2)
                         .foregroundStyle(NS.Color.text)
                     MonoCaps(detail, size: 9, tracking: 1)
@@ -750,7 +750,7 @@ struct HomeView: View {
                 }
                 Spacer(minLength: 0)
                 Text("↗")
-                    .font(NS.Font.mono(15))
+                    .nsMono(15)
                     .foregroundStyle(NS.Color.accent)
             }
             .padding(.horizontal, 18)
@@ -839,7 +839,7 @@ struct MovedAddress: View {
                 MonoCaps("NEW ADDRESS FOR THIS MAC", size: 9, tracking: 1.6)
 
                 Text("The key stays. This is the same Mac at a different address, so there is nothing to pair again — no code, no trip to the menu bar.")
-                    .font(NS.Font.sans(13))
+                    .nsSans(13)
                     .foregroundStyle(NS.Color.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -848,7 +848,7 @@ struct MovedAddress: View {
                 // that moved may well have moved to a different port too.
                 HStack(spacing: 8) {
                     TextField("192.168.1.24 or mac.tailnet.ts.net", text: $address)
-                        .font(NS.Font.mono(13))
+                        .nsMono(13)
                         .foregroundStyle(NS.Color.text)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -862,7 +862,7 @@ struct MovedAddress: View {
                         .accessibilityLabel("The Mac’s new address")
 
                     TextField("8787", text: $port)
-                        .font(NS.Font.mono(13))
+                        .nsMono(13)
                         .foregroundStyle(NS.Color.text)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
@@ -880,7 +880,7 @@ struct MovedAddress: View {
                 // address has not been touched.
                 if let failure {
                     Text(failure)
-                        .font(NS.Font.sans(13))
+                        .nsSans(13)
                         .foregroundStyle(NS.Color.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }

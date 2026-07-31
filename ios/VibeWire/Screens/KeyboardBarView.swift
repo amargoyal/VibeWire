@@ -58,7 +58,7 @@ struct KeyboardBarView: View {
             Caret().frame(width: 2, height: 18)
             MonoCaps("TYPING INTO", size: 11, color: NS.Color.accent, tracking: 0.6)
             Text(model.link.frontmostApp.isEmpty ? "Unknown window" : model.link.frontmostApp)
-                .font(NS.Font.sans(14))
+                .nsSans(14)
                 .foregroundStyle(NS.Color.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -75,7 +75,7 @@ struct KeyboardBarView: View {
                 model.releaseModifiers()
             } label: {
                 Text("✕")
-                    .font(NS.Font.mono(13))
+                    .nsMono(13)
                     .foregroundStyle(NS.Color.textSecondary)
                     .frame(width: 44, height: 44)
             }
@@ -124,7 +124,7 @@ struct KeyboardBarView: View {
             model.key(code)
         } label: {
             Text(label)
-                .font(NS.Font.mono(11))
+                .nsMono(11)
                 .tracking(0.6)
                 .foregroundStyle(NS.Color.text)
                 .padding(.horizontal, 12)
@@ -157,7 +157,7 @@ struct KeyboardBarView: View {
             model.key(code)
         } label: {
             Text(glyph)
-                .font(NS.Font.mono(size))
+                .nsMono(size)
                 .foregroundStyle(NS.Color.textSecondary)
                 .frame(width: 26, height: height)
                 // An arrow glyph is mostly empty space, and these keys have no
@@ -188,7 +188,7 @@ struct KeyboardBarView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     Text(label(for: combo))
-                        .font(NS.Font.mono(12))
+                        .nsMono(12)
                         .foregroundStyle(NS.Color.text)
                         .padding(.horizontal, 13)
                         .frame(height: 44)
@@ -202,7 +202,7 @@ struct KeyboardBarView: View {
                 showComboEditor = true
             } label: {
                 Text("+")
-                    .font(NS.Font.mono(11))
+                    .nsMono(11)
                     .foregroundStyle(NS.Color.textTertiary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
@@ -299,7 +299,7 @@ struct ComboEditor: View {
                 }
 
                 TextField("key", text: $letter)
-                    .font(NS.Font.mono(15))
+                    .nsMono(15)
                     .foregroundStyle(NS.Color.text)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

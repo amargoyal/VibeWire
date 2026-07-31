@@ -94,7 +94,7 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(device.name)
-                            .font(NS.Font.sans(15, weight: .medium))
+                            .nsSans(15, weight: .medium)
                             .tracking(-0.2)
                             .foregroundStyle(NS.Color.text)
                         MonoCaps(
@@ -217,7 +217,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Sensitivity")
-                    .font(NS.Font.sans(15))
+                    .nsSans(15)
                     .foregroundStyle(NS.Color.text)
                 Spacer()
                 MonoCaps("\(model.settings.sensitivity) / 8", size: 11, color: NS.Color.accent, tracking: 0)
@@ -320,7 +320,7 @@ struct SettingsView: View {
         } label: {
             HStack {
                 Text("Revoke every device")
-                    .font(NS.Font.sans(15))
+                    .nsSans(15)
                     .foregroundStyle(NS.Color.red)
                 Spacer()
                 // Solid, not 70%: the count is the scale of what the tap
@@ -348,7 +348,7 @@ struct SettingRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(NS.Font.sans(15))
+                    .nsSans(15)
                     .foregroundStyle(NS.Color.text)
                 if let subtitle {
                     MonoCaps(subtitle, size: 9, color: subtitleColor, tracking: 1.2)
@@ -445,7 +445,7 @@ struct RevokeConfirmSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     MonoCaps(title, size: 10, color: NS.Color.red, tracking: 1.8)
                     Text(headline)
-                        .font(NS.Font.sans(24, weight: .semibold))
+                        .nsSans(24, weight: .semibold)
                         .tracking(-0.6)
                         .foregroundStyle(NS.Color.text)
                         .fixedSize(horizontal: false, vertical: true)
@@ -469,7 +469,7 @@ struct RevokeConfirmSheet: View {
                         }
                     } label: {
                         Text(confirmLabel)
-                            .font(NS.Font.sans(17, weight: .medium))
+                            .nsSans(17, weight: .medium)
                             .foregroundStyle(NS.Color.onRed)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 60)
@@ -524,10 +524,10 @@ struct RevokeConfirmSheet: View {
     private func consequence(_ text: String, _ arrowColor: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 11) {
             Text("→")
-                .font(NS.Font.mono(10))
+                .nsMono(10)
                 .foregroundStyle(arrowColor)
             Text(text)
-                .font(NS.Font.sans(14))
+                .nsSans(14)
                 .foregroundStyle(arrowColor == NS.Color.textTertiary ? NS.Color.textSecondary : NS.Color.text)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

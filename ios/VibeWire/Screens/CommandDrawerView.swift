@@ -82,7 +82,49 @@ struct CommandDrawerView: View {
         }
     }
 
+    /// The drawer never grows past the glass it is drawn on.
+    ///
+    /// Measured at the accessibility1 step — which is the top of this screen's
+    /// range, now that the ceiling on it binds — the panel wants 324pt with
+    /// nothing latched and 382pt with a modifier down, the difference being the
+    /// sentence that explains the latch. A landscape phone with the status bar
+    /// hidden has its portrait width less the 21pt home indicator to give: 354pt
+    /// on a 13 mini, 372 on a 15, 381 on a 16 Pro, 419 on a 16 Pro Max. So on
+    /// every phone but the largest, a latched modifier pushed 1–28pt of drawer
+    /// off the top edge — and because the drawer is bottom-aligned, what went
+    /// was the grabber, the COMMANDS heading and HIDE, which is the way out.
+    ///
+    /// `ViewThatFits` states the preference rather than computing a height: use
+    /// the panel at its own size, and only when that does not fit, the same
+    /// panel in a scroll view. Nothing is dropped, nothing is shrunk, and the
+    /// scroll view does not exist on the phones and text sizes where the panel
+    /// fits — which is most of them, including every portrait case.
     private var drawer: some View {
+        ViewThatFits(in: .vertical) {
+            panel
+            ScrollView { panel }
+                .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(
+            UnevenRoundedRectangle(
+                topLeadingRadius: NS.Metric.radiusDrawer,
+                topTrailingRadius: NS.Metric.radiusDrawer
+            )
+            .fill(NS.Color.raised)
+        )
+        .padding(.horizontal, 8)
+        // It rises from the bottom edge, which is the whole reason its top
+        // corners are larger than a card's: the shape says it arrived from
+        // off-screen, and a cross-fade in place contradicts it. The transition
+        // is on the drawer rather than on the view around it so the travel is
+        // the drawer's own height, and `rise` is what keeps a reader who asked
+        // for less motion still being told the panel appeared.
+        .transition(NS.Motion.rise(reduced: reduceMotion))
+        .accessibilityAddTraits(.isModal)
+        .accessibilityLabel("Commands")
+    }
+
+    private var panel: some View {
         VStack(spacing: 14) {
             Grabber()
 
@@ -121,7 +163,7 @@ struct CommandDrawerView: View {
                 // columns because that caption does not fit in one.
                 VStack(spacing: 7) {
                     Text("⌘")
-                        .font(NS.Font.mono(16))
+                        .nsMono(16)
                         .foregroundStyle(NS.Color.accent)
                     MonoCaps(
                         held.isEmpty ? "MODIFIERS" : "MODIFIERS · \(held.count) HELD",
@@ -150,23 +192,6 @@ struct CommandDrawerView: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
-        .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: NS.Metric.radiusDrawer,
-                topTrailingRadius: NS.Metric.radiusDrawer
-            )
-            .fill(NS.Color.raised)
-        )
-        .padding(.horizontal, 8)
-        // It rises from the bottom edge, which is the whole reason its top
-        // corners are larger than a card's: the shape says it arrived from
-        // off-screen, and a cross-fade in place contradicts it. The transition
-        // is on the drawer rather than on the view around it so the travel is
-        // the drawer's own height, and `rise` is what keeps a reader who asked
-        // for less motion still being told the panel appeared.
-        .transition(NS.Motion.rise(reduced: reduceMotion))
-        .accessibilityAddTraits(.isModal)
-        .accessibilityLabel("Commands")
     }
 
     private var modifierSection: some View {
@@ -219,7 +244,7 @@ struct CommandDrawerView: View {
 
             if !held.isEmpty {
                 Text("Latched keys survive taps, drags and the keyboard. The next touch is a \(sent) touch.")
-                    .font(NS.Font.sans(13))
+                    .nsSans(13)
                     .foregroundStyle(NS.Color.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

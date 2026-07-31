@@ -98,13 +98,26 @@ struct RemoteView: View {
         .statusBarHidden(isLandscape)
         // The one screen that cannot take the whole Dynamic Type range, and it
         // is worth being precise about why: almost nothing here is text. The
-        // hub's six spokes sit at hard-coded offsets tracing a thumb's sweep —
-        // that is hand geometry, not type — the picture holds a fixed aspect,
-        // and the landscape dock is 231pt of controls. Past this step the
-        // captions start colliding with the video they annotate.
+        // picture holds a fixed aspect whatever the reader's setting, the
+        // trackpad and the corner ticks are hand and pixel geometry rather than
+        // type, and the landscape dock and the command drawer are runs of
+        // controls sized against a landscape phone's 354pt of glass. Past this
+        // step the captions start colliding with the video they annotate.
         //
         // accessibility1 is already two steps beyond the largest standard size,
         // and every other screen in the app takes the full range.
+        //
+        // This line used to be a claim rather than a limit. `NS.Font` resolved
+        // every size through `UIFontMetrics.scaledValue(for:)`, which reads the
+        // *application's* content size category and never SwiftUI's — so the
+        // ceiling bound the standard text styles and left every readout on this
+        // screen free to grow to accessibility5. Measured, a 9pt label under
+        // this modifier rendered at 33.33pt with the phone at the largest step,
+        // and the dock and the drawer were being sized against a step no reader
+        // could be held to. `NS.Font` now takes the reader's size from the
+        // environment, so this modifier means here what it means everywhere:
+        // the same 9pt label measures 17.33pt at the top of this screen's
+        // range, and 33.33 on every screen that has no ceiling.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .task { await queueTicker() }
         .onAppear {
@@ -493,7 +506,7 @@ struct RemoteView: View {
     private var zoomBadge: some View {
         VStack(spacing: 6) {
             Text(String(format: "%.1f×", model.zoomScale))
-                .font(NS.Font.mono(46, weight: .medium))
+                .nsMono(46, weight: .medium)
                 .foregroundStyle(NS.Color.text)
             MonoCaps("DOUBLE-TAP FITS", size: 10, color: NS.Color.accent, tracking: 2)
         }
@@ -546,7 +559,7 @@ struct RemoteView: View {
                     }
 
                     Text(overlaySentence)
-                        .font(NS.Font.sans(15))
+                        .nsSans(15)
                         .foregroundStyle(NS.Color.text)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 12)
@@ -625,7 +638,7 @@ struct RemoteView: View {
                         not, stop the stream and start it again.
                         """
                     )
-                    .font(NS.Font.sans(15))
+                    .nsSans(15)
                     .foregroundStyle(NS.Color.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 12)
@@ -635,7 +648,7 @@ struct RemoteView: View {
                         // wrote them. Evidence, not the answer — the answer is
                         // the sentence above.
                         Text(reason)
-                            .font(NS.Font.mono(11))
+                            .nsMono(11)
                             .foregroundStyle(NS.Color.textSecondary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -685,7 +698,7 @@ struct RemoteView: View {
             model.stopStream()
         } label: {
             HStack(spacing: 9) {
-                Text("✕").font(NS.Font.mono(14))
+                Text("✕").nsMono(14)
                 if let label {
                     MonoCaps(label, size: 9, color: NS.Color.textSecondary, tracking: 1.4)
                 }
@@ -778,7 +791,7 @@ struct RemoteView: View {
             withAnimation(NS.Motion.stateChange) { model.showHub.toggle() }
         } label: {
             Text("⋯")
-                .font(NS.Font.mono(15))
+                .nsMono(15)
                 .foregroundStyle(NS.Color.text)
                 .frame(width: NS.Metric.railButton, height: NS.Metric.railButton)
                 .background(
@@ -800,7 +813,7 @@ struct RemoteView: View {
     ) -> some View {
         Button(action: action) {
             Text(glyph)
-                .font(NS.Font.mono(15))
+                .nsMono(15)
                 .foregroundStyle(
                     held ? NS.Color.accent : (enabled ? NS.Color.text : NS.Color.textDisabled)
                 )

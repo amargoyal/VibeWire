@@ -17,16 +17,15 @@ import SwiftUI
 /// the 21pt home indicator to give: 354pt on a 13 mini, 372 on a 15, 381 on a
 /// 16 Pro, 419 on a 16 Pro Max. So the stack overflowed the glass on every
 /// phone in that range, and what hung off the bottom edge was the last row —
-/// the way to Claude and the way to stop the stream. At the accessibility1 step
-/// it wanted 467, and at the system's largest step 543.
+/// the way to Claude and the way to stop the stream.
 ///
-/// The largest step is reachable, whatever `RemoteView`'s
-/// `.dynamicTypeSize(...accessibility1)` says. `NS.Font` resolves its sizes
-/// through `UIFontMetrics`, which reads the *application's* content size
-/// category, not SwiftUI's `dynamicTypeSize` environment — so the clamp binds
-/// the standard text styles and leaves every mono readout in this app free to
-/// grow to accessibility5. That is a separate defect, and it is a second reason
-/// this dock may not be sized to a step it merely hopes the reader is on.
+/// Re-measured now that `RemoteView`'s `.dynamicTypeSize(...accessibility1)`
+/// binds this app's own faces and not only the system's, this split wants,
+/// with one monitor: 344pt at the default size and 390 at accessibility1, which
+/// is the top of this screen's range. With a second monitor's picker in the
+/// scrolling half: 400 and 446. Unclamped — which is what the reader would get
+/// if the ceiling above were removed — the same dock wants 630 at the system's
+/// largest step and 776 with two monitors and a latched modifier.
 ///
 /// No amount of shaving fixes that, because the text can always grow further
 /// than the glass. So the dock states which half it would rather lose sight of:
@@ -43,6 +42,13 @@ import SwiftUI
 /// all — the scroll view is invisible until the reader's text size, or a second
 /// monitor's picker, actually needs it, and `.scrollBounceBehavior(.basedOnSize)`
 /// is what stops it rubber-banding while it has nothing to scroll.
+///
+/// The pinned half is what that promise is measured against, and it holds with
+/// room to spare: 139pt at the default size and 169 at the top of the range,
+/// against 354pt of glass on the shortest phone. That leaves the scrolling half
+/// 173pt there, against the 209 it wants with one monitor and the 265 it wants
+/// with two — so on that phone it scrolls, and on a 16 Pro Max, with 238pt for
+/// it, the one-monitor case still does not.
 struct LandscapeDock: View {
     /// 16 is `spacing.lg`; the 22/24 this used to carry were not on the scale
     /// at all.
@@ -270,7 +276,7 @@ struct DockInstrument: View {
                     model.stopStream()
                 } label: {
                     Text("✕")
-                        .font(NS.Font.mono(14))
+                        .nsMono(14)
                         .foregroundStyle(NS.Color.textSecondary)
                         .frame(width: 50, height: 50)
                         .background(

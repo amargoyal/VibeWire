@@ -132,7 +132,7 @@ struct ClaudePanelView: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
                     Text(shortPath(model.claudeCwd))
-                        .font(NS.Font.mono(10))
+                        .nsMono(10)
                         .foregroundStyle(NS.Color.text)
                         .lineLimit(1)
                         .truncationMode(.head)
@@ -265,7 +265,7 @@ struct ClaudePanelView: View {
             Text(model.claudeMode == .chat
                  ? "Ask about this Mac. Nothing is edited."
                  : "Run Claude Code in a folder on the Mac.")
-                .font(NS.Font.sans(19))
+                .nsSans(19)
                 .foregroundStyle(NS.Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -444,7 +444,7 @@ struct ClaudePanelView: View {
                 text: $draft,
                 axis: .vertical
             )
-            .font(NS.Font.sans(15))
+            .nsSans(15)
             .foregroundStyle(NS.Color.text)
             .focused($composerFocused)
             .lineLimit(1...4)
@@ -478,7 +478,7 @@ struct ClaudePanelView: View {
                     draft = ""
                 } label: {
                     Text("↑")
-                        .font(NS.Font.mono(19))
+                        .nsMono(19)
                         .foregroundStyle(NS.Color.onAccent)
                         .frame(width: 56, height: 56)
                         .background(
@@ -557,10 +557,10 @@ struct ToolRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
                     Text(call.name)
-                        .font(NS.Font.mono(11))
+                        .nsMono(11)
                         .foregroundStyle(NS.Color.text)
                     Text(call.target)
-                        .font(NS.Font.mono(11))
+                        .nsMono(11)
                         .foregroundStyle(NS.Color.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -577,7 +577,7 @@ struct ToolRow: View {
                 // Only the running one shows output.
                 if call.state == .running, let preview = call.preview, !preview.isEmpty {
                     Text(preview)
-                        .font(NS.Font.mono(10))
+                        .nsMono(10)
                         .foregroundStyle(NS.Color.textTertiary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -617,19 +617,19 @@ struct ChangedFileRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Text(file.status)
-                .font(NS.Font.mono(10))
+                .nsMono(10)
                 .foregroundStyle(file.status == "A" ? NS.Color.green : NS.Color.amber)
             Text(file.path)
-                .font(NS.Font.mono(11))
+                .nsMono(11)
                 .foregroundStyle(NS.Color.text)
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer(minLength: 8)
             if file.added > 0 {
-                Text("+\(file.added)").font(NS.Font.mono(10)).foregroundStyle(NS.Color.green)
+                Text("+\(file.added)").nsMono(10).foregroundStyle(NS.Color.green)
             }
             if file.removed > 0 {
-                Text("−\(file.removed)").font(NS.Font.mono(10)).foregroundStyle(NS.Color.red)
+                Text("−\(file.removed)").nsMono(10).foregroundStyle(NS.Color.red)
             }
             ratioBars
         }
@@ -681,7 +681,7 @@ struct PermissionCard: View {
             .padding(.horizontal, 16)
 
             Text(request.command)
-                .font(NS.Font.mono(12))
+                .nsMono(12)
                 .foregroundStyle(NS.Color.text)
                 .lineSpacing(3)
                 .textSelection(.enabled)
@@ -695,7 +695,7 @@ struct PermissionCard: View {
                 .padding(.top, 12)
 
             Text(request.explanation)
-                .font(NS.Font.sans(13))
+                .nsSans(13)
                 .foregroundStyle(NS.Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 16)
@@ -706,7 +706,7 @@ struct PermissionCard: View {
                     model.answerPermission(allow: true, scope: "once")
                 } label: {
                     Text("Allow once")
-                        .font(NS.Font.sans(16, weight: .medium))
+                        .nsSans(16, weight: .medium)
                         .foregroundStyle(NS.Color.onAccent)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 56)
@@ -815,7 +815,7 @@ struct SessionPicker: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(session.summary)
-                                        .font(NS.Font.sans(14))
+                                        .nsSans(14)
                                         .foregroundStyle(NS.Color.text)
                                         .lineLimit(2)
                                         .multilineTextAlignment(.leading)

@@ -114,14 +114,14 @@ struct BannerView: View {
             Spacer()
             HStack(alignment: .top, spacing: 12) {
                 Text(text)
-                    .font(NS.Font.sans(13))
+                    .nsSans(13)
                     .foregroundStyle(NS.Color.onAmberWash)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 14)
                 Spacer(minLength: 0)
                 Button(action: dismiss) {
                     Text("✕")
-                        .font(NS.Font.mono(13))
+                        .nsMono(13)
                         .foregroundStyle(NS.Color.textSecondary)
                         .frame(width: 44, height: 44)
                 }

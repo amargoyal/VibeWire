@@ -140,6 +140,28 @@ enum NS {
         /// own size, using that style's own growth curve: a 9pt unit label
         /// tracks `caption2`, a 36pt machine name tracks `largeTitle`, and the
         /// two grow at the different rates Apple already tuned.
+        ///
+        /// **The reader's size is an argument, never something read here**, and
+        /// that is the whole of the fix for a clamp that did not clamp.
+        ///
+        /// `UIFontMetrics.scaledValue(for:)` resolves against the *application's*
+        /// content size category and against nothing else — not
+        /// `UITraitCollection.current`, and not SwiftUI's `dynamicTypeSize`
+        /// environment. Measured, with the app at the largest accessibility
+        /// step: `scaledValue(for: 9)` returns 33.33 both inside and outside a
+        /// `.dynamicTypeSize(...accessibility1)` subtree, while a standard
+        /// `caption2` line under that same modifier drops from 66.33pt to
+        /// 33.67. So the remote screen's ceiling bound the text styles and left
+        /// every `mono` and `sans` in the app free to grow past it — a screen
+        /// documenting a limit it did not have. `performAsCurrent` does not
+        /// reach it either, which rules out every trait-collection override.
+        ///
+        /// `scaledValue(for:compatibleWith:)` does honour a stated category, so
+        /// the size comes in from the environment instead: already clamped
+        /// where a ceiling is in force, and the reader's own everywhere else.
+        /// Measured against the old spelling with no ceiling anywhere, the two
+        /// agree to the point: 9.00 / 17.33 / 33.33 for a 9pt label at large /
+        /// accessibility1 / accessibility5.
         private static func metrics(for size: CGFloat) -> UIFontMetrics {
             UIFontMetrics(forTextStyle: textStyle(for: size))
         }
@@ -185,14 +207,20 @@ enum NS {
         /// The point size a call will actually render at, after the reader's
         /// text setting and the floor. Exposed because a monospaced layout can
         /// compute its own width from it — see `DiffView`.
-        static func scaledSize(_ size: CGFloat) -> CGFloat {
-            max(floor, metrics(for: size).scaledValue(for: size))
+        static func scaledSize(_ size: CGFloat, at type: DynamicTypeSize) -> CGFloat {
+            max(
+                floor,
+                metrics(for: size).scaledValue(
+                    for: size,
+                    compatibleWith: UITraitCollection(preferredContentSizeCategory: .init(type))
+                )
+            )
         }
 
         /// SF Mono and IBM Plex Mono both advance 0.6em per character, which is
         /// what makes a monospaced column measurable without laying it out.
-        static func monoAdvance(_ size: CGFloat) -> CGFloat {
-            scaledSize(size) * 0.6
+        static func monoAdvance(_ size: CGFloat, at type: DynamicTypeSize) -> CGFloat {
+            scaledSize(size, at: type) * 0.6
         }
 
         /// IBM Plex Mono if bundled, otherwise the system monospace. Every
@@ -203,8 +231,14 @@ enum NS {
         /// these is SF Mono in practice. The branch is kept because it is the
         /// one place that would need to change if the face is ever added, and
         /// because `custom` scales natively against the same style the fallback
-        /// computes.
-        static func mono(_ size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
+        /// computes — natively meaning *from the environment*, which is the one
+        /// thing the fallback did not do and the reason a ceiling on this app
+        /// used to bind one branch of this function and not the other.
+        static func mono(
+            _ size: CGFloat,
+            weight: SwiftUI.Font.Weight = .regular,
+            at type: DynamicTypeSize
+        ) -> SwiftUI.Font {
             if UIFont(name: "IBMPlexMono", size: size) != nil {
                 let name: String
                 switch weight {
@@ -218,14 +252,18 @@ enum NS {
                     relativeTo: swiftUIStyle(for: size)
                 )
             }
-            return .system(size: scaledSize(size), weight: weight, design: .monospaced)
+            return .system(size: scaledSize(size, at: type), weight: weight, design: .monospaced)
         }
 
         /// Names, prose, answers. Instrument Sans where it is installed, the
         /// system face otherwise — the design's grammar is the weights and the
         /// tracking, not the specific face, and an instrument that waits on a
         /// font to say whether the link is up has its priorities wrong.
-        static func sans(_ size: CGFloat, weight: SwiftUI.Font.Weight = .regular) -> SwiftUI.Font {
+        static func sans(
+            _ size: CGFloat,
+            weight: SwiftUI.Font.Weight = .regular,
+            at type: DynamicTypeSize
+        ) -> SwiftUI.Font {
             if UIFont(name: "InstrumentSans-Regular", size: size) != nil {
                 let name: String
                 switch weight {
@@ -235,14 +273,14 @@ enum NS {
                 }
                 return .custom(name, size: max(floor, size), relativeTo: swiftUIStyle(for: size))
             }
-            return .system(size: scaledSize(size), weight: weight)
+            return .system(size: scaledSize(size, at: type), weight: weight)
         }
 
         /// The app's one heading style. Tight tracking and a semibold weight is
         /// what makes a machine name read as a title rather than as large body
         /// copy — Longarm set these regular and they never quite did.
-        static func display(_ size: CGFloat) -> SwiftUI.Font {
-            sans(size, weight: .semibold)
+        static func display(_ size: CGFloat, at type: DynamicTypeSize) -> SwiftUI.Font {
+            sans(size, weight: .semibold, at: type)
         }
     }
 
@@ -358,6 +396,86 @@ enum NS {
         static func linearLoop(_ duration: Double, reduced: Bool) -> Animation? {
             guard !reduced else { return nil }
             return .linear(duration: duration).repeatForever(autoreverses: false)
+        }
+    }
+}
+
+// MARK: - Type, applied where the reader's size can be read
+
+/// The app's faces, applied as a modifier rather than fetched as a value.
+///
+/// `NS.Font` cannot read the reader's text size for itself: a static function
+/// has no view, therefore no environment, and `UIFontMetrics` answers a static
+/// call with the *application's* setting no matter what ceiling the view tree
+/// above it declared. A modifier does have an environment. So this is where the
+/// two meet, and it is the only place in the app that resolves a font.
+///
+/// The cost is that a font is no longer a value a call site can hold: every
+/// `.nsMono(9)` is `.nsMono(9)` instead, and the three places that
+/// need the resolved *number* rather than the face — the display title's
+/// tracking, the diff's column width, the markdown parser's inline code —
+/// declare `@Environment(\.dynamicTypeSize)` and say `at:` themselves. In
+/// exchange, `.dynamicTypeSize(...)` means on this app's own type exactly what
+/// it means on the system's, which is what it already claimed.
+struct NSFontModifier: ViewModifier {
+    enum Face { case mono, sans, display }
+
+    let face: Face
+    let size: CGFloat
+    var weight: SwiftUI.Font.Weight = .regular
+
+    @Environment(\.dynamicTypeSize) private var type
+
+    func body(content: Content) -> some View {
+        content.font(resolved)
+    }
+
+    private var resolved: SwiftUI.Font {
+        switch face {
+        case .mono: return NS.Font.mono(size, weight: weight, at: type)
+        case .sans: return NS.Font.sans(size, weight: weight, at: type)
+        case .display: return NS.Font.display(size, at: type)
+        }
+    }
+}
+
+extension View {
+    /// Anything the machine measured or named.
+    func nsMono(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
+        modifier(NSFontModifier(face: .mono, size: size, weight: weight))
+    }
+
+    /// Anything a person wrote.
+    func nsSans(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
+        modifier(NSFontModifier(face: .sans, size: size, weight: weight))
+    }
+
+    /// The one heading.
+    func nsDisplay(_ size: CGFloat) -> some View {
+        modifier(NSFontModifier(face: .display, size: size))
+    }
+}
+
+/// SwiftUI and UIKit each name the twelve steps of Dynamic Type, and only the
+/// SwiftUI → UIKit direction is missing from the frameworks. `UIFontMetrics`
+/// speaks the UIKit one; the environment speaks the SwiftUI one; this is the
+/// single place they are translated, so a step cannot be mismapped twice.
+extension UIContentSizeCategory {
+    init(_ type: DynamicTypeSize) {
+        switch type {
+        case .xSmall: self = .extraSmall
+        case .small: self = .small
+        case .medium: self = .medium
+        case .large: self = .large
+        case .xLarge: self = .extraLarge
+        case .xxLarge: self = .extraExtraLarge
+        case .xxxLarge: self = .extraExtraExtraLarge
+        case .accessibility1: self = .accessibilityMedium
+        case .accessibility2: self = .accessibilityLarge
+        case .accessibility3: self = .accessibilityExtraLarge
+        case .accessibility4: self = .accessibilityExtraExtraLarge
+        case .accessibility5: self = .accessibilityExtraExtraExtraLarge
+        @unknown default: self = .large
         }
     }
 }

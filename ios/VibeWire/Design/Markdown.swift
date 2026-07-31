@@ -17,6 +17,11 @@ struct MarkdownText: View {
     var textColor: Color = NS.Color.text
     var size: CGFloat = 15
 
+    /// An inline run has to be a `Text` — that is what lets a paragraph be one
+    /// wrapping block rather than a stack of fragments — so these two cannot
+    /// take the font as a modifier and read the reader's size themselves.
+    @Environment(\.dynamicTypeSize) private var type
+
     init(_ text: String, color: Color = NS.Color.text, size: CGFloat = 15) {
         self.text = text
         self.textColor = color
@@ -52,7 +57,7 @@ struct MarkdownText: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .top, spacing: 8) {
                         Text("•")
-                            .font(NS.Font.mono(size - 2))
+                            .nsMono(size - 2)
                             .foregroundStyle(NS.Color.accent.opacity(0.8))
                         inline(item)
                             .fixedSize(horizontal: false, vertical: true)
@@ -65,7 +70,7 @@ struct MarkdownText: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .top, spacing: 8) {
                         Text("\(index + 1).")
-                            .font(NS.Font.mono(size - 3))
+                            .nsMono(size - 3)
                             .foregroundStyle(NS.Color.accent.opacity(0.8))
                         inline(item)
                             .fixedSize(horizontal: false, vertical: true)
@@ -96,14 +101,14 @@ struct MarkdownText: View {
         weight: Font.Weight = .regular,
         color: Color? = nil
     ) -> Text {
-        Text(Self.attributed(content))
-            .font(NS.Font.sans(overrideSize ?? size, weight: weight))
+        Text(Self.attributed(content, at: type))
+            .font(NS.Font.sans(overrideSize ?? size, weight: weight, at: type))
             .foregroundStyle(color ?? textColor)
     }
 
     /// Inline spans only. `.inlineOnlyPreservingWhitespace` keeps the parser
     /// from swallowing the line structure this view has already resolved.
-    static func attributed(_ content: String) -> AttributedString {
+    static func attributed(_ content: String, at type: DynamicTypeSize) -> AttributedString {
         guard var attributed = try? AttributedString(
             markdown: content,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
@@ -114,7 +119,7 @@ struct MarkdownText: View {
         // Inline code needs to look like code; the system parser marks the run
         // but leaves it styled as prose.
         for run in attributed.runs where run.inlinePresentationIntent == .code {
-            attributed[run.range].font = NS.Font.mono(13)
+            attributed[run.range].font = NS.Font.mono(13, at: type)
             attributed[run.range].foregroundColor = NS.Color.accent
         }
         for run in attributed.runs where run.link != nil {
@@ -202,7 +207,7 @@ private struct CodeBlock: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
-                    .font(NS.Font.mono(12))
+                    .nsMono(12)
                     .foregroundStyle(NS.Color.codeInk)
                     .lineSpacing(2)
                     .textSelection(.enabled)

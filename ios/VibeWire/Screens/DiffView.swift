@@ -10,12 +10,15 @@ import SwiftUI
 struct DiffView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    /// The column's width is a character count times a rendered advance, so
+    /// this one needs the resolved point size rather than the face.
+    @Environment(\.dynamicTypeSize) private var type
 
     var body: some View {
         // Parsed once per body pass. As four separate computed properties this
         // split the whole patch four times per render — for the rows, the
         // width, and each of the two counts in the footer.
-        let patch = Patch(model.diffPatch)
+        let patch = Patch(model.diffPatch, at: type)
 
         return ScreenBody {
             VStack(alignment: .leading, spacing: 0) {
@@ -70,7 +73,7 @@ struct DiffView: View {
         let added: Int
         let removed: Int
 
-        init(_ text: String) {
+        init(_ text: String, at type: DynamicTypeSize) {
             var lines: [String] = []
             var longest = 0
             var added = 0
@@ -92,7 +95,7 @@ struct DiffView: View {
             // Wide enough for the longest line, so the added and removed tints
             // run the full width of the column instead of stopping raggedly at
             // each line's own last character.
-            self.width = CGFloat(longest) * NS.Font.monoAdvance(DiffView.codeSize) + 20
+            self.width = CGFloat(longest) * NS.Font.monoAdvance(DiffView.codeSize, at: type) + 20
         }
     }
 
@@ -104,7 +107,7 @@ struct DiffView: View {
                 SheetDismiss("CLOSE") { dismiss() }
             }
             Text(model.diffPath ?? "")
-                .font(NS.Font.mono(12))
+                .nsMono(12)
                 .foregroundStyle(NS.Color.text)
                 .lineLimit(2)
                 .truncationMode(.head)
@@ -135,7 +138,7 @@ struct DiffView: View {
     private func row(_ line: String) -> some View {
         let kind = DiffLineKind(line)
         return Text(line.isEmpty ? " " : line)
-            .font(NS.Font.mono(Self.codeSize))
+            .nsMono(Self.codeSize)
             .foregroundStyle(kind.foreground)
             .padding(.horizontal, 10)
             .padding(.vertical, 1)

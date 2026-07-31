@@ -98,7 +98,7 @@ struct PairingView: View {
 
             if let errorText {
                 Text(errorText)
-                    .font(NS.Font.sans(13))
+                    .nsSans(13)
                     .foregroundStyle(NS.Color.red)
                     // Transport failures carry a domain and code; they must not
                     // be truncated to the half that says nothing.
@@ -187,7 +187,7 @@ struct PairingView: View {
                     if isActive { Caret(height: 30) }
                 } else {
                     Text(value)
-                        .font(NS.Font.mono(30))
+                        .nsMono(30)
                         .foregroundStyle(NS.Color.text)
                 }
             }
@@ -242,7 +242,7 @@ struct PairingView: View {
                 if editingTarget {
                     HStack(spacing: 8) {
                         TextField("192.168.1.24 or mac.tailnet.ts.net", text: $address)
-                            .font(NS.Font.mono(13))
+                            .nsMono(13)
                             .foregroundStyle(NS.Color.text)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
@@ -255,7 +255,7 @@ struct PairingView: View {
                             )
 
                         TextField("8787", text: $port)
-                            .font(NS.Font.mono(13))
+                            .nsMono(13)
                             .foregroundStyle(NS.Color.text)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.center)
@@ -268,7 +268,7 @@ struct PairingView: View {
                     }
                 } else {
                     Text(address.isEmpty ? "No address" : "\(address):\(port)")
-                        .font(NS.Font.mono(14))
+                        .nsMono(14)
                         .foregroundStyle(NS.Color.text)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -308,7 +308,7 @@ struct PairingView: View {
                     )
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Scan the QR on the Mac")
-                        .font(NS.Font.sans(15, weight: .medium))
+                        .nsSans(15, weight: .medium)
                         .tracking(-0.2)
                         .foregroundStyle(NS.Color.text)
                     MonoCaps("OPENS CAMERA · SAME HANDSHAKE", size: 9, tracking: 1)
@@ -361,7 +361,7 @@ struct PairingView: View {
                         .frame(height: 84)
                         .overlay(
                             Text(digits[index])
-                                .font(NS.Font.mono(30))
+                                .nsMono(30)
                                 .foregroundStyle(NS.Color.textTertiary)
                         )
                 }
