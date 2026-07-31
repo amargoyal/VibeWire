@@ -938,10 +938,22 @@ function SessionPicker({ onClose }: { onClose: () => void }) {
           <SheetDismiss title="CLOSE" onClick={onClose} />
         </div>
 
+        {/* The heading is a promise about what is below it, so it cannot be made
+            where there is nothing to resume. */}
         <Display level={30} rank={2} style={{ marginTop: '14px', flex: '0 0 auto' }}>
-          Pick up where
-          <br />
-          you left off.
+          {sessions.length ? (
+            <>
+              Pick up where
+              <br />
+              you left off.
+            </>
+          ) : (
+            <>
+              Nothing to pick
+              <br />
+              up yet.
+            </>
+          )}
         </Display>
 
         <div
@@ -1026,7 +1038,9 @@ function SessionPicker({ onClose }: { onClose: () => void }) {
             detail={
               store.claudeCwd.value
                 ? `STARTS IN ${shortPath(store.claudeCwd.value).toUpperCase()}`
-                : 'STARTS IN THE LAST PROJECT'
+                : // No folder has been named, by this client or by the Mac, so
+                  // "the last project" would be describing one that may not exist.
+                  'THE MAC PICKS THE FOLDER'
             }
             glyph="＋"
             tint="var(--ns-accent)"
