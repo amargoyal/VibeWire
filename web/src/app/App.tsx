@@ -26,6 +26,7 @@ import { Pairing } from '../screens/Pairing'
 import { Remote } from '../screens/Remote'
 import { Settings } from '../screens/Settings'
 import { showShortcuts, ShortcutsSheet, useShortcuts } from './shortcuts'
+import { watchTabCondition } from './tabIndicator'
 
 /**
  * How long a hidden tab keeps its socket.
@@ -43,6 +44,11 @@ const HIDDEN_GRACE_MS = 30_000
 export function App() {
   const [ready, setReady] = useState(false)
   const hiddenTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // The tab strip is a surface too, and the one the laptop client is most often
+  // looked at from: eleven tabs, and the question is whether this one still has a
+  // Mac on the end of it.
+  useEffect(() => watchTabCondition(), [])
 
   useEffect(() => {
     void store.load().then(() => setReady(true))
