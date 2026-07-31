@@ -443,12 +443,14 @@ function SessionHeader({ onPick }: { onPick: () => void }) {
     // The model, where the host named one. Two facts about a session that are
     // worth stating and cannot be inferred from anything else on screen: what is
     // answering, and that it is not billing per token.
-    const model = store.claudeModel.value
-      ? `${shortModel(store.claudeModel.value)} · `
-      : ''
-    return store.claudeUsingSubscription.value === true
-      ? `${model}SUBSCRIPTION · NO API KEY`
-      : `${model}SESSION OPEN`
+    // NO API KEY is what SUBSCRIPTION already means, and the two together plus a
+    // model name wrap this row onto a second line on a phone. Where the model is
+    // known it takes that space, because it is the fact the reader does not have.
+    const model = store.claudeModel.value ? shortModel(store.claudeModel.value) : ''
+    if (store.claudeUsingSubscription.value !== true) {
+      return model ? `${model} · SESSION OPEN` : 'SESSION OPEN'
+    }
+    return model ? `${model} · SUBSCRIPTION` : 'SUBSCRIPTION · NO API KEY'
   })()
 
   const right = (() => {
