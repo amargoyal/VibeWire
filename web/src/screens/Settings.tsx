@@ -171,6 +171,29 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 </Caps>
               </button>
 
+              {/* Quieter than the revoke above it, and below it, because it is the
+                  smaller act: this browser forgets the Mac and the Mac forgets
+                  nothing. Outlined rather than clay — nothing is destroyed on the
+                  other end, and colour in this system reports a condition. */}
+              <button
+                class="outlined"
+                onClick={() => store.logOut()}
+                style={{
+                  marginTop: '9px',
+                  minHeight: '54px',
+                  justifyContent: 'flex-start',
+                  paddingInline: '18px',
+                  gap: '10px',
+                  flex: '0 0 auto',
+                }}
+              >
+                <span style={{ fontSize: 'var(--fs-15)' }}>Log out</span>
+                <span class="spacer" />
+                <Caps size="var(--fs-9)" tracking="0.12em">
+                  BACK TO PAIRING
+                </Caps>
+              </button>
+
               <Caps
                 size="var(--fs-9)"
                 tracking="0.12em"

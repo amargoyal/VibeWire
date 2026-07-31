@@ -1420,6 +1420,19 @@ export class Store {
     this.unpairLocally()
   }
 
+  /**
+   * This browser forgets the Mac, and nothing else happens.
+   *
+   * Deliberately not a revoke. Revoking deletes keys on the Mac and takes every
+   * other device with it; this drops only what this browser holds, so the Mac
+   * keeps its row for this device and the next pairing reuses it rather than
+   * adding a second. Two different acts with two different costs, and the sheet
+   * says which is which.
+   */
+  logOut(): void {
+    this.unpairLocally()
+  }
+
   private unpairLocally(): void {
     // Everything below used to sit behind `await Identity.forgetHost()`. That is
     // an IndexedDB round trip, and a browser can leave one pending indefinitely —
