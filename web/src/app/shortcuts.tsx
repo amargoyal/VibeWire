@@ -25,7 +25,7 @@ import { useEffect } from 'preact/hooks'
 import { signal } from '@preact/signals'
 
 import { store } from './store'
-import { typedIntoBrowser } from './keymap'
+import { keyboardLocked, releaseKeyboardLock, requestKeyboardLock, typedIntoBrowser } from './keymap'
 import { Caps, Display, ScreenBody, SectionLabel, SheetDismiss, useSheet } from '../design/components'
 
 /** Open only from `?`, and only on a machine with a keyboard to press it with. */
@@ -63,6 +63,12 @@ const BINDINGS: Binding[] = [
     run: () => {
       store.presented.value = store.presented.value === 'settings' ? null : 'settings'
     },
+  },
+  {
+    key: 'f',
+    label: 'Fill the screen',
+    where: 'anywhere',
+    run: () => void toggleFullscreen(),
   },
   {
     key: 'k',
@@ -112,6 +118,32 @@ const BINDINGS: Binding[] = [
   },
 ]
 
+/**
+ * Fullscreen, and the one thing that only fullscreen can buy.
+ *
+ * The browser keeps ⌘W, ⌘T, ⌘N, ⌘Q and ⌘⇧W whatever this page does about it —
+ * `preventDefault` cannot stop a tab closing — and the keyboard bar has always
+ * had to name them as keys that stay behind. The Keyboard Lock API is the one
+ * exception, and it is only offered in fullscreen. So the two are asked for
+ * together: fill the screen, and the keys the browser was holding go to the Mac.
+ *
+ * The lock is Chromium-only and can resolve on engines that then deliver nothing,
+ * so what the app reports is what came back, never what was asked for.
+ */
+async function toggleFullscreen(): Promise<void> {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+      return
+    }
+    await document.documentElement.requestFullscreen()
+  } catch {
+    // Some engines refuse this outside a user gesture chain, and a keystroke is
+    // one — but a refusal here is not worth a banner: the screen simply did not
+    // change, which the reader can see.
+  }
+}
+
 function selectDisplay(index: number): void {
   const display = store.displays.value[index]
   if (!display) return
@@ -146,8 +178,21 @@ export function useShortcuts(): void {
       binding.run()
     }
 
+    // The lock is granted to a fullscreen document and lost with it, so it is
+    // taken and given back where fullscreen actually changes rather than where it
+    // was requested — including when the reader leaves with the browser's own
+    // Escape, which this page never sees as a keystroke.
+    const onFullscreen = () => {
+      if (document.fullscreenElement) void requestKeyboardLock()
+      else releaseKeyboardLock()
+    }
+
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    document.addEventListener('fullscreenchange', onFullscreen)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
   }, [])
 }
 
@@ -183,6 +228,19 @@ export function ShortcutsSheet() {
 
         <Caps size="var(--fs-9)" tracking="0.14em" style={{ marginTop: '12px', flex: '0 0 auto' }}>
           {'NOT SENT TO THE MAC · A CAPTURE OR THE KEYBOARD BAR TAKES THEM ALL BACK'}
+        </Caps>
+
+        {/* The one fact about this that is worth stating twice: what filling the
+            screen actually buys is the five keys the browser otherwise keeps. */}
+        <Caps
+          size="var(--fs-9)"
+          tracking="0.14em"
+          color={keyboardLocked.value ? 'var(--ns-green)' : 'var(--ns-text-tertiary)'}
+          style={{ marginTop: '8px', flex: '0 0 auto', lineHeight: 1.7 }}
+        >
+          {keyboardLocked.value
+            ? 'FULL SCREEN · ⌘W ⌘T ⌘N ⌘Q ⌘⇧W ARE REACHING THE MAC'
+            : 'FULL SCREEN IS WHAT LETS ⌘W ⌘T ⌘N ⌘Q ⌘⇧W REACH THE MAC · CHROMIUM ONLY'}
         </Caps>
 
         {groups.map(([title, bindings]) => (

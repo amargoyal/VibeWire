@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { store } from '../app/store'
-import { BROWSER_RESERVED } from '../app/keymap'
+import { BROWSER_RESERVED, keyboardLocked } from '../app/keymap'
 import {
   Caps,
   Caret,
@@ -261,7 +261,13 @@ export function KeyboardBar() {
           color="var(--ns-text-faint)"
           style={{ paddingInline: '18px', marginTop: '10px', lineHeight: 1.7 }}
         >
-          {`THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(' ')} STAY WITH THE BROWSER`}
+          {keyboardLocked.value
+            ? `THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(
+                ' ',
+              )} TOO, WHILE THIS FILLS THE SCREEN`
+            : `THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(
+                ' ',
+              )} STAY WITH THE BROWSER · F FILLS THE SCREEN AND TAKES THEM`}
         </Caps>
       )}
 

@@ -1,3 +1,5 @@
+import { signal } from '@preact/signals'
+
 /**
  * Browser `KeyboardEvent.code` → the stable key names the host understands.
  *
@@ -113,6 +115,16 @@ export function typedIntoBrowser(target: EventTarget | null): boolean {
 export const BROWSER_RESERVED = ['⌘W', '⌘T', '⌘N', '⌘Q', '⌘⇧W']
 
 /**
+ * Whether the browser has actually handed over the keys it normally keeps.
+ *
+ * A measured value, not an intention: `keyboard.lock()` resolves on engines that
+ * then deliver nothing, and every surface that talks about ⌘W has to say which of
+ * the two behaviours is in force rather than leave the user to find out by losing
+ * a tab with a build running in it.
+ */
+export const keyboardLocked = signal(false)
+
+/**
  * Ask for every keystroke, including the reserved ones.
  *
  * Requires fullscreen and is Chromium-only. Returns whether the lock was taken, so
@@ -122,17 +134,23 @@ export const BROWSER_RESERVED = ['⌘W', '⌘T', '⌘N', '⌘Q', '⌘⇧W']
 export async function requestKeyboardLock(): Promise<boolean> {
   const keyboard = (navigator as Navigator & { keyboard?: { lock(keys?: string[]): Promise<void> } })
     .keyboard
-  if (!keyboard?.lock || !document.fullscreenElement) return false
+  if (!keyboard?.lock || !document.fullscreenElement) {
+    keyboardLocked.value = false
+    return false
+  }
   try {
     await keyboard.lock()
+    keyboardLocked.value = true
     return true
   } catch {
+    keyboardLocked.value = false
     return false
   }
 }
 
 export function releaseKeyboardLock(): void {
   const keyboard = (navigator as Navigator & { keyboard?: { unlock(): void } }).keyboard
+  keyboardLocked.value = false
   try {
     keyboard?.unlock()
   } catch {
