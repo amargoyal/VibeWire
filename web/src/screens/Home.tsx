@@ -533,12 +533,20 @@ function UnreachableStrip() {
         }. Nothing answered on either path.`
       : 'Nothing answered on either path.'
 
-  const lastContact = (() => {
+  // How long ago this browser and this Mac traded keys. It was labelled LAST
+  // CONTACT, which is a different fact and a more useful one — and one nothing
+  // here has: `pairedAt` is the only timestamp the client stores about the host,
+  // and the protocol carries a last-seen time for the Mac's *devices*, not for
+  // the Mac. A row that answers a question it was not asked is worse on this
+  // screen than on any other, because the screen exists to say why nothing is
+  // answering.
+  const pairedAge = (() => {
     if (!paired) return 'NEVER'
     const elapsed = (Date.now() - Date.parse(paired.pairedAt)) / 1000
     if (elapsed < 60) return 'JUST NOW'
     if (elapsed < 3600) return `${Math.floor(elapsed / 60)}M AGO`
-    return `${Math.floor(elapsed / 3600)}H AGO`
+    if (elapsed < 86_400) return `${Math.floor(elapsed / 3600)}H AGO`
+    return `${Math.floor(elapsed / 86_400)}D AGO`
   })()
 
   return (
@@ -562,7 +570,7 @@ function UnreachableStrip() {
             }
             ok={transport.path === 'relay'}
           />
-          <TransportRow label="LAST CONTACT" verdict={lastContact} ok={null} />
+          <TransportRow label="PAIRED" verdict={pairedAge} ok={null} />
         </div>
       </div>
     </Card>
