@@ -1600,7 +1600,7 @@ function Dock() {
           class="outlined"
           onClick={() => store.releaseModifiers()}
           disabled={held.length === 0}
-          style={{ width: '76px', minHeight: '46px', flex: '0 0 auto', opacity: held.length ? 1 : 0.45 }}
+          style={{ width: '76px', minHeight: '46px', flex: '0 0 auto' }}
         >
           <Caps size="var(--fs-9)" tracking="0.1em" color="var(--ns-text-secondary)">
             RELEASE

@@ -506,6 +506,7 @@ export function FilledAction({
   ink = 'var(--ns-on-accent)',
   height,
   hint,
+  enabled = true,
   onClick,
 }: {
   title: string
@@ -513,12 +514,14 @@ export function FilledAction({
   ink?: string
   height?: number
   hint?: string
+  enabled?: boolean
   onClick: () => void
 }) {
   return (
     <button
       class="filled"
       title={hint}
+      disabled={!enabled}
       onClick={onClick}
       style={
         {
@@ -537,19 +540,25 @@ export function FilledAction({
 export function OutlinedAction({
   title,
   tint = 'var(--ns-text-secondary)',
-  edge = 'var(--ns-stroke)',
+  // The control-edge ink, not the hairline. A default of `stroke` here overrode
+  // the stylesheet's own fallback, so every outlined action in the app kept the
+  // 1.5:1 edge the token was introduced to replace.
+  edge = 'var(--ns-edge)',
   height,
+  enabled = true,
   onClick,
 }: {
   title: string
   tint?: string
   edge?: string
   height?: number
+  enabled?: boolean
   onClick: () => void
 }) {
   return (
     <button
       class="outlined"
+      disabled={!enabled}
       style={
         {
           '--edge': edge,

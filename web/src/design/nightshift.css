@@ -653,6 +653,15 @@ textarea {
 
 /* A filled action with no sub-label: the confirming verb on a destructive
    sheet, the send button, "Allow once". */
+/* 45% on the whole control, the one disabled treatment in the system — see the
+   primary action above, which has always had it. Stated once per shape rather
+   than re-invented as an inline opacity at each call site, which is what the
+   command drawer and the landscape dock were both doing. */
+.filled:disabled,
+.outlined:disabled {
+  opacity: 0.45;
+}
+
 .filled {
   display: flex;
   align-items: center;

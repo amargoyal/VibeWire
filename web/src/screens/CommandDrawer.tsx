@@ -208,7 +208,6 @@ export function CommandDrawer() {
               style={{
                 flex: '1.3 1 0',
                 minHeight: '52px',
-                opacity: held.length === 0 ? 0.45 : 1,
               }}
             >
               <Caps size="var(--fs-8)" tracking="0.1em" color="var(--ns-text-secondary)">
