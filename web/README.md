@@ -68,7 +68,7 @@ timeout where a scheme mismatch belongs would be the exact defect it exists to a
 Same handshake as the phone: six digits from the Mac's menu bar, an Ed25519 key
 exchange, and no stored bearer token.
 
-Four ways in, fastest first:
+Five ways in, fastest first:
 
 - **Scan the BROWSER QR.** The Mac's pairing window shows two. The left is
   `vibewire://pair?…` for the iOS app — a custom scheme, which no browser can
@@ -83,6 +83,13 @@ Four ways in, fastest first:
 
   The same URL is printed in the host log as `browser pairing url …`, for when
   pasting beats pointing.
+- **Scan it from this client.** Where the engine has a `BarcodeDetector` — Chromium
+  today — the pairing screen opens the camera and reads either QR itself. It is
+  the row under OTHER WAYS IN, and where the engine cannot scan, that row is a
+  statement rather than a dead button: seven different sentences for seven
+  different reasons, including the one that cannot be worked around — a page on
+  plain `http://` has no camera to ask for, so the copy the Mac serves over the
+  tailnet says so instead of failing silently.
 - **Type the code.** Enter the Mac's address, then the six digits.
 - **Paste the pairing link.** Reads either QR's payload off the clipboard.
 - **A link with the fields in it.** `…/?host=<mac>&port=8787&code=<code>`. `host`
@@ -117,7 +124,8 @@ not a choice.
 | Video decode | `AVSampleBufferDisplayLayer` | WebCodecs `VideoDecoder` | a browser without it gets a banner saying the picture will not appear, and everything else still works |
 | Which radio | `NWPathMonitor`, definitive | Network Information API, Chromium only | reported as `UNKNOWN LINK` rather than guessed, and the cellular-cap row says so |
 | ⌘W, ⌘T, ⌘N, ⌘Q | reach the Mac | the browser keeps them | named in the keyboard bar; Keyboard Lock takes them in Chromium in fullscreen |
-| QR scan | camera + system scanner | no custom-scheme handler | paste the link instead |
+| QR scan | camera + system scanner | `BarcodeDetector` where the engine has one, and never on a plain-`http://` origin | scanned in-page in Chromium; elsewhere the row states why it cannot, and the phone's own camera opens the browser QR anyway |
+| Keys of its own | no keyboard to shortcut with | eleven bare keys, listed under `?` | off entirely on a touch device, and every key gives way to a pointer capture, the keyboard bar and any text field |
 | Face ID each session | honoured | no equivalent | the Settings row says it governs the iPhone app |
 | Screenshot | straight to the pasteboard | clipboard image writes are usually refused | shown, with Save PNG and Copy Image |
 
