@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-31T01:05:58.109034Z",
+  "generatedAt": "2026-07-31T05:35:17.547000Z",
   "title": "Design System: VibeWire — Nightshift",
   "extensions": {
     "colorMeta": {
@@ -244,6 +244,21 @@
           "oklch(92% 0.012 262)"
         ]
       },
+      "edge": {
+        "role": "neutral",
+        "displayName": "Edge",
+        "canonical": "oklch(0.52 0.012 262)",
+        "tonalRamp": [
+          "oklch(15% 0.012 262)",
+          "oklch(26% 0.012 262)",
+          "oklch(37% 0.012 262)",
+          "oklch(48% 0.012 262)",
+          "oklch(59% 0.012 262)",
+          "oklch(70% 0.012 262)",
+          "oklch(81% 0.012 262)",
+          "oklch(92% 0.012 262)"
+        ]
+      },
       "on-jade": {
         "role": "neutral",
         "displayName": "On Jade",
@@ -419,9 +434,9 @@
       "name": "Outlined Action",
       "kind": "button",
       "refersTo": "action-outlined",
-      "description": "The second choice beside a filled one. The outline is drawn inside the box so a row of these lines up with a filled sibling of the same declared height.",
-      "html": "<button class=\"ds-outlined\">DENY</button>",
-      "css": ".ds-outlined{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;border:0;border-radius:16px;background:none;outline:1px solid color-mix(in srgb, var(--ns-red,#F37272) 50%, transparent);outline-offset:-1px;color:var(--ns-red,#F37272);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.625rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}.ds-outlined:focus-visible{outline:2px solid var(--ns-accent,#96ADFF);outline-offset:2px}"
+      "description": "The second choice beside a filled one, at the 44 pt minimum target. Its one-point edge is drawn inside the box so a row of these lines up with a filled sibling of the same declared height, and it is inked in `edge` rather than `stroke`: on a control with no fill the edge is the control, so it is held to the 3:1 non-text threshold a hairline is not.",
+      "html": "<div class=\"ds-outlined-stack\"><button class=\"ds-outlined\">COPY IMAGE</button><button class=\"ds-outlined ds-outlined--destructive\">DENY</button></div>",
+      "css": ".ds-outlined-stack{display:flex;flex-direction:column;gap:8px}.ds-outlined{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;border:0;border-radius:16px;background:none;box-shadow:inset 0 0 0 1px var(--ns-edge,#656970);color:var(--ns-text-secondary,#A5A9B1);font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:.625rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}.ds-outlined--destructive{box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ns-red,#F37272) 50%, transparent);color:var(--ns-red,#F37272)}.ds-outlined:focus-visible{outline:2px solid var(--ns-accent,#96ADFF);outline-offset:2px}.ds-outlined:disabled{opacity:.45;cursor:default}"
     },
     {
       "name": "Condition Card",
