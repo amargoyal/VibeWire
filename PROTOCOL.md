@@ -232,7 +232,7 @@ Host → phone:
 | `sub` | Payload |
 |---|---|
 | `sessions` | `[{ id, summary, cwd, gitBranch, modifiedAt }]` |
-| `opened` | `{ sessionId, cwd, gitBranch, ahead, model, pid, tools }` |
+| `opened` | `{ sessionId, cwd, model, tools, permissionMode, apiKeySource, usingSubscription, version }`, or `{ pending: true }` for the ack the host sends before the CLI has said anything |
 | `delta` | `{ text }` streaming assistant text |
 | `message` | `{ role, blocks }` completed turn |
 | `tool` | `{ id, name, target, state: "running"\|"ok"\|"error", ms, preview }` |

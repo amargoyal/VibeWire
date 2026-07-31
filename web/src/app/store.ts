@@ -314,6 +314,8 @@ export class Store {
   claudeSessionId = signal<string | null>(null)
   claudeCwd = signal('')
   claudeBranch = signal<string | null>(null)
+  /** The model the running session reports, from the CLI's own init message. */
+  claudeModel = signal('')
   claudeUsingSubscription = signal<boolean | null>(null)
   claudeOpenedAt = signal<number | null>(null)
   /** Spawned, but the CLI has not spoken yet. */
@@ -832,6 +834,11 @@ export class Store {
 
         batch(() => {
           this.claudeOpening.value = false
+          // Which model is answering. The host has sent this since the bridge was
+          // written and nothing has ever read it — on a panel whose subheading
+          // already carries the auth source, because that is the fact worth
+          // stating about a session, and the model is the other one.
+          this.claudeModel.value = str(payload['model']) ?? ''
           this.claudeUsingSubscription.value =
             typeof payload['usingSubscription'] === 'boolean'
               ? (payload['usingSubscription'] as boolean)

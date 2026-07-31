@@ -411,6 +411,24 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
   )
 }
 
+/**
+ * `claude-opus-4-20250514` in a 9 pt caps line is a serial number. The family and
+ * its version answer "what is on the other end of this"; the date stamp is not
+ * something anyone reads from a phone.
+ *
+ * The id spells a minor version with a dash — `claude-sonnet-4-5-20250929` is
+ * 4.5, not 4 — so the two numbers are joined rather than the second dropped, or
+ * this names a model that does not exist. The date stamp is a dashed run of
+ * digits too, which is why the minor is bounded at two and refuses to be followed
+ * by a third.
+ */
+function shortModel(model: string): string {
+  const found = /(opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2})(?!\d))?/i.exec(model)
+  if (!found) return model.toUpperCase()
+  const version = found[3] ? `${found[2]}.${found[3]}` : found[2]
+  return `${found[1].toUpperCase()} ${version}`
+}
+
 /** The session's real working directory and branch, straight from the CLI. */
 function SessionHeader({ onPick }: { onPick: () => void }) {
   const left = (() => {
@@ -422,9 +440,15 @@ function SessionHeader({ onPick }: { onPick: () => void }) {
     if (store.claudeSessionId.value == null) return `NO SESSION · ${tapVerb()} TO PICK`
     // The subscription flag is the load-bearing fact: it is what proves this is not
     // quietly billing per token.
+    // The model, where the host named one. Two facts about a session that are
+    // worth stating and cannot be inferred from anything else on screen: what is
+    // answering, and that it is not billing per token.
+    const model = store.claudeModel.value
+      ? `${shortModel(store.claudeModel.value)} · `
+      : ''
     return store.claudeUsingSubscription.value === true
-      ? 'SUBSCRIPTION · NO API KEY'
-      : 'SESSION OPEN'
+      ? `${model}SUBSCRIPTION · NO API KEY`
+      : `${model}SESSION OPEN`
   })()
 
   const right = (() => {
