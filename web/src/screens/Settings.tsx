@@ -2,7 +2,7 @@
  * 13 · SETTINGS and 14 · REVOKE — CONFIRM.
  * Mirrored by ios/VibeWire/Screens/SettingsView.swift.
  *
- * Five groups, no search field, no icons in coloured squares. Every value that
+ * Six groups, no search field, no icons in coloured squares. Every value that
  * affects the picture shows its cost in bytes or milliseconds, because that is the
  * only reason to come here.
  *
@@ -10,6 +10,12 @@
  * BROWSER states where the private key actually lives and what that costs, since
  * unlike the phone there is no Secure Enclave to take for granted and the answer
  * differs between engines.
+ *
+ * Past 900px the six groups become two columns, split on which end of the wire
+ * each one is about — see the comment over the two wrappers below. DOM order is
+ * the phone's order and the wrappers are `display: contents` until the container
+ * query fires, so nothing here is rendered twice and the phone lays out the same
+ * flat run of sections it always has.
  */
 
 import type { ComponentChildren } from 'preact'
@@ -25,7 +31,6 @@ import {
   Grabber,
   Group,
   OutlinedAction,
-  ScreenBody,
   SectionLabel,
   SheetDismiss,
   Toggle,
@@ -47,114 +52,142 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
   return (
     <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label="Settings">
-      <ScreenBody scrolls>
-        <div
-          style={{
-            opacity: target ? 0.18 : 1,
-            pointerEvents: target ? 'none' : 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            flex: '1 1 auto',
-            transition: 'opacity var(--state-change) ease-out',
-          }}
-        >
-          <div class="row" style={{ minHeight: '40px', marginTop: '12px', flex: '0 0 auto' }}>
-            <Display level={26} rank={2}>Settings</Display>
-            <span class="spacer" />
-            <SheetDismiss onClick={onClose} id="dismissSettings" />
-          </div>
-
-          <SettingsGroup title="PAIRED">
-            <PairedDevices />
-          </SettingsGroup>
-          <SettingsGroup title="VIDEO">
-            <VideoSection />
-          </SettingsGroup>
-          <SettingsGroup title="TRACKPAD">
-            <TrackpadSection />
-          </SettingsGroup>
-          <SettingsGroup title="ACCESS">
-            <AccessSection />
-          </SettingsGroup>
-          <SettingsGroup title="THIS BROWSER">
-            <BrowserSection />
-          </SettingsGroup>
-
-          {/* The shortcut list is opened with `?`, which is only discoverable to
-              someone who already knows it. This is the other way in, and it is
-              absent on a touch device where there is no keyboard to list. */}
-          {hasKeyboard() ? (
-            <SettingsGroup title="KEYBOARD">
-              <button
-                class="group-row"
-                onClick={() => {
-                  onClose()
-                  showShortcuts.value = true
-                }}
-                style={{ borderRadius: 'var(--radius-group-outer)', textAlign: 'left' }}
-              >
-                <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500 }}>
-                  Keys that stay on this side
-                </span>
-                <span class="spacer" />
-                <span class="cap" style={{ flex: '0 0 auto', width: '38px', minHeight: '30px' }}>
-                  <span class="mono" style={{ fontSize: 'var(--fs-13)' }}>
-                    ?
-                  </span>
-                </span>
-              </button>
-            </SettingsGroup>
-          ) : null}
-
-          <button
-            class="outlined"
-            onClick={() =>
-              // Goes through the same sheet as a single revoke. Revoking one device
-              // asked for confirmation; revoking all of them, including this
-              // browser, went straight through on one tap.
-              (store.revokeTarget.value = {
-                kind: 'everything',
-                count: store.devices.value.length,
-              })
-            }
-            style={
-              {
-                marginTop: '20px',
-                minHeight: '54px',
-                justifyContent: 'flex-start',
-                paddingInline: '18px',
-                gap: '10px',
-                flex: '0 0 auto',
-                '--edge': 'color-mix(in srgb, var(--ns-red) 40%, transparent)',
-              } as Record<string, string>
-            }
-          >
-            <span style={{ fontSize: 'var(--fs-15)', color: 'var(--ns-red)' }}>
-              Revoke every device
-            </span>
-            <span class="spacer" />
-            {/* Solid, not 70%: the count is the scale of what the tap destroys, and
-                the faded version read at 3.4:1. */}
-            <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-red)">
-              {`${store.devices.value.length} KEYS`}
-            </Caps>
-          </button>
-
-          <Caps
-            size="var(--fs-9)"
-            tracking="0.12em"
-            color="var(--ns-text-faint)"
+      <div class="wide-shell screen--scrolls">
+        <div class="column wide-column">
+          <div
+            class="settings"
             style={{
-              marginTop: '12px',
-              paddingBottom: 'calc(40px + var(--safe-bottom))',
-              lineHeight: 1.7,
-              flex: '0 0 auto',
+              opacity: target ? 0.18 : 1,
+              pointerEvents: target ? 'none' : 'auto',
+              transition: 'opacity var(--state-change) ease-out',
             }}
           >
-            {`VIBEWIRE WEB ${store.appVersion} · HOST ${settings.hostVersion} · NO ACCOUNT, NO CLOUD`}
-          </Caps>
+            <div
+              class="row settings__title"
+              style={{ minHeight: '40px', marginTop: '12px', flex: '0 0 auto' }}
+            >
+              <Display level={26} rank={2}>Settings</Display>
+              <span class="spacer" />
+              <SheetDismiss onClick={onClose} id="dismissSettings" />
+            </div>
+
+            {/*
+              The split is which end of the wire the group is about, not what would
+              make the two columns the same height — they are not the same height,
+              and the one about this browser is the shorter.
+
+              Left: the Mac at the other end. The keys it holds, the picture it
+              sends, the pointer it moves, the paths it will answer on. Every value
+              in this column is stored on the Mac or spent by it.
+
+              Right: this end. Where this browser's signing key actually lives,
+              whether this engine can decode video at all, which origin the pairing
+              belongs to, and which keys never leave this side. That difference is
+              the reason this client has a group the phone does not, so it is the
+              line the sheet splits on.
+
+              Revoke and the version line stay at the foot of the right-hand column
+              where the phone puts them, because that is the column they belong to:
+              revoking every device deletes this browser's key with the rest, which
+              is the second sentence of the confirmation.
+            */}
+            <div class="settings__mac">
+              <SettingsGroup title="PAIRED">
+                <PairedDevices />
+              </SettingsGroup>
+              <SettingsGroup title="VIDEO">
+                <VideoSection />
+              </SettingsGroup>
+              <SettingsGroup title="TRACKPAD">
+                <TrackpadSection />
+              </SettingsGroup>
+              <SettingsGroup title="ACCESS">
+                <AccessSection />
+              </SettingsGroup>
+            </div>
+
+            <div class="settings__browser">
+              <SettingsGroup title="THIS BROWSER">
+                <BrowserSection />
+              </SettingsGroup>
+
+              {/* The shortcut list is opened with `?`, which is only discoverable to
+                  someone who already knows it. This is the other way in, and it is
+                  absent on a touch device where there is no keyboard to list. */}
+              {hasKeyboard() ? (
+                <SettingsGroup title="KEYBOARD">
+                  <button
+                    class="group-row"
+                    onClick={() => {
+                      onClose()
+                      showShortcuts.value = true
+                    }}
+                    style={{ borderRadius: 'var(--radius-group-outer)', textAlign: 'left' }}
+                  >
+                    <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500 }}>
+                      Keys that stay on this side
+                    </span>
+                    <span class="spacer" />
+                    <span class="cap" style={{ flex: '0 0 auto', width: '38px', minHeight: '30px' }}>
+                      <span class="mono" style={{ fontSize: 'var(--fs-13)' }}>
+                        ?
+                      </span>
+                    </span>
+                  </button>
+                </SettingsGroup>
+              ) : null}
+
+              <button
+                class="outlined"
+                onClick={() =>
+                  // Goes through the same sheet as a single revoke. Revoking one device
+                  // asked for confirmation; revoking all of them, including this
+                  // browser, went straight through on one tap.
+                  (store.revokeTarget.value = {
+                    kind: 'everything',
+                    count: store.devices.value.length,
+                  })
+                }
+                style={
+                  {
+                    marginTop: '20px',
+                    minHeight: '54px',
+                    justifyContent: 'flex-start',
+                    paddingInline: '18px',
+                    gap: '10px',
+                    flex: '0 0 auto',
+                    '--edge': 'color-mix(in srgb, var(--ns-red) 40%, transparent)',
+                  } as Record<string, string>
+                }
+              >
+                <span style={{ fontSize: 'var(--fs-15)', color: 'var(--ns-red)' }}>
+                  Revoke every device
+                </span>
+                <span class="spacer" />
+                {/* Solid, not 70%: the count is the scale of what the tap destroys, and
+                    the faded version read at 3.4:1. */}
+                <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-red)">
+                  {`${store.devices.value.length} KEYS`}
+                </Caps>
+              </button>
+
+              <Caps
+                size="var(--fs-9)"
+                tracking="0.12em"
+                color="var(--ns-text-faint)"
+                style={{
+                  marginTop: '12px',
+                  paddingBottom: 'calc(40px + var(--safe-bottom))',
+                  lineHeight: 1.7,
+                  flex: '0 0 auto',
+                }}
+              >
+                {`VIBEWIRE WEB ${store.appVersion} · HOST ${settings.hostVersion} · NO ACCOUNT, NO CLOUD`}
+              </Caps>
+            </div>
+          </div>
         </div>
-      </ScreenBody>
+      </div>
 
       {target ? (
         <>

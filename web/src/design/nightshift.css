@@ -1175,6 +1175,26 @@ textarea {
   flex: 0 0 auto;
 }
 
+/* ── Settings ─────────────────────────────────────────────────────────── */
+
+/* Six groups, a destructive action and a version line: one column on a phone,
+   two past 900px.
+
+   The two wrappers are `display: contents` here, so below the threshold the
+   sections are still direct children of this flex column — their own margins,
+   their own `flex: 0 0 auto`, the same run in the same order as before there
+   were wrappers at all. The container query is what turns them into columns. */
+.settings {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings__mac,
+.settings__browser {
+  display: contents;
+}
+
 /* ── Remote ───────────────────────────────────────────────────────────── */
 
 /* The picture keeps every pixel it has and the chrome lives in the letterbox
@@ -1387,5 +1407,55 @@ textarea {
      across a laptop and lose the eye on the way back. */
   .claude__talk > .stack {
     max-width: var(--measure);
+  }
+
+  /* Settings splits on which end of the wire each group is about, not on what
+     would make the columns the same length: the Mac on the left — the keys it
+     holds, the picture it sends, the pointer it moves, the paths it answers on
+     — and this browser on the right, which is the column that has to say where
+     the signing key lives and what this engine cannot do. The reasoning is
+     written out over the two wrappers in Settings.tsx.
+
+     Same mechanism as Home and the Claude panel: DOM order is the phone's
+     order, and two grid areas do the arranging. */
+  .settings {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'title   title'
+      'mac     browser';
+    align-content: start;
+    column-gap: 22px;
+    /* Neither column past the reading measure. Every row in this sheet is a
+       label at one end and a switch, a count or a value at the other, and that
+       is the row the measure exists for — run one to the glass on a 1280 pt
+       window and its two ends stop reading as one line. Two measures and the
+       gap is as wide as this sheet gets, however wide the window is. */
+    width: 100%;
+    max-width: calc(var(--measure) * 2 + 22px);
+    margin-inline: auto;
+  }
+
+  .settings__title {
+    grid-area: title;
+  }
+
+  .settings__mac,
+  .settings__browser {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .settings__mac {
+    grid-area: mac;
+    /* The version line carries the bottom air on a phone, because it is the last
+       thing on the sheet. Here it is only the last thing in one column, and the
+       other one ends on a toggle a laptop window would cut. */
+    padding-bottom: calc(40px + var(--safe-bottom));
+  }
+
+  .settings__browser {
+    grid-area: browser;
   }
 }
