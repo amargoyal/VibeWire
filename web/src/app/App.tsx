@@ -17,6 +17,7 @@ import {
   SectionLabel,
   SheetDismiss,
   Spinner,
+  useSheet,
 } from '../design/components'
 import { decoderSupport } from '../video/renderer'
 import { ClaudePanel } from '../screens/ClaudePanel'
@@ -198,13 +199,21 @@ function Banner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
  * is likely to fail before it is tried.
  */
 function ScreenshotSheet() {
+  const sheet = useSheet<HTMLDivElement>(() => (store.screenshot.value = null))
   const source = store.screenshot.value
   if (!source) return null
 
   const display = store.selectedDisplay.value
 
   return (
-    <div class="sheet" role="dialog" aria-label="Screenshot of the Mac" style={{ zIndex: 65 }}>
+    <div
+      ref={sheet}
+      class="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Screenshot of the Mac"
+      style={{ zIndex: 65 }}
+    >
       <ScreenBody>
         <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
           <SectionLabel>SCREENSHOT</SectionLabel>

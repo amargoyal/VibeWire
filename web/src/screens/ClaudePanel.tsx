@@ -45,6 +45,7 @@ import {
   SectionLabel,
   TimelineMark,
   type TimelineState,
+  useSheet,
 } from '../design/components'
 import { MarkdownText } from '../design/markdown'
 import { DiffView } from './Diff'
@@ -77,15 +78,9 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
     if (permission) composer.current?.blur()
   }, [permission?.id])
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !store.diffPath.value && !store.showSessionPicker.value) {
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Escape goes to whichever sheet is on top: the diff and the session picker open
+  // over this one and answer for themselves.
+  const sheet = useSheet<HTMLDivElement>(onClose)
 
   // A brand new session counts as ready even though it has no id yet: the CLI stays
   // silent until the first prompt, so the header asks for one, and gating on the id
@@ -111,7 +106,13 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
       : []
 
   return (
-    <div class={half ? 'sheet sheet--half' : 'sheet'} role="dialog" aria-label="Claude">
+    <div
+      ref={sheet}
+      class={half ? 'sheet sheet--half' : 'sheet'}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Claude"
+    >
       <ScreenBody>
         {/* The one thing the system does not know: which Mac this is talking to,
             and how far away it is. */}
@@ -837,6 +838,8 @@ function PermissionCard() {
 
 /** Real sessions from ~/.claude/projects, resumable by id. */
 function SessionPicker({ onClose }: { onClose: () => void }) {
+  const sheet = useSheet<HTMLDivElement>(onClose)
+
   useEffect(() => {
     store.listClaudeSessions()
   }, [])
@@ -845,7 +848,7 @@ function SessionPicker({ onClose }: { onClose: () => void }) {
   const current = store.claudeSessionId.value
 
   return (
-    <div class="sheet" role="dialog" aria-label="Resume a session">
+    <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label="Resume a session">
       <ScreenBody>
         <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
           <SectionLabel>SESSIONS ON THE MAC</SectionLabel>
@@ -890,10 +893,9 @@ function SessionPicker({ onClose }: { onClose: () => void }) {
                       padding: '15px 16px',
                       borderRadius: 'var(--radius-control)',
                       background: 'var(--ns-raised)',
-                      outline: selected
-                        ? '1px solid color-mix(in srgb, var(--ns-accent) 35%, transparent)'
+                      boxShadow: selected
+                        ? 'inset 0 0 0 1px color-mix(in srgb, var(--ns-accent) 35%, transparent)'
                         : undefined,
-                      outlineOffset: '-1px',
                     }}
                   >
                     <span

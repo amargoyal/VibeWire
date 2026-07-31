@@ -21,8 +21,6 @@
  * conditions never use it.
  */
 
-import { useEffect } from 'preact/hooks'
-
 import { store } from '../app/store'
 import {
   Caps,
@@ -31,6 +29,7 @@ import {
   MODIFIERS,
   modifierGlyph,
   Tile,
+  useSheet,
 } from '../design/components'
 import { focusKeyboardField } from './KeyboardBar'
 
@@ -60,13 +59,7 @@ export function CommandDrawer() {
   const held = store.heldModifiers.value
   const sent = [...held].sort().map(modifierGlyph).join('')
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') store.showHub.value = false
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  const sheet = useSheet<HTMLDivElement>(() => (store.showHub.value = false))
 
   const run = (action: string) => {
     navigator.vibrate?.(6)
@@ -109,9 +102,11 @@ export function CommandDrawer() {
       />
 
       <div
+        ref={sheet}
         class="drawer"
         data-nopad
         role="dialog"
+        aria-modal="true"
         aria-label="Commands"
         style={{
           left: '8px',

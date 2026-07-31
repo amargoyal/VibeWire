@@ -863,8 +863,11 @@ export function DisplayChip({
         background: selected
           ? 'color-mix(in srgb, var(--ns-accent) 12%, transparent)'
           : 'var(--ns-raised)',
-        outline: selected ? '1px solid color-mix(in srgb, var(--ns-accent) 50%, transparent)' : undefined,
-        outlineOffset: '-1px',
+        // An inset ring, not an outline: `outline` is spoken for by the focus
+        // ring, and a selected chip is the one a keyboard is most likely on.
+        boxShadow: selected
+          ? 'inset 0 0 0 1px color-mix(in srgb, var(--ns-accent) 50%, transparent)'
+          : undefined,
       }}
     >
       <span

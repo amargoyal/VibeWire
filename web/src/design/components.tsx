@@ -6,7 +6,8 @@
  * is are the part that would otherwise be lost.
  */
 
-import type { ComponentChildren, JSX } from 'preact'
+import type { ComponentChildren, JSX, RefObject } from 'preact'
+import { useEffect, useRef } from 'preact/hooks'
 
 // MARK: - Condition
 
@@ -745,6 +746,107 @@ export function spokenGlyph(glyph: string): string {
     default:
       return glyph
   }
+}
+
+// MARK: - Sheets
+
+/** What a keyboard can land on. Order is document order, which is tab order. */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+function focusablesIn(node: HTMLElement): HTMLElement[] {
+  return Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (element) => element.getClientRects().length > 0,
+  )
+}
+
+/**
+ * The open sheets, innermost last.
+ *
+ * Escape belongs to exactly one of them — the combo editor over the keyboard bar
+ * closes the editor, not the bar — and without a stack every open sheet would take
+ * the same keystroke and the screen would collapse two layers at once.
+ */
+const sheetStack: Array<{ node: HTMLElement | null; dismiss?: () => void }> = []
+
+/**
+ * Makes a `role="dialog"` behave like one.
+ *
+ * Three things, all of which the browser does for `<dialog>` and for nothing else:
+ * Escape closes the topmost sheet (which `SheetDismiss` has always claimed);
+ * focus moves into the sheet on open and Tab stays inside it, instead of walking
+ * into the screen behind the scrim where a sighted user cannot see where they are;
+ * and focus returns to whatever opened the sheet when it closes, so the next Tab
+ * carries on from where it was rather than from the top of the document.
+ *
+ * `focus` picks where the keyboard lands. It is `last` on a destructive sheet,
+ * where the first control is the irreversible one and a stray Return on an
+ * auto-focused button is exactly the accident the sheet exists to prevent.
+ *
+ * Returns the ref to put on the dialog element.
+ */
+export function useSheet<T extends HTMLElement = HTMLDivElement>(
+  onDismiss?: () => void,
+  { focus = 'first' }: { focus?: 'first' | 'last' } = {},
+): RefObject<T> {
+  const container = useRef<T | null>(null)
+  const dismiss = useRef(onDismiss)
+  dismiss.current = onDismiss
+
+  useEffect(() => {
+    const node = container.current
+    const restoreTo = document.activeElement as HTMLElement | null
+    const entry = { node, dismiss: () => dismiss.current?.() }
+    sheetStack.push(entry)
+
+    if (node) {
+      const focusables = focusablesIn(node)
+      const target = focus === 'last' ? focusables[focusables.length - 1] : focusables[0]
+      if (target) target.focus()
+      else {
+        node.tabIndex = -1
+        node.focus()
+      }
+    }
+
+    const onKey = (event: KeyboardEvent) => {
+      if (sheetStack[sheetStack.length - 1] !== entry) return
+
+      if (event.key === 'Escape') {
+        if (!dismiss.current) return
+        event.preventDefault()
+        // Stops the layer underneath — the keyboard bar, a pointer capture — from
+        // reading the same press as its own way out.
+        event.stopPropagation()
+        dismiss.current()
+        return
+      }
+
+      if (event.key !== 'Tab' || !node) return
+      const focusables = focusablesIn(node)
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      const outside = !node.contains(active)
+      if (event.shiftKey ? active === first || outside : active === last || outside) {
+        event.preventDefault()
+        event.stopPropagation()
+        ;(event.shiftKey ? last : first).focus()
+      }
+    }
+
+    window.addEventListener('keydown', onKey, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      const index = sheetStack.indexOf(entry)
+      if (index >= 0) sheetStack.splice(index, 1)
+      // Only if it is still on the page: a revoked device's row is gone by now.
+      if (restoreTo?.isConnected) restoreTo.focus()
+    }
+  }, [])
+
+  return container
 }
 
 /**

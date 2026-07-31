@@ -28,14 +28,18 @@ import {
   SectionLabel,
   SheetDismiss,
   Toggle,
+  useSheet,
 } from '../design/components'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const settings = store.settings.value
   const target = store.revokeTarget.value
+  // While the revoke sheet is up it owns Escape; this one would otherwise close
+  // underneath it and take the question with it.
+  const sheet = useSheet<HTMLDivElement>(target ? undefined : onClose)
 
   return (
-    <div class="sheet" role="dialog" aria-label="Settings">
+    <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label="Settings">
       <ScreenBody scrolls>
         <div
           style={{
@@ -573,6 +577,11 @@ function SettingRow({
  */
 function RevokeConfirm({ target }: { target: RevokeTarget }) {
   const isEverything = target.kind === 'everything'
+  // Escape answers with the safe answer, and so does the key the sheet opens on:
+  // focus starts on KEEP IT PAIRED, not on the button that deletes a key.
+  const sheet = useSheet<HTMLDivElement>(() => (store.revokeTarget.value = null), {
+    focus: 'last',
+  })
 
   const title = isEverything
     ? `REVOKE ALL ${target.count} DEVICES`
@@ -602,6 +611,7 @@ function RevokeConfirm({ target }: { target: RevokeTarget }) {
 
   return (
     <div
+      ref={sheet}
       class="drawer"
       role="dialog"
       aria-modal="true"

@@ -9,10 +9,15 @@
  * the moment a `Bash` step writes a file.
  */
 
-import { useEffect } from 'preact/hooks'
-
 import { store } from '../app/store'
-import { Caps, ScreenBody, SectionLabel, SheetDismiss, Spinner } from '../design/components'
+import {
+  Caps,
+  ScreenBody,
+  SectionLabel,
+  SheetDismiss,
+  Spinner,
+  useSheet,
+} from '../design/components'
 import { RatioBars } from './ClaudePanel'
 
 type LineKind = 'added' | 'removed' | 'hunk' | 'meta' | 'context'
@@ -55,13 +60,7 @@ export function DiffView() {
   const patch = store.diffPatch.value
   const path = store.diffPath.value
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') store.closeDiff()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  const sheet = useSheet<HTMLDivElement>(() => store.closeDiff())
 
   // One pass over the patch: the rows and the two counts the footer states. As
   // separate computed values this split the whole patch three times per render, on a
@@ -75,7 +74,7 @@ export function DiffView() {
   }
 
   return (
-    <div class="sheet" role="dialog" aria-label={`Live diff for ${path ?? ''}`}>
+    <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label={`Live diff for ${path ?? ''}`}>
       <ScreenBody>
         <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
           <SectionLabel style={{ color: 'var(--ns-accent)' }}>LIVE DIFF</SectionLabel>

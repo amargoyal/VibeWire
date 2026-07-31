@@ -280,8 +280,7 @@ export function Pairing() {
                     : filled
                       ? 'var(--ns-raised-2)'
                       : 'var(--ns-raised)',
-                  outline: active ? '1.5px solid var(--ns-accent)' : undefined,
-                  outlineOffset: '-1.5px',
+                  boxShadow: active ? 'inset 0 0 0 1.5px var(--ns-accent)' : undefined,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

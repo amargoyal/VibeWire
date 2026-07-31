@@ -28,6 +28,7 @@ import {
   ScreenBody,
   SectionLabel,
   SheetDismiss,
+  useSheet,
 } from '../design/components'
 
 const DEFAULT_COMBOS: string[][] = [
@@ -104,6 +105,10 @@ export function KeyboardField() {
         fieldElement = node
       }}
       aria-label="Type into the Mac"
+      // The one field on the page whose keystrokes are the Mac's. `Remote`'s
+      // physical-keyboard handler reads this to tell it from a field the browser
+      // owns, and leaves every other one alone.
+      data-mac-keyboard="true"
       rows={1}
       autocapitalize="sentences"
       autocomplete="off"
@@ -285,8 +290,7 @@ function TypingIntoBanner({ onClose }: { onClose: () => void }) {
         paddingLeft: '14px',
         borderRadius: 'var(--radius-control)',
         background: 'color-mix(in srgb, var(--ns-accent) 10%, transparent)',
-        outline: '1px solid color-mix(in srgb, var(--ns-accent) 30%, transparent)',
-        outlineOffset: '-1px',
+        boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ns-accent) 30%, transparent)',
       }}
     >
       <Caret height={18} />
@@ -427,9 +431,10 @@ function ComboEditor({
 }) {
   const [selected, setSelected] = useState<string[]>(['cmd'])
   const [letter, setLetter] = useState('')
+  const sheet = useSheet<HTMLDivElement>(onClose)
 
   return (
-    <div class="sheet" role="dialog" aria-label="New combo">
+    <div ref={sheet} class="sheet" role="dialog" aria-modal="true" aria-label="New combo">
       <ScreenBody scrolls>
         <div class="row" style={{ minHeight: '40px', marginTop: '16px' }}>
           <SectionLabel>NEW COMBO</SectionLabel>

@@ -59,6 +59,33 @@ type PadMode = 'pointer' | 'pan'
 const TAP_SLOP = 6
 /** How long a finger has to stay put before a slide becomes a drag. */
 const HOLD_TO_DRAG_MS = 450
+/** The two keys that fire whatever the browser has focused. */
+const ACTIVATION_CODES = new Set(['Space', 'Enter', 'NumpadEnter'])
+
+/**
+ * Whether this keystroke is being typed into the browser rather than at the Mac.
+ *
+ * The hidden field in `KeyboardBar` is the one text box on the page that belongs to
+ * the Mac, and it marks itself; every other field — the combo editor, the Claude
+ * composer, the address box — keeps its own keystrokes.
+ */
+function typedIntoBrowser(target: EventTarget | null): boolean {
+  const node = target as HTMLElement | null
+  if (!node || typeof node.tagName !== 'string') return false
+  if (node.dataset?.['macKeyboard'] === 'true') return false
+  return (
+    node.tagName === 'INPUT' ||
+    node.tagName === 'TEXTAREA' ||
+    node.tagName === 'SELECT' ||
+    node.isContentEditable
+  )
+}
+
+/** Whether the keystroke landed on something the browser can activate. */
+function focusedControl(target: EventTarget | null): boolean {
+  const node = target as HTMLElement | null
+  return !!node?.closest?.('button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])')
+}
 
 export function Remote() {
   const [padMode, setPadMode] = useState<PadMode>('pointer')
@@ -416,12 +443,42 @@ export function Remote() {
   // bar's hidden field owns the system keyboard there, and a `preventDefault` here
   // would swallow every character before the field ever saw it — the on-screen
   // keyboard would type nothing at all.
+  //
+  // Three keys are never taken, or the browser stops being operable from a keyboard
+  // — which the WCAG people call a trap and everyone else calls a stuck app:
+  //
+  //  - **Anything typed into a browser field.** The combo editor, the Claude
+  //    composer and the address box are the browser's own; only the hidden field
+  //    that exists to feed the Mac is exempt, and it says so with an attribute.
+  //  - **Escape.** It is the way out of both modes — it releases a capture, and it
+  //    closes the bar. The Mac's own Escape is the `esc` cap in the bar, which is
+  //    there precisely because the browser will not part with this one.
+  //  - **Tab, Space and Return while uncaptured.** Focus still has to move and a
+  //    focused button still has to fire. Under a capture there is no page to
+  //    operate, so all three go to the Mac.
 
   useEffect(() => {
-    const wantsPhysical = captured || (store.showKeyboard.value && !isTouchPrimary())
+    const barOpen = store.showKeyboard.value && !isTouchPrimary()
+    const wantsPhysical = captured || barOpen
     if (!wantsPhysical) return
 
+    /** Keys this browser keeps, and what to do with them instead. */
+    const browsersOwn = (event: KeyboardEvent): boolean => {
+      if (typedIntoBrowser(event.target)) return true
+      if (captured) return false
+      if (event.code === 'Tab') return true
+      if (ACTIVATION_CODES.has(event.code) && focusedControl(event.target)) return true
+      return false
+    }
+
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Escape') {
+        // The browser is about to exit the pointer lock on its own; the bar is ours
+        // to close. Either way this key never reaches the Mac from here.
+        if (!captured) store.showKeyboard.value = false
+        return
+      }
+      if (browsersOwn(event)) return
       const name = hostKeyName(event.code)
       store.setModifiers(modifiersFrom(event))
       if (!name) return
@@ -429,6 +486,7 @@ export function Remote() {
       store.keyDown(name, event.key.length === 1 ? event.key : undefined)
     }
     const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Escape' || browsersOwn(event)) return
       const name = hostKeyName(event.code)
       store.setModifiers(modifiersFrom(event))
       if (!name) return
@@ -793,8 +851,7 @@ function Picture({
               lineHeight: 1.45,
               color: 'var(--ns-on-amber-wash)',
               background: 'color-mix(in srgb, var(--ns-deep) 92%, transparent)',
-              outline: '1px solid color-mix(in srgb, var(--ns-amber) 34%, transparent)',
-              outlineOffset: '-1px',
+              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ns-amber) 34%, transparent)',
             }}
           >
             The Mac is sending video this browser cannot decode: {renderer.failure}
@@ -868,8 +925,21 @@ function SideBySidePanes() {
         return (
           <div
             key={display.id}
+            // A pane is a control: it decides which screen the trackpad and the
+            // keyboard are pointed at. It was the one thing on the page a keyboard
+            // could not reach, on the layout most likely to be driven by one.
+            role="button"
+            tabIndex={0}
+            aria-pressed={focused}
+            aria-label={`Send input to ${display.name}`}
             style={{ position: 'relative', flex: '1 1 0', minHeight: 0, display: 'flex' }}
             onClick={() => {
+              store.inputPane.value = index
+              store.selectDisplay(display.id)
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              event.preventDefault()
               store.inputPane.value = index
               store.selectDisplay(display.id)
             }}
@@ -893,8 +963,7 @@ function SideBySidePanes() {
                   tracking="0.1em"
                   color="var(--ns-accent)"
                   style={{
-                    outline: '1px solid color-mix(in srgb, var(--ns-accent) 50%, transparent)',
-                    outlineOffset: '-1px',
+                    boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ns-accent) 50%, transparent)',
                   }}
                 >
                   INPUT HERE
@@ -1000,8 +1069,7 @@ function Minimap() {
           height: '49px',
           borderRadius: 'var(--radius-small)',
           background: 'color-mix(in srgb, var(--ns-deep) 88%, transparent)',
-          outline: '1px solid var(--ns-stroke)',
-          outlineOffset: '-1px',
+          boxShadow: 'inset 0 0 0 1px var(--ns-stroke)',
           display: 'block',
         }}
       >
@@ -1014,8 +1082,7 @@ function Minimap() {
             width: `${78 / zoom}px`,
             height: `${49 / zoom}px`,
             background: 'color-mix(in srgb, var(--ns-accent) 18%, transparent)',
-            outline: '1px solid var(--ns-accent)',
-            outlineOffset: '-1px',
+            boxShadow: 'inset 0 0 0 1px var(--ns-accent)',
           }}
         />
       </span>

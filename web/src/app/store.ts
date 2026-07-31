@@ -256,7 +256,13 @@ export class Store {
   lastFrameAgeSeconds = signal<number | null>(null)
 
   // Input
+  /** Everything the Mac is being told is down — tapped and physical together. */
   heldModifiers = signal<string[]>([])
+  /** The subset a tap on a key cap is holding. Kept apart from the physical set so
+   *  a ⌘ latched in the drawer survives the next keystroke on a real keyboard,
+   *  which reports only the modifiers its own fingers are on. */
+  private latchedModifiers: string[] = []
+  private physicalModifiers: string[] = []
   scrollLock = signal(false)
   sessionCount = signal(0)
 
@@ -1113,21 +1119,29 @@ export class Store {
   }
 
   toggleModifier(name: string): void {
-    const held = this.heldModifiers.value
-    this.heldModifiers.value = held.includes(name)
-      ? held.filter((entry) => entry !== name)
-      : [...held, name]
-    this.send({ t: 'modifiers', held: this.heldModifiers.value, latched: true })
+    const latched = this.latchedModifiers
+    this.latchedModifiers = latched.includes(name)
+      ? latched.filter((entry) => entry !== name)
+      : [...latched, name]
+    this.publishModifiers(true)
   }
 
+  /** What a physical keyboard reports as down right now. */
   setModifiers(names: string[]): void {
-    const next = [...new Set(names)].sort()
+    this.physicalModifiers = names
+    this.publishModifiers(false)
+  }
+
+  private publishModifiers(latched: boolean): void {
+    const next = [...new Set([...this.latchedModifiers, ...this.physicalModifiers])].sort()
     if (next.join() === [...this.heldModifiers.value].sort().join()) return
     this.heldModifiers.value = next
-    this.send({ t: 'modifiers', held: next, latched: false })
+    this.send({ t: 'modifiers', held: next, latched })
   }
 
   releaseModifiers(): void {
+    this.latchedModifiers = []
+    this.physicalModifiers = []
     if (!this.heldModifiers.value.length) return
     this.heldModifiers.value = []
     this.send({ t: 'modifiers', held: [], latched: false })
