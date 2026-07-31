@@ -1,0 +1,1265 @@
+/*
+ * Nightshift — the design system the whole client obeys.
+ *
+ * It replaces Longarm, and the change is structural rather than cosmetic. Longarm
+ * drew an instrument out of hairlines on a near-black ground: every panel was a
+ * 1px border, every grouped list a stack of rules, and the accent was cyan.
+ * Nightshift keeps what that was for — dark only, colour reports a condition,
+ * monospace for anything measured — and changes what carries the structure:
+ *
+ *  - **Filled surfaces, not hairlines.** A card is a lighter ground with a large
+ *    corner, not a box drawn around nothing. Two greys apart is easier to read at
+ *    arm's length than a 1px line, and it survives a phone at minimum brightness
+ *    outdoors, which the hairlines did not.
+ *  - **Violet is the user's colour**, where Longarm used cyan. Held keys, focus,
+ *    Claude, the current selection. Machine conditions keep green / amber / red,
+ *    so "the Mac is doing something" and "I left something switched on" still
+ *    cannot be confused.
+ *  - **Grouped rows are one shape.** A list is a run of rows two pixels apart
+ *    whose outer corners round and whose inner corners do not, so the group reads
+ *    as one object and each row is still its own target.
+ *
+ * Unchanged from Longarm, because the reasons have not changed:
+ *  - Dark only. There is no light mode and no `prefers-color-scheme` branching.
+ *  - Colour reports a condition, never decorates.
+ *  - Monospace for anything measured; the sans for names, prose and answers. Both
+ *    scale with the reader's text size and nothing renders under 9px.
+ *  - Reduce Motion takes the travel and the scale, never the fact that something
+ *    happened, and never the spinner.
+ */
+
+:root {
+  /* ── Condition ──────────────────────────────────────────────────────────
+     Reported, never decorative. Green reachable, amber degraded, red lost. */
+  --ns-green: oklch(0.83 0.14 165);
+  --ns-amber: oklch(0.84 0.13 80);
+  --ns-red: oklch(0.705 0.16 22);
+
+  /* The user's own state: held keys, focus, the current selection, Claude.
+     Violet rather than cyan so it cannot be mistaken for a green readout at a
+     glance on a dim screen, which is where the two used to collide. */
+  --ns-accent: oklch(0.765 0.13 272);
+
+  /* ── Ground ─────────────────────────────────────────────────────────────
+     Four steps, and every surface in the app is one of them. `screen` is the
+     app; `deep` is what video and code sit on; `raised` is a card; `raised-2`
+     is a control inside a card. */
+  --ns-deep: oklch(0.13 0.006 262);
+  --ns-screen: oklch(0.175 0.008 262);
+  --ns-raised: oklch(0.218 0.010 262);
+  --ns-raised-2: oklch(0.265 0.012 262);
+  /* Chrome is `raised` measured against `deep` rather than against `screen` —
+     the same apparent step, on the darker ground the remote view uses. */
+  --ns-chrome: oklch(0.20 0.008 262);
+  --ns-chrome-2: oklch(0.22 0.008 262);
+
+  /* ── Ink ────────────────────────────────────────────────────────────────
+     Four steps, each measured against the ground it lands on.
+     text 15.9:1 · secondary 7.4:1 · tertiary 4.6:1 on `screen`.
+     `faint` is 3.1:1, deliberately below the body threshold: it is for the
+     all-caps footnotes that repeat something already stated above, never for a
+     sentence that carries information on its own.
+     `disabled` is not for text at all — dormant indicator fills only. */
+  --ns-text: oklch(0.965 0.004 262);
+  --ns-text-secondary: oklch(0.735 0.012 262);
+  --ns-text-tertiary: oklch(0.585 0.014 262);
+  --ns-text-faint: oklch(0.50 0.014 262);
+  --ns-text-disabled: oklch(0.38 0.012 262);
+  /* Prose the user wrote, set a step below Claude's answers so a transcript
+     reads as a conversation without either side being a bubble. */
+  --ns-you: oklch(0.82 0.010 262);
+  --ns-code-ink: oklch(0.90 0.006 262);
+  --ns-context: oklch(0.78 0.008 262);
+  /* Body copy inside an amber card, where plain secondary ink would sit at
+     3.9:1 against the wash. */
+  --ns-on-amber-wash: oklch(0.80 0.09 80);
+
+  /* ── Lines ──────────────────────────────────────────────────────────────
+     Nightshift draws far fewer of these than Longarm did: a line now separates
+     things a gap cannot, and nothing else. */
+  --ns-hairline: oklch(0.28 0.012 262);
+  --ns-hairline-dim: oklch(0.24 0.010 262);
+  --ns-stroke: oklch(0.32 0.012 262);
+
+  /* ── Ink on a filled action ─────────────────────────────────────────────
+     Each is its own tint taken down to a near-black of the same hue, so a
+     filled button reads as one object rather than as black text on colour. */
+  --ns-on-green: oklch(0.26 0.06 165);
+  --ns-on-amber: oklch(0.24 0.06 80);
+  --ns-on-accent: oklch(0.20 0.05 272);
+  --ns-on-red: oklch(0.18 0.05 22);
+
+  /* ── Type ───────────────────────────────────────────────────────────────
+     The named faces first, then the platform's own. The design was drawn in
+     Instrument Sans and IBM Plex Mono, and where those are installed the client
+     uses them — but this page is usually served by the Mac on a local network
+     with no route to a font CDN, and an instrument that waits on a webfont to
+     say whether the link is up has its priorities wrong. The fallbacks are the
+     system faces, which is what Longarm used throughout.
+
+     Sizes are the phone's designed point values expressed against the reader's
+     root font size, so raising the browser or OS text size scales the whole
+     instrument the way Dynamic Type does on iOS. The `max()` is the 9pt floor:
+     the instrument is dense on purpose, but a 6px caption is not density — it is
+     a value nobody can read. */
+  --ns-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ns-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo,
+    Consolas, 'Liberation Mono', monospace;
+
+  --fs-8: max(9px, 0.5rem);
+  --fs-9: max(9px, 0.5625rem);
+  --fs-10: max(9px, 0.625rem);
+  --fs-11: max(9px, 0.6875rem);
+  --fs-12: max(9px, 0.75rem);
+  --fs-13: max(9px, 0.8125rem);
+  --fs-14: max(9px, 0.875rem);
+  --fs-15: 0.9375rem;
+  --fs-16: 1rem;
+  --fs-17: 1.0625rem;
+  --fs-19: 1.1875rem;
+  --fs-22: 1.375rem;
+  --fs-24: 1.5rem;
+  --fs-26: 1.625rem;
+  --fs-28: 1.75rem;
+  --fs-30: 1.875rem;
+  --fs-36: 2.25rem;
+  --fs-38: 2.375rem;
+  --fs-46: 2.875rem;
+
+  /* Tracking. All-caps mono is tracked open; the display sizes are tracked
+     tight, which is the single most legible difference between this and the
+     screen it replaces. */
+  --caps-tracking: 0.14em;
+  --caps-tracking-wide: 0.24em;
+  --display-tracking: -0.035em;
+  --title-tracking: -0.03em;
+
+  /* ── Metrics ────────────────────────────────────────────────────────────
+     Every tappable thing is at least 44px. The primary action grew from
+     Longarm's 76px box to a 68px card because it no longer carries a border and
+     the sub-label sits tighter under the title. */
+  --target: 44px;
+  --primary-action: 68px;
+  --secondary-action: 56px;
+  --row: 58px;
+
+  /* Corners. A card is 20; the control inside it is 16; the control inside
+     *that* is 12. The three steps are what make a nested control read as
+     nested without a single line being drawn. */
+  --radius-card: 20px;
+  --radius-card-large: 22px;
+  --radius-control: 16px;
+  --radius-inner: 12px;
+  --radius-small: 8px;
+  --radius-pill: 999px;
+  /* A drawer's top corners, larger than a card's so it reads as arriving from
+     off-screen rather than as a card that grew. */
+  --radius-drawer: 28px;
+  /* The outline of a screen, wherever one is drawn small: the display rows, the
+     side-by-side pair, the last-frame thumbnail. Tighter on purpose — a 22px
+     rectangle with a 16px corner reads as a pill, not as a monitor. */
+  --radius-screen: 3px;
+
+  /* Grouped rows: the outer corner of the run, and the inner one. A row in the
+     middle of a group keeps the small corner so the 2px gap reads as a seam
+     rather than as space between separate cards. */
+  --radius-group-outer: 16px;
+  --radius-group-inner: 4px;
+  --group-gap: 2px;
+
+  --gutter: 20px;
+
+  /* The widest a column of readings is allowed to get on a phone-shaped layout.
+     Run a label-left value-right row to the glass on a desktop monitor and the
+     two ends stop reading as one line. */
+  --measure: 560px;
+  /* Past this the client stops being a tall column and becomes two: picture on
+     the left, readings on the right. Chosen from the content — a 320px rail plus
+     a 16:10 picture wide enough to be worth looking at — not from a device. */
+  --wide: 900px;
+
+  /* 120–180 ms, only for state changes and to hint at touch. */
+  --state-change: 150ms;
+
+  /* Safe areas, so the remote view can run edge to edge without hiding controls
+     under a home indicator or a sensor housing. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: dark;
+  /* Held keys and pinch-to-zoom on the glass belong to the Mac, not to the
+     browser's own selection and page zoom. */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--ns-screen);
+  color: var(--ns-text);
+  font-family: var(--ns-sans);
+  font-size: var(--fs-15);
+  -webkit-font-smoothing: antialiased;
+  /* `overscroll-behavior: none` stops the pull-to-refresh that would otherwise
+     fire on the first downward swipe over the trackpad. */
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100%;
+  display: flow-root;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  /* Every tappable thing in this app is at least 44px, and a double tap on one
+     must not be read as a page zoom. */
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  margin: 0;
+}
+
+/* Keyboard focus is the only way to drive this client on a laptop, so it is
+   drawn deliberately rather than left to the browser default over a dark ground.
+   Violet, because focus is the user's own state. */
+:focus-visible {
+  outline: 2px solid var(--ns-accent);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduce Motion is about the vestibular system, not about stillness: what has to
+   go is travel, scale and parallax, not the fact that something appeared. The one
+   exception is the activity spinner — a small rotating arc is not a trigger, and
+   freezing one would say the host had stopped answering, which is a claim this app
+   is not allowed to make without having measured it. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.spinner) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Type helpers ─────────────────────────────────────────────────────── */
+
+.mono {
+  font-family: var(--ns-mono);
+  font-variant-ligatures: none;
+}
+
+/* All-caps monospace with the spec's tracking. Used for every readout heading,
+   status line and unit. */
+.caps {
+  font-family: var(--ns-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--caps-tracking);
+  color: var(--ns-text-tertiary);
+  font-size: var(--fs-10);
+  line-height: 1.25;
+  white-space: pre-wrap;
+}
+
+.sans {
+  font-family: var(--ns-sans);
+}
+
+/* The one heading style the app has, at four sizes. Tight tracking and a 600
+   weight is what makes a machine name read as a title rather than as large body
+   copy — Longarm set these at 500 and they never quite did. */
+.display {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: var(--display-tracking);
+  line-height: 1.06;
+  font-size: var(--fs-38);
+}
+
+.display--36 {
+  font-size: var(--fs-36);
+  line-height: 1;
+}
+
+.display--30 {
+  font-size: var(--fs-30);
+  line-height: 1.1;
+  letter-spacing: var(--title-tracking);
+}
+
+.display--26 {
+  font-size: var(--fs-26);
+  line-height: 1.15;
+  letter-spacing: var(--title-tracking);
+}
+
+.prose {
+  margin: 0;
+  font-size: var(--fs-15);
+  line-height: 1.5;
+}
+
+/* ── Structure ────────────────────────────────────────────────────────── */
+
+.screen {
+  background: var(--ns-screen);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen--scrolls {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.column {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: calc(var(--gutter) + var(--safe-left));
+  padding-block-start: var(--safe-top);
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* A card: a lighter ground with a large corner and no border. The tinted
+   variant is for a card that reports a condition — the wash carries the colour
+   and a hairline of the same tint keeps it legible where the wash is too faint
+   to find an edge. */
+.card {
+  background: var(--ns-raised);
+  border-radius: var(--radius-card);
+}
+
+.card--tinted {
+  background: color-mix(in srgb, var(--tint) 7%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--tint) 34%, transparent);
+  outline-offset: -1px;
+}
+
+/* A run of rows two pixels apart that reads as one object. The outer corners of
+   the run round; the seams between rows stay square-ish. Doing this with
+   `:first-child` rather than with props means a row does not have to know where
+   in the list it sits. */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--group-gap);
+}
+
+.group > * {
+  border-radius: var(--radius-group-inner);
+}
+
+.group > *:first-child {
+  border-start-start-radius: var(--radius-group-outer);
+  border-start-end-radius: var(--radius-group-outer);
+}
+
+.group > *:last-child {
+  border-end-start-radius: var(--radius-group-outer);
+  border-end-end-radius: var(--radius-group-outer);
+}
+
+.group > *:only-child {
+  border-radius: var(--radius-group-outer);
+}
+
+/* The row inside a group. `min-height`, not `height`: at a large text size a
+   fixed row clips the caption that says what the row is. */
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--row);
+  padding-inline: 16px;
+  background: var(--ns-raised);
+  text-align: left;
+  transition: background var(--state-change) ease-out;
+}
+
+.group-row--selected {
+  background: color-mix(in srgb, var(--ns-accent) 12%, transparent);
+}
+
+.group-row--dashed {
+  background: transparent;
+  border: 1px dashed var(--ns-stroke);
+}
+
+/* A dashed stroke means unmeasured, pending, or unselected, and it resolves to
+   solid when the thing becomes real. One axis, one pixel tall. */
+.dashed-rule {
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    var(--ns-stroke) 0 4px,
+    transparent 4px 8px
+  );
+  background-size: 8px 1px;
+  background-repeat: repeat-x;
+}
+
+.hairline {
+  height: 1px;
+  background: var(--ns-hairline);
+  flex: 0 0 auto;
+}
+
+/* ── Indicators ───────────────────────────────────────────────────────── */
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* A lost condition is the one indicator that is not a circle. Colour alone
+   cannot carry "this is the bad one" — the square is the redundant channel. */
+.dot--square {
+  border-radius: 0;
+}
+
+/* Pulse rate carries meaning: a thin link blinks faster than a healthy one. The
+   pulse is emphasis, not information — the colour already reports the condition
+   and the label beside it spells it out — so it is safe to hold still, at full
+   opacity, never mid-fade. */
+.dot--pulse {
+  animation: ns-pulse 2.6s ease-in-out infinite alternate;
+}
+
+.dot--pulse-fast {
+  animation-duration: 1.4s;
+}
+
+@keyframes ns-pulse {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dot--idle {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--ns-text-tertiary);
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+
+.bars > i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--ns-stroke);
+  display: block;
+}
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+
+.spark > i {
+  width: 3px;
+  border-radius: 1px;
+  display: block;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.spark > i.spark--now {
+  opacity: 1;
+}
+
+/* The one loop that keeps running under Reduce Motion. See the note above. */
+.spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  animation: ns-spin 0.9s linear infinite;
+}
+
+@keyframes ns-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.caret {
+  width: 2px;
+  background: var(--ns-accent);
+  animation: ns-blink 1.1s step-end infinite;
+}
+
+@keyframes ns-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* The rotating countdown that says when the pairing code turns over. A conic
+   gradient rather than an SVG arc: one element, and the sweep is a single custom
+   property the screen can animate or set. */
+.rotates {
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--ns-amber) 0 var(--sweep, 50%),
+    var(--ns-raised-2) var(--sweep, 50%) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* The hole in the middle takes the colour of whatever the dial sits on, which
+   differs between the phone screen and the Mac's pairing window. */
+.rotates::after {
+  content: '';
+  border-radius: 50%;
+  background: var(--hole, var(--ns-screen));
+  width: 58%;
+  height: 58%;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+
+/* The primary action. Carries its own preflight in the sub-label, because the
+   button should say what it is about to do and how long it will take. */
+.primary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: var(--primary-action);
+  padding-inline: 22px;
+  padding-block: 12px;
+  border-radius: var(--radius-card);
+  background: var(--tint);
+  color: var(--ink);
+  text-align: left;
+}
+
+.primary:disabled {
+  opacity: 0.45;
+}
+
+.primary__title {
+  font-size: var(--fs-19);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  display: block;
+}
+
+.primary__detail {
+  display: block;
+  margin-top: 3px;
+  /* 0.66 put this at 4.50:1 on the accent fill, which is the threshold to three
+     decimal places; 0.72 gives it actual margin on all four tints. */
+  opacity: 0.72;
+  color: inherit;
+}
+
+.primary__glyph {
+  margin-left: auto;
+  font-family: var(--ns-mono);
+  font-size: var(--fs-22);
+}
+
+/* A filled action with no sub-label: the confirming verb on a destructive
+   sheet, the send button, "Allow once". */
+.filled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--secondary-action);
+  border-radius: var(--radius-control);
+  background: var(--tint, var(--ns-accent));
+  color: var(--ink, var(--ns-on-accent));
+  font-size: var(--fs-16);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* An outlined action. The outline is drawn inside the box so a row of these
+   lines up with a filled sibling of the same declared height. */
+.outlined {
+  width: 100%;
+  min-height: var(--target);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--edge, var(--ns-stroke));
+  outline-offset: -1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A control that is only a label — the third option on a destructive sheet, the
+   standing grant on a permission prompt. Deliberately weightless. */
+.quiet {
+  width: 100%;
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The segmented control: a padded track with a filled thumb, rather than
+   Longarm's row of bordered cells. MON 1 / MON 2 / BOTH, CHAT / CODE, the
+   quality ladder, POINTER / VIEW. */
+.segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-inner);
+  background: var(--ns-raised);
+}
+
+.segmented > button {
+  flex: 1 1 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: calc(var(--radius-inner) - 3px);
+  transition: background var(--state-change) ease-out;
+}
+
+.segmented > button[aria-selected='true'],
+.segmented > button[aria-checked='true'] {
+  background: color-mix(in srgb, var(--ns-accent) 16%, transparent);
+}
+
+/* On the remote view the track sits on `deep` rather than on `screen`. */
+.segmented--onGlass {
+  background: color-mix(in srgb, var(--ns-chrome) 92%, transparent);
+}
+
+.toggle {
+  width: 52px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--ns-stroke);
+  outline-offset: -1px;
+  background: var(--ns-raised-2);
+  position: relative;
+  flex: 0 0 auto;
+  transition:
+    background var(--state-change) ease-out,
+    outline-color var(--state-change) ease-out;
+}
+
+.toggle[aria-checked='true'] {
+  outline-color: var(--ns-accent);
+  background: color-mix(in srgb, var(--ns-accent) 30%, transparent);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ns-text-tertiary);
+  transition:
+    transform var(--state-change) ease-out,
+    background var(--state-change) ease-out;
+}
+
+.toggle[aria-checked='true']::after {
+  transform: translateX(20px);
+  background: var(--ns-accent);
+}
+
+/* A key cap. Violet and dotted when held — the app's one signal for "this is
+   still down", used identically in the command drawer, the modifier row and the
+   keyboard bar. */
+.cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 46px;
+  border-radius: var(--radius-inner);
+  background: var(--ns-raised-2);
+  position: relative;
+  flex: 1 1 0;
+  transition:
+    background var(--state-change) ease-out,
+    outline-color var(--state-change) ease-out;
+}
+
+.cap--held {
+  background: color-mix(in srgb, var(--ns-accent) 20%, transparent);
+  outline: 1px solid var(--ns-accent);
+  outline-offset: -1px;
+  color: var(--ns-accent);
+}
+
+.cap--held::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ns-accent);
+}
+
+.cap__glyph {
+  font-family: var(--ns-mono);
+  font-size: var(--fs-15);
+  color: var(--ns-text);
+}
+
+.cap--held .cap__glyph {
+  color: var(--ns-accent);
+}
+
+/* A tile in the command drawer: a glyph over a caption, 70px tall. */
+.tile {
+  height: 70px;
+  border-radius: var(--radius-control);
+  background: var(--ns-raised-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.tile--accent {
+  background: color-mix(in srgb, var(--ns-accent) 14%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--ns-accent) 45%, transparent);
+  outline-offset: -1px;
+}
+
+/* A pill: the follow-up suggestions, the connection badge on the wide header. */
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding-inline: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--ns-raised);
+}
+
+/* ── Video chrome ─────────────────────────────────────────────────────── */
+
+/* The ground any mark needs when it sits on the Mac's picture. Defined once so a
+   caption, a badge and a readout cannot drift apart.
+
+   Alpha cannot be verified against content nobody controls: a caption at 34%
+   white measures 2.9:1 over a black desktop, 1.5:1 over a grey one, and 1.0:1 —
+   invisible — over a white document, which is what a text editor actually looks
+   like. The text is solid and carries its own ground at 92%. */
+.video-chip {
+  padding: 4px 8px;
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--ns-deep) 92%, transparent);
+}
+
+/* The band above and below a 16:10 picture inside a phone's glass. The chrome
+   lives here rather than over the picture. */
+.letterbox {
+  background: var(--ns-deep);
+}
+
+/* ── Sheets and drawers ───────────────────────────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, oklch(0.10 0.006 262) 72%, transparent);
+  z-index: 40;
+}
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--ns-screen);
+  animation: ns-rise var(--state-change) ease-out;
+}
+
+/* Half height over a live picture, full height over Home — a fact about what is
+   underneath, not a remembered preference. */
+.sheet--half {
+  top: auto;
+  height: min(74dvh, 100dvh);
+  border-radius: var(--radius-drawer) var(--radius-drawer) 0 0;
+}
+
+/* A drawer rises from the bottom edge and never covers the picture it acts on.
+   This is what replaced the thumb arc: the same seven actions, labelled, in a
+   surface that can be read rather than swept. */
+.drawer {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 60;
+  background: var(--ns-raised);
+  border-radius: var(--radius-drawer) var(--radius-drawer) 0 0;
+  animation: ns-rise var(--state-change) ease-out;
+}
+
+/* The grabber. Not a control — it says which edge this arrived from. */
+.grabber {
+  width: 40px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ns-stroke);
+  margin-inline: auto;
+  flex: 0 0 auto;
+}
+
+@keyframes ns-rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Travel is what Reduce Motion means; arrival is not. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes ns-rise {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* ── Timeline ─────────────────────────────────────────────────────────── */
+
+/* Claude's tool calls. Longarm drew them as a boxed list of equal rows, which
+   said nothing about order and made twenty calls look like a table. A timeline
+   says these happened in sequence, one rail down the left, and lets the running
+   one be a different shape without breaking the run. */
+.timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The rail runs behind the marks; each mark carries the screen's own ground, so
+   it punches a hole in the line rather than sitting on top of it. Nothing here is
+   absolutely positioned: a row is as tall as its content, and the rail is drawn
+   from the top of the first mark to the bottom of the last whatever that comes
+   to. */
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: color-mix(in srgb, var(--ns-accent) 28%, transparent);
+}
+
+.timeline__mark {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--ns-screen);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-9);
+  flex: 0 0 auto;
+  z-index: 1;
+}
+
+.timeline__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+}
+
+.timeline__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The running call is the one that gets a ground and shows its output. */
+.timeline__row--running {
+  align-items: flex-start;
+  padding-block: 6px;
+}
+
+.timeline__row--running .timeline__body {
+  background: var(--ns-raised);
+  border-radius: var(--radius-inner);
+  padding: 10px 12px;
+  margin-top: -6px;
+}
+
+/* ── Code ─────────────────────────────────────────────────────────────── */
+
+.code {
+  font-family: var(--ns-mono);
+  font-size: var(--fs-12);
+  line-height: 1.55;
+  background: var(--ns-deep);
+  border-radius: var(--radius-inner);
+  padding: 13px 14px;
+  color: var(--ns-code-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+/* ── Layout atoms used across screens ─────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row--baseline {
+  align-items: baseline;
+}
+
+.row--top {
+  align-items: flex-start;
+}
+
+.spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Truncating a path from the front keeps the filename, which is the half that
+   identifies it. */
+.ellipsis--head {
+  direction: rtl;
+  text-align: left;
+}
+
+.ellipsis--head > span {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── The hero ─────────────────────────────────────────────────────────── */
+
+/* Home shows the Mac instead of describing it.
+ *
+ * The last frame the Mac sent is the largest thing on the screen and it is also
+ * the way in — tapping it is what starts the stream. Everything that used to be
+ * a paragraph about the machine is now either a chip on this picture or one strip
+ * of readings under it. Behind the canvas is a hatch rather than a flat fill, so
+ * a picture that has not arrived reads as an empty frame rather than as a black
+ * screen the Mac might actually be showing.
+ */
+.hero {
+  position: relative;
+  width: 100%;
+  padding: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-card-large);
+  background: repeating-linear-gradient(
+    135deg,
+    oklch(0.205 0.010 262) 0 8px,
+    oklch(0.168 0.008 262) 8px 16px
+  );
+  text-align: left;
+  flex: 0 0 auto;
+}
+
+.hero__chip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+/* ── Home ─────────────────────────────────────────────────────────────── */
+
+.home {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The way forward sits at the bottom of the screen whatever the content above it
+   came to. */
+.home__acts {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 0 0 auto;
+  padding-bottom: calc(20px + var(--safe-bottom));
+}
+
+.home__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 0 0 auto;
+}
+
+/* ── Remote ───────────────────────────────────────────────────────────── */
+
+/* The picture keeps every pixel it has and the chrome lives in the letterbox
+   bands. This is what replaced the thumb arc: a labelled rail in the band, and a
+   drawer for the rest — neither of which ever covers the Mac's screen. */
+.remote {
+  position: fixed;
+  inset: 0;
+  background: var(--ns-deep);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+.remote__rail {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-inline: calc(14px + var(--safe-left)) calc(14px + var(--safe-right));
+  flex: 0 0 auto;
+}
+
+/* A control in the rail: 52px, the same square whether it holds a glyph or a
+   segmented pair. */
+.rail-button {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-control);
+  background: var(--ns-chrome);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ns-text);
+  transition: background var(--state-change) ease-out;
+}
+
+.rail-button--accent {
+  background: var(--ns-raised-2);
+}
+
+.rail-button--held {
+  background: color-mix(in srgb, var(--ns-accent) 20%, transparent);
+  outline: 1px solid var(--ns-accent);
+  outline-offset: -1px;
+  color: var(--ns-accent);
+}
+
+/* Landscape and the laptop: the letterbox rail becomes a dock down the right-hand
+   side, where there is height to label things properly and no thumb to reach
+   around. The split is taken from the shape of the window rather than from what
+   kind of device is asking — a tablet in Split View gets whichever layout its
+   actual width earns. */
+.remote__stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.remote__dock {
+  width: min(276px, 38vw);
+  flex: 0 0 auto;
+  background: var(--ns-screen);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: calc(24px + var(--safe-top)) calc(22px + var(--safe-right))
+    calc(24px + var(--safe-bottom)) 22px;
+  overflow-y: auto;
+}
+
+/* ── The wide layout ──────────────────────────────────────────────────── */
+
+/* Past `--wide` the client stops being a phone column centred in a desktop
+   window and becomes two columns: the Mac's picture takes the space it deserves
+   on the left, and the readings that were stacked under it move to a rail on the
+   right. Driven by a container query on the screen itself rather than by a media
+   query, so a tablet in Split View gets the layout its actual width earns. */
+.wide-shell {
+  container-type: inline-size;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ns-screen);
+}
+
+/* Declared before the container query, not after it: these two rules have the
+   same specificity, so the later one wins, and a `display: none` written below
+   the query would hide the wide layout at every width. */
+.wide-only {
+  display: none;
+}
+
+@container (min-width: 900px) {
+  .wide-only {
+    display: flex;
+  }
+
+  .narrow-only {
+    display: none;
+  }
+
+  /* The column stops being centred and bounded: a laptop window is not a tall
+     phone with wasted sides, so the content takes the width and splits. */
+  .wide-column {
+    max-width: none;
+    padding-inline: calc(28px + var(--safe-left)) calc(28px + var(--safe-right));
+  }
+
+  /* Home becomes two columns: the picture and the way in on the left, every
+     reading that was stacked under them on a rail to the right. The DOM order is
+     the phone's order; grid areas are what re-arrange it, so nothing has to be
+     rendered twice. */
+  .home {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'hero rail'
+      'acts rail';
+    gap: 16px 22px;
+  }
+
+  .home__title {
+    display: none;
+  }
+
+  .home__hero {
+    grid-area: hero;
+    display: flex;
+    min-height: 0;
+  }
+
+  /* The picture takes the height the grid row gives it rather than the 226px a
+     phone screen allows. */
+  .home__hero > .hero {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .home__rail {
+    grid-area: rail;
+    overflow-y: auto;
+  }
+
+  /* Two actions side by side rather than stacked, because there is room and the
+     second one is not a footnote. */
+  .home__acts {
+    grid-area: acts;
+    margin-top: 0;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .home__acts > .primary {
+    flex: 1 1 auto;
+  }
+
+  .home__acts > .home__claude {
+    width: 210px;
+    flex: 0 0 auto;
+  }
+
+}

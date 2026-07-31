@@ -1,10 +1,19 @@
 import SwiftUI
 import AVFoundation
 
-/// 01A · PAIRING · WAITING and 01B · PAIRING · EXCHANGING.
+/// 01 · PAIRING and 02 · EXCHANGING KEYS.
 ///
 /// A handshake, not a login: two named machines agreeing to trust each other.
 /// No account, no password field, no branding.
+///
+/// Nightshift restructured this screen more than any other. It used to be a
+/// machine-pair graphic, six boxes, a scan button, two address fields and a
+/// discovery line — five things competing to be read first, four of which are
+/// usually already correct. It is now one hero and one target card: the six
+/// digits are the whole top of the screen, and everything about *where* they are
+/// being sent collapses into a single card that states the answer and offers
+/// EDIT. The fields still exist; they are just no longer the first thing between
+/// the user and the code they are holding in their head.
 struct PairingView: View {
     @Environment(AppModel.self) private var model
 
@@ -17,7 +26,13 @@ struct PairingView: View {
     @State private var steps: [ExchangeStep] = ExchangeStep.initial
     @State private var errorText: String?
     @State private var showScanner = false
+    @State private var editingTarget = false
+    @State private var secondsLeft = 60
     @FocusState private var codeFieldFocused: Bool
+
+    /// The host rotates the pairing code on this cadence, and the dial reports
+    /// it.
+    private static let rotationSeconds = 60
 
     var body: some View {
         ScreenBody(scrolls: true) {
@@ -34,57 +49,64 @@ struct PairingView: View {
             }
         }
         .task { await probeLoop() }
+        .task { await rotationLoop() }
     }
 
-    // MARK: 01A — waiting
+    // MARK: 01 — waiting
 
     private var waitingBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MonoCaps("VibeWire", size: 13, color: LG.Color.textTertiary, tracking: 4.4, weight: .medium)
-                .padding(.top, 12)
+            MonoCaps(
+                "VibeWire",
+                size: 11,
+                color: NS.Color.textSecondary,
+                tracking: 3.5,
+                weight: .medium
+            )
+            .frame(minHeight: 34, alignment: .leading)
 
-            machinePair(active: false)
-                .padding(.top, 46)
+            DisplayTitle("Six digits\nfrom the menu bar.")
+                .padding(.top, 44)
 
-            Text("Type the six digits\non your Mac.")
-                .font(LG.Font.sans(27))
-                .foregroundStyle(LG.Color.text)
-                .padding(.top, 34)
+            MonoCaps("MENU BAR → VIBEWIRE → PAIR", size: 10, tracking: 1.6)
+                .padding(.top, 14)
 
-            VStack(alignment: .leading, spacing: 2) {
-                MonoCaps("MENU BAR → VIBEWIRE → PAIR", size: 11, tracking: 0.4, weight: .regular)
-                HStack(spacing: 4) {
-                    MonoCaps("CODE ROTATES EVERY", size: 11, tracking: 0.4)
-                    MonoCaps("60S", size: 11, color: LG.Color.amber, tracking: 0.4)
-                }
+            codeBoxes.padding(.top, 34)
+
+            HStack(spacing: 9) {
+                RotatesIn(fraction: Double(secondsLeft) / Double(Self.rotationSeconds))
+                MonoCaps("ROTATES IN", size: 9, tracking: 1.4)
+                MonoCaps("\(secondsLeft)S", size: 9, color: NS.Color.amber, tracking: 1.4)
             }
-            .padding(.top, 12)
-
-            codeBoxes
-                .padding(.top, 30)
+            .padding(.top, 16)
 
             if let errorText {
                 Text(errorText)
-                    .font(LG.Font.sans(13))
-                    .foregroundStyle(LG.Color.red)
-                    .multilineTextAlignment(.center)
+                    .font(NS.Font.sans(13))
+                    .foregroundStyle(NS.Color.red)
                     // Transport failures carry a domain and code; they must not
                     // be truncated to the half that says nothing.
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
-                    .padding(.top, 14)
+                    .padding(.top, 16)
             }
 
-            Hairline().padding(.top, 26)
+            targetCard.padding(.top, 30)
 
-            scanRow.padding(.top, 26)
+            SectionLabel("OTHER WAYS IN").padding(.top, 26)
 
-            addressRow.padding(.top, 20)
+            scanRow.padding(.top, 10)
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 16)
 
-            discoveryLine
-                .padding(.bottom, 20)
+            MonoCaps(
+                "NO ACCOUNT. NO PASSWORD.\nTHE MAC KEEPS A PUBLIC KEY AND NOTHING REPLAYABLE.",
+                size: 9,
+                color: NS.Color.textFaint,
+                tracking: 1.4
+            )
+            .lineSpacing(5)
+            .padding(.bottom, 20)
         }
     }
 
@@ -110,9 +132,9 @@ struct PairingView: View {
             .textContentType(.oneTimeCode)
             .focused($codeFieldFocused)
             .opacity(0.01)
-            .frame(minHeight: 64)
+            .frame(minHeight: 84)
 
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 ForEach(0..<6, id: \.self) { index in
                     codeBox(index: index)
                 }
@@ -127,28 +149,132 @@ struct PairingView: View {
     private func codeBox(index: Int) -> some View {
         let isActive = index == focusedIndex && codeFieldFocused
         let value = digits[index]
-        // A maximum, not a fixed width. Six 48pt boxes and five 9pt gaps need
-        // 333pt; an iPhone SE offers 327pt inside the gutter, so the row
-        // overflowed the app's very first screen by 6pt. Letting the boxes take
-        // an equal share of whatever is there costs nothing on a wider phone
-        // and fits on a narrow one.
-        return RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
-            .fill(isActive ? LG.Color.cyan.opacity(0.08) : LG.Color.panel)
-            .frame(maxWidth: 48)
-            .frame(minHeight: 64)
-            .overlay(
-                RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
-                    .stroke(isActive ? LG.Color.cyan : LG.Color.hairline, lineWidth: 1)
+        // The boxes take an equal share of whatever width is there: six fixed
+        // boxes and five gaps overflowed the app's very first screen on the
+        // narrowest phone it targets.
+        return RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+            .fill(
+                isActive
+                    ? NS.Color.accent.opacity(0.12)
+                    : (value.isEmpty ? NS.Color.raised : NS.Color.raised2)
             )
+            .frame(maxWidth: .infinity)
+            .frame(height: 84)
             .overlay {
-                if value.isEmpty {
-                    if isActive { Caret() }
-                } else {
-                    Text(value)
-                        .font(LG.Font.mono(27))
-                        .foregroundStyle(LG.Color.text)
+                if isActive {
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                        .stroke(NS.Color.accent, lineWidth: 1.5)
                 }
             }
+            .overlay {
+                if value.isEmpty {
+                    if isActive { Caret(height: 30) }
+                } else {
+                    Text(value)
+                        .font(NS.Font.mono(30))
+                        .foregroundStyle(NS.Color.text)
+                }
+            }
+    }
+
+    /// Where the six digits are about to go.
+    ///
+    /// One card doing what a status line and two labelled fields used to do
+    /// between them. Discovery is reported in its own header — if the Mac were
+    /// not there, this says so rather than accepting six digits into a void —
+    /// and the address is a value to read, not a field to fill, until EDIT says
+    /// otherwise.
+    private var targetCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 9) {
+                    Group {
+                        if discovery.square {
+                            Rectangle().fill(discovery.tone)
+                        } else {
+                            Circle().fill(discovery.tone)
+                        }
+                    }
+                    .frame(width: 7, height: 7)
+
+                    MonoCaps(
+                        discovery.text,
+                        size: 9,
+                        color: discovery.tone,
+                        tracking: 1.6,
+                        weight: .medium
+                    )
+                    Spacer(minLength: 8)
+                    Button {
+                        withAnimation(NS.Motion.stateChange) { editingTarget.toggle() }
+                    } label: {
+                        MonoCaps(
+                            editingTarget ? "DONE" : "EDIT",
+                            size: 9,
+                            color: NS.Color.accent,
+                            tracking: 1.4
+                        )
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: NS.Metric.minimumTarget)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, -12)
+                    .accessibilityLabel("Edit the Mac’s address")
+                }
+
+                if editingTarget {
+                    HStack(spacing: 8) {
+                        TextField("192.168.1.24 or mac.tailnet.ts.net", text: $address)
+                            .font(NS.Font.mono(13))
+                            .foregroundStyle(NS.Color.text)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: NS.Metric.minimumTarget)
+                            .background(
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                                    .fill(NS.Color.raised2)
+                            )
+
+                        TextField("8787", text: $port)
+                            .font(NS.Font.mono(13))
+                            .foregroundStyle(NS.Color.text)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 72)
+                            .frame(minHeight: NS.Metric.minimumTarget)
+                            .background(
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                                    .fill(NS.Color.raised2)
+                            )
+                    }
+                } else {
+                    Text(address.isEmpty ? "No address" : "\(address):\(port)")
+                        .font(NS.Font.mono(14))
+                        .foregroundStyle(NS.Color.text)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                MonoCaps("THE CODE AND THE KEYS GO TO THIS ADDRESS ONLY", size: 9, tracking: 1)
+                    .lineSpacing(3)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 16)
+            .padding(.bottom, 18)
+        }
+    }
+
+    private var discovery: (text: String, tone: Color, square: Bool) {
+        if let probeMillis {
+            return ("HOST FOUND · \(Int(probeMillis)) MS", NS.Color.green, false)
+        }
+        if address.isEmpty {
+            return ("NO ADDRESS YET", NS.Color.textTertiary, false)
+        }
+        return ("NOTHING ANSWERING", NS.Color.red, true)
     }
 
     private var scanRow: some View {
@@ -156,199 +282,97 @@ struct PairingView: View {
             showScanner = true
         } label: {
             HStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: LG.Metric.radiusHairline)
-                    .fill(LG.Color.textSecondary.opacity(0.35))
-                    .frame(width: 30, height: 30)
+                RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                    .fill(NS.Color.raised2)
+                    .frame(width: 34, height: 34)
                     .overlay(
                         Image(systemName: "qrcode")
-                            .font(.system(size: 18))
-                            .foregroundStyle(LG.Color.textSecondary)
+                            .font(.system(size: 17))
+                            .foregroundStyle(NS.Color.textSecondary)
                     )
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Scan the QR instead")
-                        .font(LG.Font.sans(15))
-                        .foregroundStyle(LG.Color.text)
-                    MonoCaps("OPENS CAMERA · SAME HANDSHAKE", size: 10, tracking: 1.2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Scan the QR on the Mac")
+                        .font(NS.Font.sans(15, weight: .medium))
+                        .tracking(-0.2)
+                        .foregroundStyle(NS.Color.text)
+                    MonoCaps("OPENS CAMERA · SAME HANDSHAKE", size: 9, tracking: 1)
                 }
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .frame(minHeight: 60)
+            .padding(.vertical, 12)
+            .frame(minHeight: NS.Metric.primaryAction)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: LG.Metric.radiusMedium).fill(LG.Color.panel)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
-                    .stroke(LG.Color.hairline, lineWidth: 1)
+                RoundedRectangle(cornerRadius: NS.Metric.radiusCard).fill(NS.Color.raised)
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Scan the QR code instead")
+        .accessibilityLabel("Scan the QR code")
         .accessibilityHint("Opens the camera. Same handshake as typing the code.")
     }
 
-    private var addressRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MonoCaps("MAC ADDRESS", size: 10)
-            HStack(spacing: 8) {
-                TextField("192.168.1.24 or mac.tailnet.ts.net", text: $address)
-                    .font(LG.Font.mono(13))
-                    .foregroundStyle(LG.Color.text)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusSmall).fill(LG.Color.panel)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
-                            .stroke(LG.Color.hairline, lineWidth: 1)
-                    )
+    // MARK: 02 — exchanging
 
-                TextField("8787", text: $port)
-                    .font(LG.Font.mono(13))
-                    .foregroundStyle(LG.Color.text)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 68, height: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusSmall).fill(LG.Color.panel)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
-                            .stroke(LG.Color.hairline, lineWidth: 1)
-                    )
-            }
-        }
-    }
-
-    /// Discovery is reported before the user types. If the Mac were not there,
-    /// this line says so instead of accepting six digits into a void.
-    private var discoveryLine: some View {
-        HStack(spacing: 10) {
-            if let probeMillis {
-                Circle().fill(LG.Color.green).frame(width: 6, height: 6)
-                MonoCaps(
-                    "HOST FOUND · \(Int(probeMillis)) MS",
-                    size: 10,
-                    color: LG.Color.textTertiary,
-                    tracking: 1.2
-                )
-            } else if address.isEmpty {
-                Circle().fill(LG.Color.textDisabled).frame(width: 6, height: 6)
-                MonoCaps("ENTER THE MAC'S ADDRESS TO BEGIN", size: 10, tracking: 1.2)
-            } else {
-                Circle().fill(LG.Color.red).frame(width: 6, height: 6)
-                MonoCaps("NOTHING ANSWERING AT THAT ADDRESS", size: 10, color: LG.Color.red, tracking: 1.2)
-            }
-        }
-    }
-
-    // MARK: 01B — exchanging
-
+    /// Four named steps with real values rather than one indeterminate spinner.
+    /// If step three fails, the failure has an address.
+    ///
+    /// The digits stay on screen and go dim: the code has been accepted and is
+    /// no longer something to act on, but removing it mid-handshake makes the
+    /// screen look like it started over.
     private var exchangingBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MonoCaps("VibeWire", size: 13, color: LG.Color.textTertiary, tracking: 4.4, weight: .medium)
-                .padding(.top, 12)
+            MonoCaps(
+                "VibeWire",
+                size: 11,
+                color: NS.Color.textSecondary,
+                tracking: 3.5,
+                weight: .medium
+            )
+            .frame(minHeight: 34, alignment: .leading)
 
-            machinePair(active: true)
-                .padding(.top, 46)
+            DisplayTitle("Trading keys.")
+                .padding(.top, 44)
 
-            Text("Trading keys.")
-                .font(LG.Font.sans(27))
-                .foregroundStyle(LG.Color.text)
-                .padding(.top, 34)
+            MonoCaps("CODE ACCEPTED · KEEP BOTH DEVICES AWAKE", size: 10, tracking: 1.6)
+                .padding(.top, 14)
 
-            MonoCaps("CODE ACCEPTED · KEEP BOTH DEVICES AWAKE", size: 11, tracking: 0.4)
-                .padding(.top, 12)
-
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 ForEach(0..<6, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
-                        .fill(LG.Color.chrome)
-                        // Same share-the-width rule as the entry boxes, so the
-                        // digits do not jump when the screen swaps to this one.
-                        .frame(maxWidth: 48)
-                        .frame(minHeight: 64)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: LG.Metric.radiusSmall)
-                                .stroke(LG.Color.stroke, lineWidth: 1)
-                        )
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                        .fill(NS.Color.raised)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 84)
                         .overlay(
                             Text(digits[index])
-                                .font(LG.Font.mono(27))
-                                .foregroundStyle(LG.Color.text)
+                                .font(NS.Font.mono(30))
+                                .foregroundStyle(NS.Color.textTertiary)
                         )
-                }
-            }
-            .padding(.top, 30)
-
-            // Four named steps with real values rather than one indeterminate
-            // spinner. If step three fails, the failure has an address.
-            VStack(spacing: 0) {
-                ForEach(steps) { step in
-                    ExchangeStepRow(step: step)
                 }
             }
             .padding(.top, 34)
 
-            Spacer()
+            VStack(spacing: NS.Metric.groupGap) {
+                ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                    ExchangeStepRow(
+                        step: step,
+                        position: GroupPosition.at(index, of: steps.count)
+                    )
+                }
+            }
+            .padding(.top, 34)
+
+            Spacer(minLength: 16)
 
             MonoCaps(
                 "PAIRING TRAFFIC STAYS ON THE PATH YOU CHOSE.\nYOU WILL NOT SEE THIS SCREEN AGAIN.",
-                size: 10,
-                tracking: 1.2
+                size: 9,
+                color: NS.Color.textFaint,
+                tracking: 1.4
             )
             .lineSpacing(5)
             .padding(.bottom, 20)
         }
-    }
-
-    private func machinePair(active: Bool) -> some View {
-        HStack(spacing: 10) {
-            machineTile(
-                glyph: RoundedRectangle(cornerRadius: 3)
-                    .stroke(active ? LG.Color.cyan : LG.Color.textSecondary, lineWidth: 1)
-                    .frame(width: 16, height: 26),
-                caption: "THIS",
-                active: active
-            )
-
-            ZStack {
-                if active {
-                    Rectangle().fill(LG.Color.cyan).frame(height: 1)
-                } else {
-                    TravellingDot()
-                }
-            }
-            .frame(maxWidth: .infinity)
-
-            machineTile(
-                glyph: RoundedRectangle(cornerRadius: 2)
-                    .stroke(active ? LG.Color.cyan : LG.Color.textSecondary, lineWidth: 1)
-                    .frame(width: 30, height: 20),
-                caption: "MAC",
-                active: active
-            )
-        }
-    }
-
-    private func machineTile(glyph: some View, caption: String, active: Bool) -> some View {
-        VStack(spacing: 5) {
-            glyph
-            MonoCaps(caption, size: 9, color: active ? LG.Color.cyan : LG.Color.textTertiary, tracking: 0.8)
-        }
-        .frame(width: 64, height: 64)
-        .background(
-            RoundedRectangle(cornerRadius: LG.Metric.radiusLarge)
-                .fill(active ? LG.Color.cyan.opacity(0.10) : LG.Color.chrome)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: LG.Metric.radiusLarge)
-                .stroke(active ? LG.Color.cyan : LG.Color.stroke, lineWidth: 1)
-        )
     }
 
     // MARK: Actions
@@ -361,6 +385,7 @@ struct PairingView: View {
         guard !isExchanging else { return }
         guard !address.isEmpty, let portValue = Int(port) else {
             errorText = "Enter the Mac's address first."
+            editingTarget = true
             return
         }
         errorText = nil
@@ -391,7 +416,7 @@ struct PairingView: View {
 
     private func advance(_ index: Int, _ state: ExchangeStep.State, detail: String? = nil) {
         guard steps.indices.contains(index) else { return }
-        withAnimation(LG.Motion.stateChange) {
+        withAnimation(NS.Motion.stateChange) {
             steps[index].state = state
             if let detail { steps[index].detail = detail }
         }
@@ -428,6 +453,18 @@ struct PairingView: View {
             try? await Task.sleep(for: .seconds(2))
         }
     }
+
+    /// The dial reports the host's rotation cadence, not a countdown this client
+    /// started — nothing here knows when the Mac last turned the code over, so
+    /// it says "there is about this much of a window left", which is the only
+    /// honest version of the fact.
+    private func rotationLoop() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            guard !isExchanging else { continue }
+            secondsLeft = secondsLeft <= 1 ? Self.rotationSeconds : secondsLeft - 1
+        }
+    }
 }
 
 // MARK: - Exchange steps
@@ -443,154 +480,61 @@ struct ExchangeStep: Identifiable, Equatable {
     static let initial: [ExchangeStep] = [
         ExchangeStep(id: 0, title: "HOST VERIFIED", detail: "—", state: .pending),
         ExchangeStep(id: 1, title: "KEYS EXCHANGED", detail: "—", state: .pending),
-        ExchangeStep(id: 2, title: "STORING TRUST IN KEYCHAIN", detail: "—", state: .pending),
+        ExchangeStep(id: 2, title: "STORING TRUST", detail: "KEYCHAIN", state: .pending),
         ExchangeStep(id: 3, title: "FIRST FRAME", detail: "QUEUED", state: .pending),
     ]
+
+    var timelineState: TimelineState {
+        switch state {
+        case .pending: return .pending
+        case .running: return .running
+        case .done: return .done
+        case .failed: return .failed
+        }
+    }
 }
 
 struct ExchangeStepRow: View {
     let step: ExchangeStep
+    let position: GroupPosition
 
     var body: some View {
         HStack(spacing: 14) {
-            marker
+            TimelineMark(state: step.timelineState, size: 20, ground: .clear)
             MonoCaps(
                 step.title,
-                size: 12,
-                color: step.state == .pending ? LG.Color.textTertiary : LG.Color.textSecondary,
+                size: 11,
+                color: titleColor,
                 tracking: 1.2
             )
-            Spacer(minLength: 0)
-            MonoCaps(step.detail, size: 11, color: detailColor, tracking: 0)
+            Spacer(minLength: 8)
+            MonoCaps(step.detail, size: 10, color: detailColor, tracking: 0)
         }
-        .frame(minHeight: 52)
-        .overlay(alignment: .bottom) {
-            if step.id != 3 { Hairline() }
+        .padding(.horizontal, 18)
+        .frame(minHeight: 64)
+        .groupedRow(
+            position,
+            background: step.state == .running
+                ? NS.Color.accent.opacity(0.10)
+                : NS.Color.raised
+        )
+    }
+
+    private var titleColor: Color {
+        switch step.state {
+        case .pending: return NS.Color.textTertiary
+        case .running: return NS.Color.text
+        default: return NS.Color.textSecondary
         }
     }
 
     private var detailColor: Color {
         switch step.state {
-        case .running: return LG.Color.cyan
-        case .failed: return LG.Color.red
-        default: return LG.Color.textTertiary
+        case .running: return NS.Color.accent
+        case .failed: return NS.Color.red
+        case .done: return NS.Color.textSecondary
+        case .pending: return NS.Color.textFaint
         }
-    }
-
-    @ViewBuilder
-    private var marker: some View {
-        switch step.state {
-        case .done:
-            Circle()
-                .stroke(LG.Color.green, lineWidth: 1)
-                .frame(width: 18, height: 18)
-                .overlay(
-                    Text("✓").font(.system(size: 11)).foregroundStyle(LG.Color.green)
-                )
-        case .running:
-            Spinner(color: LG.Color.cyan).frame(width: 18, height: 18)
-        case .failed:
-            Circle()
-                .stroke(LG.Color.red, lineWidth: 1)
-                .frame(width: 18, height: 18)
-                .overlay(
-                    Text("✕").font(.system(size: 10)).foregroundStyle(LG.Color.red)
-                )
-        case .pending:
-            Circle()
-                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                .foregroundStyle(LG.Color.stroke)
-                .frame(width: 18, height: 18)
-        }
-    }
-}
-
-// MARK: - Small animated pieces
-
-struct Caret: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var visible = true
-
-    var body: some View {
-        Rectangle()
-            .fill(LG.Color.cyan)
-            .frame(width: 2, height: 26)
-            .opacity(visible ? 1 : 0)
-            .onAppear {
-                // Still, the caret still marks the caret's position — which is
-                // the only thing it was ever there to say.
-                guard let blink = LG.Motion.linearLoop(1.1, reduced: reduceMotion) else {
-                    visible = true
-                    return
-                }
-                withAnimation(blink) { visible.toggle() }
-            }
-    }
-}
-
-/// The one loop that keeps running under Reduce Motion.
-///
-/// A small rotating arc is not a vestibular trigger, and iOS keeps its own
-/// `ProgressView` turning under the setting for the same reason. A frozen
-/// spinner would say the host had stopped answering — a claim about the Mac
-/// that nothing measured, which is exactly what this app refuses to make.
-struct Spinner: View {
-    var color: Color = LG.Color.cyan
-    @State private var angle: Double = 0
-
-    var body: some View {
-        Circle()
-            .trim(from: 0, to: 0.75)
-            .stroke(color, style: StrokeStyle(lineWidth: 1, lineCap: .round))
-            .rotationEffect(.degrees(angle))
-            .onAppear {
-                withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
-                    angle = 360
-                }
-            }
-    }
-}
-
-/// The only motion on the waiting screen: one dot travelling the dashed line
-/// between the two named machines.
-///
-/// It is also the one piece of motion here that crosses the whole screen, so
-/// it is the one Reduce Motion most clearly means. Travel is replaced by a dot
-/// resting at the midpoint of the line: the wire is still drawn, the two
-/// machines are still joined, and the discovery line underneath was always the
-/// part that said in words whether anything answered.
-struct TravellingDot: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var progress: CGFloat = 0
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(height: 1)
-                    .overlay(
-                        Rectangle()
-                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                            .foregroundStyle(LG.Color.stroke)
-                    )
-                Circle()
-                    .fill(LG.Color.green)
-                    .frame(width: 5, height: 5)
-                    .offset(x: progress * geometry.size.width)
-                    // The fade at either end hides the dot as it wraps. A
-                    // resting dot must not inherit that, or it vanishes.
-                    .opacity(reduceMotion || (progress > 0.02 && progress < 0.98) ? 1 : 0)
-            }
-            .onAppear {
-                guard let travel = LG.Motion.linearLoop(2.2, reduced: reduceMotion) else {
-                    progress = 0.5
-                    return
-                }
-                withAnimation(travel) { progress = 1 }
-            }
-        }
-        .frame(height: 6)
     }
 }
 
@@ -614,7 +558,9 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.043, green: 0.051, blue: 0.063, alpha: 1)
+        // The Nightshift `deep`, so the camera sheet arrives on the same ground
+        // as the rest of the app rather than on a black rectangle.
+        view.backgroundColor = UIColor(red: 0.024, green: 0.027, blue: 0.039, alpha: 1)
 
         guard let device = AVCaptureDevice.default(for: .video),
               let input = try? AVCaptureDeviceInput(device: device),

@@ -26,7 +26,7 @@ struct SettingsView: View {
                         MonoCaps(
                             "VIBEWIRE \(model.settings.appVersion) · HOST \(model.settings.hostVersion) · NO ACCOUNT, NO CLOUD",
                             size: 9,
-                            color: LG.Color.textTertiary,
+                            color: NS.Color.textTertiary,
                             tracking: 1.2
                         )
                         .padding(.top, 10)
@@ -51,8 +51,8 @@ struct SettingsView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text("Settings")
-                .font(LG.Font.sans(22, weight: .medium))
-                .foregroundStyle(LG.Color.text)
+                .font(NS.Font.sans(22, weight: .medium))
+                .foregroundStyle(NS.Color.text)
 
             Spacer()
 
@@ -76,27 +76,28 @@ struct SettingsView: View {
     // MARK: Paired
 
     private var pairedDevices: some View {
-        VStack(spacing: 0) {
-            ForEach(model.devices) { device in
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: device.kind == "tablet" ? 2 : 3)
-                        .stroke(device.isThisDevice ? LG.Color.cyan : LG.Color.textTertiary, lineWidth: 1)
+        VStack(spacing: NS.Metric.groupGap) {
+            ForEach(Array(model.devices.enumerated()), id: \.element.id) { index, device in
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: device.kind == "tablet" ? 2 : 4)
+                        .stroke(device.isThisDevice ? NS.Color.accent : NS.Color.textTertiary, lineWidth: 1)
                         .frame(
-                            width: device.kind == "tablet" ? 28 : 20,
-                            height: device.kind == "tablet" ? 22 : 30
+                            width: device.kind == "tablet" ? 27 : 19,
+                            height: device.kind == "tablet" ? 21 : 28
                         )
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(device.name)
-                            .font(LG.Font.sans(15))
-                            .foregroundStyle(LG.Color.text)
+                            .font(NS.Font.sans(15, weight: .medium))
+                            .tracking(-0.2)
+                            .foregroundStyle(NS.Color.text)
                         MonoCaps(
                             device.isThisDevice
                                 ? "THIS DEVICE · PAIRED \(shortDate(device.pairedAt))"
                                 : lastSeenLabel(device),
                             size: 9,
-                            color: device.isThisDevice ? LG.Color.cyan : LG.Color.textTertiary,
-                            tracking: 1.2
+                            color: device.isThisDevice ? NS.Color.accent : NS.Color.textTertiary,
+                            tracking: 1
                         )
                     }
 
@@ -106,19 +107,26 @@ struct SettingsView: View {
                         Button {
                             model.showRevokeConfirm = .device(device)
                         } label: {
-                            MonoCaps("REVOKE", size: 10, color: LG.Color.red, tracking: 1)
-                                .padding(.horizontal, 14)
-                                .frame(minHeight: 44)
+                            MonoCaps("REVOKE", size: 9, color: NS.Color.red, tracking: 1.2)
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 38)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(LG.Color.red.opacity(0.4), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                                        .stroke(NS.Color.red.opacity(0.4), lineWidth: 1)
                                 )
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .frame(minHeight: 50)
-                .overlay(alignment: .bottom) { Hairline(color: LG.Color.chrome) }
+                .padding(.horizontal, 16)
+                .frame(minHeight: NS.Metric.row)
+                .groupedRow(
+                    GroupPosition.at(index, of: model.devices.count),
+                    background: device.isThisDevice
+                        ? NS.Color.accent.opacity(0.12)
+                        : NS.Color.raised
+                )
             }
 
             if model.devices.isEmpty {
@@ -177,7 +185,7 @@ struct SettingsView: View {
             HStack {
                 MonoCaps(nowLabel, size: 9, tracking: 1.2)
                 Spacer()
-                MonoCaps("DROPS ON ITS OWN", size: 9, color: LG.Color.textSecondary, tracking: 1.2)
+                MonoCaps("DROPS ON ITS OWN", size: 9, color: NS.Color.textSecondary, tracking: 1.2)
             }
 
             SettingRow(
@@ -203,10 +211,10 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Sensitivity")
-                    .font(LG.Font.sans(15))
-                    .foregroundStyle(LG.Color.text)
+                    .font(NS.Font.sans(15))
+                    .foregroundStyle(NS.Color.text)
                 Spacer()
-                MonoCaps("\(model.settings.sensitivity) / 8", size: 11, color: LG.Color.cyan, tracking: 0)
+                MonoCaps("\(model.settings.sensitivity) / 8", size: 11, color: NS.Color.accent, tracking: 0)
             }
 
             // Eight ticks rather than a continuous slider, because a thumb can
@@ -217,7 +225,7 @@ struct SettingsView: View {
                         model.setSetting("sensitivity", tick)
                     } label: {
                         Rectangle()
-                            .fill(tick <= model.settings.sensitivity ? LG.Color.cyan : LG.Color.stroke)
+                            .fill(tick <= model.settings.sensitivity ? NS.Color.accent : NS.Color.stroke)
                             .frame(width: 4, height: 10 + CGFloat(tick - 1) * 4)
                             .frame(width: 22, height: 44)
                             .contentShape(Rectangle())
@@ -271,12 +279,12 @@ struct SettingsView: View {
                     set: { model.setSetting("requireBiometricEachSession", $0) }
                 )
             )
-            .overlay(alignment: .bottom) { Hairline(color: LG.Color.chrome) }
+            .overlay(alignment: .bottom) { Hairline(color: NS.Color.raised2) }
 
             SettingRow(
                 title: "Relay over internet",
                 subtitle: relaySubtitle,
-                subtitleColor: model.settings.relayOverInternet ? LG.Color.amber : LG.Color.textTertiary,
+                subtitleColor: model.settings.relayOverInternet ? NS.Color.amber : NS.Color.textTertiary,
                 isOn: Binding(
                     get: { model.settings.relayOverInternet },
                     set: { model.setSetting("relayOverInternet", $0) }
@@ -306,18 +314,18 @@ struct SettingsView: View {
         } label: {
             HStack {
                 Text("Revoke every device")
-                    .font(LG.Font.sans(15))
-                    .foregroundStyle(LG.Color.red)
+                    .font(NS.Font.sans(15))
+                    .foregroundStyle(NS.Color.red)
                 Spacer()
                 // Solid, not 70%: the count is the scale of what the tap
                 // destroys, and the faded version read at 3.4:1.
-                MonoCaps("\(model.devices.count) KEYS", size: 9, color: LG.Color.red, tracking: 1.2)
+                MonoCaps("\(model.devices.count) KEYS", size: 9, color: NS.Color.red, tracking: 1.2)
             }
             .padding(.horizontal, 18)
             .frame(minHeight: 54)
             .overlay(
-                RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
-                    .stroke(LG.Color.red.opacity(0.4), lineWidth: 1)
+                RoundedRectangle(cornerRadius: NS.Metric.radiusCard)
+                    .stroke(NS.Color.red.opacity(0.4), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -327,21 +335,21 @@ struct SettingsView: View {
 struct SettingRow: View {
     let title: String
     var subtitle: String?
-    var subtitleColor: Color = LG.Color.textTertiary
+    var subtitleColor: Color = NS.Color.textTertiary
     @Binding var isOn: Bool
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(LG.Font.sans(15))
-                    .foregroundStyle(LG.Color.text)
+                    .font(NS.Font.sans(15))
+                    .foregroundStyle(NS.Color.text)
                 if let subtitle {
                     MonoCaps(subtitle, size: 9, color: subtitleColor, tracking: 1.2)
                 }
             }
             Spacer(minLength: 8)
-            LGToggle(isOn: $isOn)
+            NSToggle(isOn: $isOn)
         }
         .frame(minHeight: 50)
     }
@@ -377,15 +385,15 @@ struct RevokeConfirmSheet: View {
         switch target {
         case .device:
             return [
-                ("Any live session from that device ends inside 1s.", LG.Color.red),
-                ("Pairing again needs physical access to the Mac.", LG.Color.red),
-                ("This iPhone keeps working. Nothing else changes.", LG.Color.textTertiary),
+                ("Any live session from that device ends inside 1s.", NS.Color.red),
+                ("Pairing again needs physical access to the Mac.", NS.Color.red),
+                ("This iPhone keeps working. Nothing else changes.", NS.Color.textTertiary),
             ]
         case .everything:
             return [
-                ("Every live session ends inside 1s.", LG.Color.red),
-                ("This iPhone is included. You will be signed out.", LG.Color.red),
-                ("Pairing again needs physical access to the Mac.", LG.Color.red),
+                ("Every live session ends inside 1s.", NS.Color.red),
+                ("This iPhone is included. You will be signed out.", NS.Color.red),
+                ("Pairing again needs physical access to the Mac.", NS.Color.red),
             ]
         }
     }
@@ -423,25 +431,28 @@ struct RevokeConfirmSheet: View {
             Spacer()
             VStack(alignment: .leading, spacing: 18) {
                 Capsule()
-                    .fill(LG.Color.stroke)
+                    .fill(NS.Color.stroke)
                     .frame(width: 46, height: 4)
                     .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    MonoCaps(title, size: 10, color: LG.Color.red, tracking: 1.8)
+                    MonoCaps(title, size: 10, color: NS.Color.red, tracking: 1.8)
                     Text(headline)
-                        .font(LG.Font.sans(24))
-                        .foregroundStyle(LG.Color.text)
+                        .font(NS.Font.sans(24, weight: .semibold))
+                        .tracking(-0.6)
+                        .foregroundStyle(NS.Color.text)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                VStack(spacing: 1) {
-                    ForEach(Array(consequences.enumerated()), id: \.offset) { _, line in
+                VStack(spacing: NS.Metric.groupGap) {
+                    ForEach(Array(consequences.enumerated()), id: \.offset) { index, line in
                         consequence(line.0, line.1)
+                            .groupedRow(
+                                GroupPosition.at(index, of: consequences.count),
+                                background: NS.Color.screenGround
+                            )
                     }
                 }
-                .background(LG.Color.chrome)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(spacing: 9) {
                     Button {
@@ -451,24 +462,28 @@ struct RevokeConfirmSheet: View {
                         }
                     } label: {
                         Text(confirmLabel)
-                            .font(LG.Font.sans(17, weight: .medium))
-                            .foregroundStyle(LG.Color.onRed)
+                            .font(NS.Font.sans(17, weight: .medium))
+                            .foregroundStyle(NS.Color.onRed)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 60)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(LG.Color.red))
+                            .background(
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                    .fill(NS.Color.red)
+                            )
                     }
                     .buttonStyle(.plain)
 
                     Button {
                         model.showRevokeConfirm = nil
                     } label: {
-                        MonoCaps(cancelLabel, size: 11, color: LG.Color.textSecondary, tracking: 1.2)
+                        MonoCaps(cancelLabel, size: 10, color: NS.Color.textSecondary, tracking: 1.4)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 52)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(LG.Color.hairline, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                    .stroke(NS.Color.stroke, lineWidth: 1)
                             )
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -476,7 +491,7 @@ struct RevokeConfirmSheet: View {
                 MonoCaps(
                     "HOST WILL LOG: REVOKED · \(auditSubject) · \(auditNoun) DELETED",
                     size: 9,
-                    color: LG.Color.textTertiary,
+                    color: NS.Color.textFaint,
                     tracking: 1.2
                 )
                 .frame(maxWidth: .infinity)
@@ -485,30 +500,33 @@ struct RevokeConfirmSheet: View {
             .padding(.top, 26)
             .padding(.bottom, 44)
             .background(
-                UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18)
-                    .fill(LG.Color.raised)
+                UnevenRoundedRectangle(
+                    topLeadingRadius: NS.Metric.radiusDrawer,
+                    topTrailingRadius: NS.Metric.radiusDrawer
+                )
+                .fill(NS.Color.raised)
             )
             .overlay(alignment: .top) {
-                Rectangle().fill(LG.Color.red.opacity(0.34)).frame(height: 1)
+                Rectangle().fill(NS.Color.red.opacity(0.34)).frame(height: 1)
             }
         }
         .ignoresSafeArea(edges: .bottom)
-        .transition(LG.Motion.rise(reduced: reduceMotion))
+        .transition(NS.Motion.rise(reduced: reduceMotion))
     }
 
     private func consequence(_ text: String, _ arrowColor: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 11) {
             Text("→")
-                .font(LG.Font.mono(10))
+                .font(NS.Font.mono(10))
                 .foregroundStyle(arrowColor)
             Text(text)
-                .font(LG.Font.sans(14))
-                .foregroundStyle(arrowColor == LG.Color.textTertiary ? LG.Color.textSecondary : LG.Color.text)
+                .font(NS.Font.sans(14))
+                .foregroundStyle(arrowColor == NS.Color.textTertiary ? NS.Color.textSecondary : NS.Color.text)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 13)
-        .background(LG.Color.screenGround)
+        .background(NS.Color.screenGround)
     }
 }

@@ -1,6 +1,6 @@
 import { render } from 'preact'
 
-import './design/longarm.css'
+import './design/nightshift.css'
 import { App } from './app/App'
 
 const root = document.getElementById('root')

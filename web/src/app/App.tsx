@@ -1,5 +1,6 @@
 /**
- * The root. Ported from ios/VibeWire/App/VibeWireApp.swift.
+ * The root, and 15 · SCREENSHOT FROM THE MAC.
+ * Mirrored by ios/VibeWire/App/VibeWireApp.swift.
  *
  * Three routes and two sheets, and deliberately absent: light mode, a tab bar, an
  * onboarding tour. The whole application is the screens in `../screens`.
@@ -8,7 +9,15 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { store } from './store'
-import { Caps, Spinner } from '../design/components'
+import {
+  Caps,
+  Display,
+  FilledAction,
+  ScreenBody,
+  SectionLabel,
+  SheetDismiss,
+  Spinner,
+} from '../design/components'
 import { decoderSupport } from '../video/renderer'
 import { ClaudePanel } from '../screens/ClaudePanel'
 import { Home } from '../screens/Home'
@@ -128,32 +137,34 @@ function Banner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
         right: 0,
         bottom: 0,
         zIndex: 70,
-        paddingInline: 'var(--gutter)',
+        paddingInline: 'calc(var(--gutter) + var(--safe-left)) calc(var(--gutter) + var(--safe-right))',
         paddingBottom: 'calc(20px + var(--safe-bottom))',
-        animation: 'lg-rise var(--state-change) ease-out',
+        animation: 'ns-rise var(--state-change) ease-out',
       }}
     >
       <div
-        class="row row--top"
-        style={{
-          gap: '12px',
-          maxWidth: 'var(--measure)',
-          marginInline: 'auto',
-          paddingLeft: '14px',
-          background: 'color-mix(in srgb, var(--lg-amber) 7%, transparent)',
-          borderLeft: '2px solid var(--lg-amber)',
-          backdropFilter: 'blur(6px)',
-        }}
+        class="row row--top card card--tinted"
+        style={
+          {
+            '--tint': 'var(--ns-amber)',
+            gap: '12px',
+            maxWidth: 'var(--measure)',
+            marginInline: 'auto',
+            paddingLeft: '16px',
+            background: 'color-mix(in srgb, var(--ns-raised) 92%, transparent)',
+            backdropFilter: 'blur(8px)',
+          } as Record<string, string>
+        }
       >
         <p
           class="wrap"
           style={{
             flex: '1 1 auto',
             margin: 0,
-            paddingBlock: '13px',
+            paddingBlock: '14px',
             fontSize: 'var(--fs-13)',
             lineHeight: 1.45,
-            color: 'var(--lg-on-amber-wash)',
+            color: 'var(--ns-on-amber-wash)',
           }}
         >
           {text}
@@ -165,7 +176,7 @@ function Banner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
             width: 'var(--target)',
             height: 'var(--target)',
             flex: '0 0 auto',
-            color: 'var(--lg-text-secondary)',
+            color: 'var(--ns-text-secondary)',
           }}
         >
           <span class="mono" style={{ fontSize: 'var(--fs-13)' }}>
@@ -178,103 +189,94 @@ function Banner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
 }
 
 /**
- * The screenshot the Mac sent.
+ * 15 · The screenshot the Mac sent.
  *
  * The phone put it straight on the pasteboard and said nothing, which a browser
  * cannot do: writing an image to the clipboard needs a permission that is refused
  * more often than granted, and refused silently. So the shot is shown, with the two
- * things that can actually be done with it.
+ * things that can actually be done with it — and the footnote says which of the two
+ * is likely to fail before it is tried.
  */
 function ScreenshotSheet() {
   const source = store.screenshot.value
   if (!source) return null
 
+  const display = store.selectedDisplay.value
+
   return (
     <div class="sheet" role="dialog" aria-label="Screenshot of the Mac" style={{ zIndex: 65 }}>
-      <div class="column" style={{ paddingBlock: 'var(--safe-top) 0' }}>
-        <div class="row" style={{ marginTop: '24px', flex: '0 0 auto' }}>
-          <Caps size="var(--fs-10)" tracking="0.2em">
-            SCREENSHOT
-          </Caps>
+      <ScreenBody>
+        <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
+          <SectionLabel>SCREENSHOT</SectionLabel>
           <span class="spacer" />
-          <button
-            onClick={() => (store.screenshot.value = null)}
-            style={{
-              minHeight: 'var(--target)',
-              paddingInline: '12px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <Caps size="var(--fs-11)" color="var(--lg-text-secondary)">
-              DONE
-            </Caps>
-          </button>
+          <SheetDismiss onClick={() => (store.screenshot.value = null)} />
         </div>
+
+        <Display level={26} style={{ marginTop: '14px', flex: '0 0 auto' }}>
+          The Mac’s screen,
+          <br />
+          a moment ago.
+        </Display>
+
+        <Caps size="var(--fs-9)" tracking="0.14em" style={{ marginTop: '10px', flex: '0 0 auto' }}>
+          {display ? `${display.name.toUpperCase()} · ${display.width} × ${display.height} · PNG` : 'PNG'}
+        </Caps>
 
         <div
           style={{
             flex: '1 1 auto',
             minHeight: 0,
-            marginTop: '14px',
+            marginTop: '18px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'var(--lg-deep)',
-            border: '1px solid var(--lg-hairline-dim)',
-            borderRadius: 'var(--radius-row)',
+            background: 'var(--ns-deep)',
+            borderRadius: 'var(--radius-card)',
             overflow: 'hidden',
           }}
         >
           <img
             src={source}
             alt="The Mac’s screen at the moment the shot was taken"
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+              display: 'block',
+            }}
           />
         </div>
 
-        <div
-          class="row"
-          style={{
-            gap: '9px',
-            paddingBlock: '16px',
-            paddingBottom: 'calc(16px + var(--safe-bottom))',
-            flex: '0 0 auto',
-          }}
-        >
+        <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
           <a
             href={source}
             download="vibewire-screenshot.png"
-            style={{
-              flex: '1 1 0',
-              minHeight: '52px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 'var(--radius-row)',
-              border: '1px solid var(--lg-hairline)',
-              textDecoration: 'none',
-            }}
+            class="outlined"
+            style={{ flex: '1 1 0', minHeight: '56px', textDecoration: 'none' }}
           >
-            <Caps size="var(--fs-11)" color="var(--lg-text-secondary)">
+            <Caps size="var(--fs-10)" tracking="0.14em" color="var(--ns-text-secondary)">
               SAVE PNG
             </Caps>
           </a>
-          <button
-            onClick={() => void copyImage(source)}
-            style={{
-              flex: '1 1 0',
-              minHeight: '52px',
-              borderRadius: 'var(--radius-row)',
-              border: '1px solid color-mix(in srgb, var(--lg-cyan) 45%, transparent)',
-            }}
-          >
-            <Caps size="var(--fs-11)" color="var(--lg-cyan)">
-              COPY IMAGE
-            </Caps>
-          </button>
+          <span style={{ flex: '1 1 0', display: 'flex' }}>
+            <FilledAction title="COPY IMAGE" height={56} onClick={() => void copyImage(source)} />
+          </span>
         </div>
-      </div>
+
+        <Caps
+          size="var(--fs-9)"
+          tracking="0.12em"
+          color="var(--ns-text-faint)"
+          style={{
+            marginTop: '12px',
+            paddingBottom: 'calc(16px + var(--safe-bottom))',
+            lineHeight: 1.7,
+            flex: '0 0 auto',
+          }}
+        >
+          {'A BROWSER USUALLY REFUSES A CLIPBOARD IMAGE WRITE.\nIF IT DOES, SAVE THE PNG INSTEAD.'}
+        </Caps>
+      </ScreenBody>
     </div>
   )
 }

@@ -15,7 +15,7 @@ struct ClaudePanelView: View {
     @FocusState private var composerFocused: Bool
 
     var body: some View {
-        ScreenBody(background: LG.Color.screenGround) {
+        ScreenBody(background: NS.Color.screenGround) {
             VStack(spacing: 0) {
                 grabber
                 modeSegment.padding(.top, 4)
@@ -32,18 +32,13 @@ struct ClaudePanelView: View {
             }
             .padding(.bottom, 8)
         }
-        .overlay(alignment: .bottom) {
-            if let permission = model.permission {
-                PermissionSheet(request: permission, waited: permissionAge)
-            }
-        }
-        // The sheet is a bottom overlay, so with the keyboard up it arrives
-        // underneath it: a tool sits waiting on an answer the user cannot see
-        // or reach. Typing gives way to the question.
+        // The composer gives way to the question: with the keyboard up, a
+        // prompt at the end of the transcript would arrive underneath it — a
+        // tool waiting on an answer the user cannot see or reach.
         .onChange(of: model.permission == nil) { _, noPermission in
             if !noPermission {
                 composerFocused = false
-                // The sheet arrives at the bottom of a scrolling transcript, so
+                // The card arrives at the bottom of a scrolling transcript, so
                 // sighted users get it in their peripheral vision and VoiceOver
                 // users got nothing at all — while a tool sat waiting on them.
                 if let request = model.permission {
@@ -74,7 +69,7 @@ struct ClaudePanelView: View {
             MonoCaps(
                 "● \(model.displays.first(where: \.selected)?.name.uppercased() ?? "MAC") · \(model.link.rttMillis.map { "\(Int($0))MS" } ?? "—")",
                 size: 9,
-                color: LG.Color.green,
+                color: NS.Color.green,
                 tracking: 1.4
             )
             // One line: this is a status caption, and wrapping it pushed
@@ -98,7 +93,7 @@ struct ClaudePanelView: View {
                 (
                     value: AppModel.ClaudeMode.code,
                     label: "CODE",
-                    badge: model.claudeSessionId != nil ? LG.Color.green : nil
+                    badge: model.claudeSessionId != nil ? NS.Color.green : nil
                 ),
             ],
             selection: Binding(
@@ -128,13 +123,13 @@ struct ClaudePanelView: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
                     Text(shortPath(model.claudeCwd))
-                        .font(LG.Font.mono(10))
-                        .foregroundStyle(LG.Color.text)
+                        .font(NS.Font.mono(10))
+                        .foregroundStyle(NS.Color.text)
                         .lineLimit(1)
                         .truncationMode(.head)
                     Spacer(minLength: 8)
                     if let branch = model.claudeBranch {
-                        MonoCaps(branch, size: 10, color: LG.Color.green, tracking: 0.8)
+                        MonoCaps(branch, size: 10, color: NS.Color.green, tracking: 0.8)
                     }
                 }
                 HStack {
@@ -145,9 +140,9 @@ struct ClaudePanelView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 11)
-            .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.raised))
+            .background(RoundedRectangle(cornerRadius: 8).fill(NS.Color.raised))
             .overlay(
-                RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairlineDim, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8).stroke(NS.Color.hairlineDim, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -185,19 +180,27 @@ struct ClaudePanelView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
-                    if isEmptyTranscript && showsModePitch { emptyState }
+                    // Everything that is not the question dims while one is
+                    // pending, so there is exactly one thing to answer.
+                    VStack(alignment: .leading, spacing: 20) {
+                        if isEmptyTranscript && showsModePitch { emptyState }
 
-                    ForEach(model.claudeTurns) { turn in
-                        turnView(turn)
+                        ForEach(model.claudeTurns) { turn in
+                            turnView(turn)
+                        }
+
+                        if !model.toolCalls.isEmpty { timeline }
+
+                        if !model.changedFiles.isEmpty { fileList }
+
+                        if model.claudeStreaming { streamingIndicator }
                     }
+                    .opacity(model.permission == nil ? 1 : 0.5)
+                    .accessibilityHidden(model.permission != nil)
 
-                    // Tool calls collapse to one 44pt line each — verb, target,
-                    // duration — so twenty stay skimmable at arm's length.
-                    if !model.toolCalls.isEmpty { toolLedger }
-
-                    if !model.changedFiles.isEmpty { fileList }
-
-                    if model.claudeStreaming { streamingIndicator }
+                    if let permission = model.permission {
+                        PermissionCard(request: permission, waited: permissionAge)
+                    }
 
                     Color.clear.frame(height: 1).id("bottom")
                 }
@@ -207,6 +210,11 @@ struct ClaudePanelView: View {
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
             .onChange(of: model.toolCalls.count) { _, _ in
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            // A question that arrives below the fold is a question nobody
+            // answers.
+            .onChange(of: model.permission?.id) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
         }
@@ -231,15 +239,15 @@ struct ClaudePanelView: View {
             MonoCaps(
                 model.claudeMode == .chat ? "CHAT" : "CODE",
                 size: 10,
-                color: LG.Color.cyan,
+                color: NS.Color.accent,
                 tracking: 1.8
             )
 
             Text(model.claudeMode == .chat
                  ? "Ask about this Mac. Nothing is edited."
                  : "Run Claude Code in a folder on the Mac.")
-                .font(LG.Font.sans(19))
-                .foregroundStyle(LG.Color.textSecondary)
+                .font(NS.Font.sans(19))
+                .foregroundStyle(NS.Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -247,12 +255,12 @@ struct ClaudePanelView: View {
                 Button {
                     showSessionPicker = true
                 } label: {
-                    MonoCaps("PICK A SESSION", size: 11, color: LG.Color.cyan, tracking: 1.4)
+                    MonoCaps("PICK A SESSION", size: 11, color: NS.Color.accent, tracking: 1.4)
                         .padding(.horizontal, 20)
                         .frame(minHeight: 46)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(LG.Color.cyan.opacity(0.45), lineWidth: 1)
+                                .stroke(NS.Color.accent.opacity(0.45), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -270,8 +278,8 @@ struct ClaudePanelView: View {
                 MarkdownText(turn.text, color: Color(hex: 0xC3C8D0))
             } else {
                 HStack(spacing: 8) {
-                    MonoCaps("CLAUDE", size: 9, color: LG.Color.cyan, tracking: 2)
-                    Rectangle().fill(LG.Color.cyan.opacity(0.2)).frame(height: 1)
+                    MonoCaps("CLAUDE", size: 9, color: NS.Color.accent, tracking: 2)
+                    Rectangle().fill(NS.Color.accent.opacity(0.2)).frame(height: 1)
                 }
                 // Full measure width — no bubble tax on a 402pt screen.
                 MarkdownText(turn.text)
@@ -279,17 +287,19 @@ struct ClaudePanelView: View {
         }
     }
 
-    private var toolLedger: some View {
-        VStack(spacing: 1) {
-            ForEach(model.toolCalls) { call in
-                ToolRow(call: call)
+    /// A rail down the left says these happened in sequence, and lets the
+    /// running one be a different shape — a card with its output in it —
+    /// without breaking the run.
+    private var timeline: some View {
+        VStack(spacing: 2) {
+            ForEach(Array(model.toolCalls.enumerated()), id: \.element.id) { index, call in
+                ToolRow(
+                    call: call,
+                    isFirst: index == 0,
+                    isLast: index == model.toolCalls.count - 1
+                )
             }
         }
-        .background(LG.Color.chrome)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8).stroke(LG.Color.chrome, lineWidth: 1)
-        )
     }
 
     /// Collapsed by default.
@@ -303,7 +313,7 @@ struct ClaudePanelView: View {
     private var fileList: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button {
-                withAnimation(LG.Motion.stateChange) { filesExpanded.toggle() }
+                withAnimation(NS.Motion.stateChange) { filesExpanded.toggle() }
             } label: {
                 HStack(spacing: 6) {
                     MonoCaps(
@@ -314,12 +324,12 @@ struct ClaudePanelView: View {
                     MonoCaps(
                         filesExpanded ? "HIDE" : "SHOW · TAP FOR THE DIFF",
                         size: 9,
-                        color: LG.Color.cyan,
+                        color: NS.Color.accent,
                         tracking: 1.6
                     )
                     Spacer()
                 }
-                .frame(minHeight: LG.Metric.minimumTarget)
+                .frame(minHeight: NS.Metric.minimumTarget)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -338,7 +348,7 @@ struct ClaudePanelView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .background(LG.Color.chrome)
+                .background(NS.Color.raised2)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -394,10 +404,10 @@ struct ClaudePanelView: View {
                 Button {
                     model.sendToClaude(suggestion)
                 } label: {
-                    MonoCaps(suggestion, size: 10, color: LG.Color.textSecondary, tracking: 1)
+                    MonoCaps(suggestion, size: 10, color: NS.Color.textSecondary, tracking: 1)
                         .padding(.horizontal, 14)
                         .frame(minHeight: 44)
-                        .overlay(Capsule().stroke(LG.Color.hairline, lineWidth: 1))
+                        .overlay(Capsule().stroke(NS.Color.hairline, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -412,16 +422,16 @@ struct ClaudePanelView: View {
                 text: $draft,
                 axis: .vertical
             )
-            .font(LG.Font.sans(15))
-            .foregroundStyle(LG.Color.text)
+            .font(NS.Font.sans(15))
+            .foregroundStyle(NS.Color.text)
             .focused($composerFocused)
             .lineLimit(1...4)
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
-            .background(RoundedRectangle(cornerRadius: LG.Metric.radiusLarge).fill(LG.Color.panel))
+            .background(RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.raised))
             .overlay(
-                RoundedRectangle(cornerRadius: LG.Metric.radiusLarge)
-                    .stroke(LG.Color.hairline, lineWidth: 1)
+                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                    .stroke(NS.Color.hairline, lineWidth: 1)
             )
 
             // Stop is a permanent red target while running: runaway agents are
@@ -432,8 +442,8 @@ struct ClaudePanelView: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 } label: {
                     VStack(spacing: 2) {
-                        Rectangle().fill(LG.Color.red).frame(width: 12, height: 12)
-                        MonoCaps("STOP", size: 9, color: LG.Color.red, tracking: 1)
+                        Rectangle().fill(NS.Color.red).frame(width: 12, height: 12)
+                        MonoCaps("STOP", size: 9, color: NS.Color.red, tracking: 1)
                     }
                 }
                 .buttonStyle(.plain)
@@ -445,11 +455,11 @@ struct ClaudePanelView: View {
                     draft = ""
                 } label: {
                     Text("↑")
-                        .font(LG.Font.mono(19))
-                        .foregroundStyle(LG.Color.onCyan)
+                        .font(NS.Font.mono(19))
+                        .foregroundStyle(NS.Color.onAccent)
                         .frame(width: 56, height: 56)
                         .background(
-                            RoundedRectangle(cornerRadius: LG.Metric.radiusLarge).fill(LG.Color.cyan)
+                            RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.accent)
                         )
                 }
                 .buttonStyle(.plain)
@@ -499,55 +509,65 @@ struct ClaudePanelView: View {
 
 struct ToolRow: View {
     let call: ToolCall
+    var isFirst = false
+    var isLast = false
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                marker
-                HStack(spacing: 4) {
-                    Text(call.name)
-                        .font(LG.Font.mono(11))
-                        .foregroundStyle(call.state == .running ? LG.Color.text : LG.Color.textSecondary)
-                    Text(call.target)
-                        .font(LG.Font.mono(11))
-                        .foregroundStyle(call.state == .running ? LG.Color.textSecondary : LG.Color.text)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                Spacer(minLength: 8)
-                MonoCaps(
-                    call.milliseconds.map { formatDuration($0) } ?? "",
-                    size: 9,
-                    color: call.state == .running ? LG.Color.cyan : LG.Color.textTertiary,
-                    tracking: 0
-                )
-            }
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-
-            // Only the running one shows output.
-            if call.state == .running, let preview = call.preview, !preview.isEmpty {
-                Text(preview)
-                    .font(LG.Font.mono(10))
-                    .foregroundStyle(LG.Color.textTertiary)
-                    .lineSpacing(3)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 11)
-            }
+    private var state: TimelineState {
+        switch call.state {
+        case .ok: return .done
+        case .error: return .failed
+        case .running: return .running
         }
-        .background(call.state == .running ? LG.Color.screenGround : LG.Color.raised)
     }
 
-    @ViewBuilder
-    private var marker: some View {
+    var body: some View {
+        TimelineRow(state: state, isFirst: isFirst, isLast: isLast) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Text(call.name)
+                        .font(NS.Font.mono(11))
+                        .foregroundStyle(NS.Color.text)
+                    Text(call.target)
+                        .font(NS.Font.mono(11))
+                        .foregroundStyle(NS.Color.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    MonoCaps(
+                        call.milliseconds.map { formatDuration($0) } ?? "",
+                        size: 9,
+                        color: durationColor,
+                        tracking: 0
+                    )
+                }
+                .frame(minHeight: call.state == .running ? 22 : 28)
+
+                // Only the running one shows output.
+                if call.state == .running, let preview = call.preview, !preview.isEmpty {
+                    Text(preview)
+                        .font(NS.Font.mono(10))
+                        .foregroundStyle(NS.Color.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, call.state == .running ? 12 : 0)
+            .padding(.vertical, call.state == .running ? 10 : 6)
+            .background {
+                if call.state == .running {
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                        .fill(NS.Color.raised)
+                }
+            }
+        }
+    }
+
+    private var durationColor: Color {
         switch call.state {
-        case .ok:
-            Text("✓").font(LG.Font.mono(11)).foregroundStyle(LG.Color.green)
-        case .error:
-            Text("✕").font(LG.Font.mono(11)).foregroundStyle(LG.Color.red)
-        case .running:
-            Spinner(color: LG.Color.cyan).frame(width: 12, height: 12)
+        case .error: return NS.Color.red
+        case .running: return NS.Color.accent
+        case .ok: return NS.Color.textTertiary
         }
     }
 
@@ -565,24 +585,24 @@ struct ChangedFileRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Text(file.status)
-                .font(LG.Font.mono(10))
-                .foregroundStyle(file.status == "A" ? LG.Color.green : LG.Color.amber)
+                .font(NS.Font.mono(10))
+                .foregroundStyle(file.status == "A" ? NS.Color.green : NS.Color.amber)
             Text(file.path)
-                .font(LG.Font.mono(11))
-                .foregroundStyle(LG.Color.text)
+                .font(NS.Font.mono(11))
+                .foregroundStyle(NS.Color.text)
                 .lineLimit(1)
                 .truncationMode(.head)
             Spacer(minLength: 8)
             if file.added > 0 {
-                Text("+\(file.added)").font(LG.Font.mono(10)).foregroundStyle(LG.Color.green)
+                Text("+\(file.added)").font(NS.Font.mono(10)).foregroundStyle(NS.Color.green)
             }
             if file.removed > 0 {
-                Text("−\(file.removed)").font(LG.Font.mono(10)).foregroundStyle(LG.Color.red)
+                Text("−\(file.removed)").font(NS.Font.mono(10)).foregroundStyle(NS.Color.red)
             }
             ratioBars
         }
         .padding(12)
-        .background(LG.Color.raised)
+        .background(NS.Color.raised)
     }
 
     private var ratioBars: some View {
@@ -591,20 +611,23 @@ struct ChangedFileRow: View {
         return HStack(spacing: 2) {
             ForEach(0..<4, id: \.self) { index in
                 Rectangle()
-                    .fill(index < greenBars ? LG.Color.green : LG.Color.red)
+                    .fill(index < greenBars ? NS.Color.green : NS.Color.red)
                     .frame(width: 3, height: 12)
             }
         }
     }
 }
 
-// MARK: - 06C permission
+// MARK: - 10 · permission
 
-/// The one thing only the user can do. States the command verbatim, what it
-/// will destroy in plain units, and how long it has been waiting.
-struct PermissionSheet: View {
+/// The one thing only the user can do.
+///
+/// States the command verbatim, what it will destroy in plain units, and how
+/// long it has been waiting. It sits at the end of the transcript rather than
+/// over it, so the sentence in which Claude explained why it wants to run this
+/// is still on screen while the question is being answered.
+struct PermissionCard: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let request: PermissionRequest
     let waited: Int
 
@@ -612,30 +635,30 @@ struct PermissionSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 9) {
                 Rectangle()
-                    .fill(LG.Color.amber)
+                    .fill(NS.Color.amber)
                     .frame(width: 7, height: 7)
-                MonoCaps("WANTS TO RUN · PAUSED \(waited)S", size: 10, color: LG.Color.amber, tracking: 1.6)
+                MonoCaps("WANTS TO RUN · PAUSED \(waited)S", size: 10, color: NS.Color.amber, tracking: 1.6)
             }
             .padding(.top, 14)
             .padding(.horizontal, 16)
 
             Text(request.command)
-                .font(LG.Font.mono(12))
-                .foregroundStyle(LG.Color.text)
+                .font(NS.Font.mono(12))
+                .foregroundStyle(NS.Color.text)
                 .lineSpacing(3)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(13)
-                .background(RoundedRectangle(cornerRadius: 6).fill(LG.Color.deepGround))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6).stroke(LG.Color.hairlineDim, lineWidth: 1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.deepGround)
                 )
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
 
             Text(request.explanation)
-                .font(LG.Font.sans(13))
-                .foregroundStyle(LG.Color.textSecondary)
+                .font(NS.Font.sans(13))
+                .foregroundStyle(NS.Color.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -645,11 +668,14 @@ struct PermissionSheet: View {
                     model.answerPermission(allow: true, scope: "once")
                 } label: {
                     Text("Allow once")
-                        .font(LG.Font.sans(16, weight: .medium))
-                        .foregroundStyle(LG.Color.onCyan)
+                        .font(NS.Font.sans(16, weight: .medium))
+                        .foregroundStyle(NS.Color.onAccent)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 56)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(LG.Color.cyan))
+                        .background(
+                            RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                .fill(NS.Color.accent)
+                        )
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Runs this command once. You will be asked again next time.")
@@ -659,10 +685,11 @@ struct PermissionSheet: View {
                 // same size, differing only in colour — so the tap that stops
                 // a tool was one thumb's width from the tap that permanently
                 // allows it, and only one of those can be taken back.
-                SecondaryAction(
+                OutlinedAction(
                     title: "DENY",
-                    tint: LG.Color.red,
-                    border: LG.Color.red.opacity(0.5)
+                    tint: NS.Color.red,
+                    edge: NS.Color.red.opacity(0.5),
+                    height: 48
                 ) {
                     model.answerPermission(
                         allow: false,
@@ -677,11 +704,11 @@ struct PermissionSheet: View {
                     MonoCaps(
                         "ALWAYS ALLOW THIS HERE",
                         size: 9,
-                        color: LG.Color.textTertiary,
+                        color: NS.Color.textTertiary,
                         tracking: 1.2
                     )
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: LG.Metric.minimumTarget)
+                    .frame(minHeight: NS.Metric.minimumTarget)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -694,15 +721,13 @@ struct PermissionSheet: View {
             .padding(16)
         }
         .background(
-            RoundedRectangle(cornerRadius: LG.Metric.radiusLarge).fill(LG.Color.raised)
+            RoundedRectangle(cornerRadius: NS.Metric.radiusCardLarge)
+                .fill(NS.Color.amber.opacity(0.07))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: LG.Metric.radiusLarge)
-                .stroke(LG.Color.amber.opacity(0.4), lineWidth: 1)
+            RoundedRectangle(cornerRadius: NS.Metric.radiusCardLarge)
+                .stroke(NS.Color.amber.opacity(0.34), lineWidth: 1)
         )
-        .padding(.horizontal, 18)
-        .padding(.bottom, 20)
-        .transition(LG.Motion.rise(reduced: reduceMotion))
         // A modal in fact if not in presentation: the agent is stopped until
         // this is answered, so the transcript behind it is not what to explore.
         .accessibilityElement(children: .contain)
@@ -736,16 +761,16 @@ struct SessionPicker: View {
                 } label: {
                     HStack(spacing: 10) {
                         Text("+")
-                            .font(LG.Font.mono(15))
-                            .foregroundStyle(LG.Color.cyan)
-                        MonoCaps("START A NEW SESSION", size: 11, color: LG.Color.cyan, tracking: 1.4)
+                            .font(NS.Font.mono(15))
+                            .foregroundStyle(NS.Color.accent)
+                        MonoCaps("START A NEW SESSION", size: 11, color: NS.Color.accent, tracking: 1.4)
                         Spacer()
                     }
                     .padding(.horizontal, 16)
                     .frame(minHeight: 52)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(LG.Color.cyan.opacity(0.4), lineWidth: 1)
+                            .stroke(NS.Color.accent.opacity(0.4), lineWidth: 1)
                     )
                     .contentShape(Rectangle())
                 }
@@ -771,8 +796,8 @@ struct SessionPicker: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(session.summary)
-                                        .font(LG.Font.sans(14))
-                                        .foregroundStyle(LG.Color.text)
+                                        .font(NS.Font.sans(14))
+                                        .foregroundStyle(NS.Color.text)
                                         .lineLimit(2)
                                         .multilineTextAlignment(.leading)
                                     HStack(spacing: 8) {
@@ -786,17 +811,17 @@ struct SessionPicker: View {
                                         .truncationMode(.head)
                                         Spacer(minLength: 4)
                                         if let branch = session.gitBranch {
-                                            MonoCaps(branch, size: 9, color: LG.Color.green, tracking: 0.8)
+                                            MonoCaps(branch, size: 9, color: NS.Color.green, tracking: 0.8)
                                         }
                                         MonoCaps("\(session.messageCount) MSG", size: 9, tracking: 0.8)
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(14)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.raised))
+                                .background(RoundedRectangle(cornerRadius: 8).fill(NS.Color.raised))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(LG.Color.hairlineDim, lineWidth: 1)
+                                        .stroke(NS.Color.hairlineDim, lineWidth: 1)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -809,8 +834,8 @@ struct SessionPicker: View {
                     title: "New session",
                     detail: "STARTS IN THE LAST PROJECT",
                     glyph: "＋",
-                    tint: LG.Color.cyan,
-                    ink: LG.Color.onCyan
+                    tint: NS.Color.accent,
+                    ink: NS.Color.onAccent
                 ) {
                     model.openClaude(mode: .code)
                     dismiss()

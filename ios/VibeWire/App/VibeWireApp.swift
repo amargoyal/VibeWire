@@ -31,7 +31,7 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            LG.Color.screenGround.ignoresSafeArea()
+            NS.Color.screenGround.ignoresSafeArea()
 
             switch model.route {
             case .pairing:
@@ -51,7 +51,7 @@ struct RootView: View {
                 }
             }
         }
-        .animation(LG.Motion.stateChange, value: model.route)
+        .animation(NS.Motion.stateChange, value: model.route)
         // Exactly one sheet modifier, driven by one value. Two modifiers here
         // would present only the first and drop the other without a word.
         .sheet(item: Binding(
@@ -65,12 +65,12 @@ struct RootView: View {
                     // The app has one appearance and no system materials, so
                     // the sheet supplies its own ground rather than letting the
                     // default material show through.
-                    .presentationBackground(LG.Color.screenGround)
+                    .presentationBackground(NS.Color.screenGround)
             case .claude:
                 ClaudePanelView()
                     .presentationDetents([.medium, .large], selection: $claudeDetent)
                     .presentationDragIndicator(.visible)
-                    .presentationBackground(LG.Color.screenGround)
+                    .presentationBackground(NS.Color.screenGround)
             }
         }
         .onChange(of: model.presented) { _, presented in
@@ -113,28 +113,35 @@ struct BannerView: View {
         VStack {
             Spacer()
             HStack(alignment: .top, spacing: 12) {
-                Rectangle()
-                    .fill(LG.Color.amber)
-                    .frame(width: 2)
                 Text(text)
-                    .font(LG.Font.sans(13))
-                    .foregroundStyle(LG.Color.onAmberWash)
+                    .font(NS.Font.sans(13))
+                    .foregroundStyle(NS.Color.onAmberWash)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 14)
                 Spacer(minLength: 0)
                 Button(action: dismiss) {
                     Text("✕")
-                        .font(LG.Font.mono(13))
-                        .foregroundStyle(LG.Color.textSecondary)
+                        .font(NS.Font.mono(13))
+                        .foregroundStyle(NS.Color.textSecondary)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss message")
             }
-            .padding(.leading, 14)
-            .background(LG.Color.amber.opacity(0.07))
-            .padding(.horizontal, LG.Metric.gutter)
+            .padding(.leading, 16)
+            // A card with a tint rather than a rule with a wash behind it: the
+            // banner is a thing that arrived, not a margin note.
+            .background(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusCard)
+                    .fill(NS.Color.amber.opacity(0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusCard)
+                    .stroke(NS.Color.amber.opacity(0.34), lineWidth: 1)
+            )
+            .padding(.horizontal, NS.Metric.gutter)
             .padding(.bottom, 20)
         }
-        .transition(LG.Motion.rise(reduced: reduceMotion))
+        .transition(NS.Motion.rise(reduced: reduceMotion))
     }
 }

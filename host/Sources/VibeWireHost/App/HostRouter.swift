@@ -48,6 +48,23 @@ final class HostRouter: Router, @unchecked Sendable {
 
     weak var server: HTTPServer?
 
+    /// What the menu bar reports before any menu item.
+    ///
+    /// Three measured facts and nothing else, because the reason to open that
+    /// menu is almost always to check whether the Mac is still serving. Read
+    /// under the same lock as everything else here, and cheap enough to answer
+    /// every time the menu opens.
+    struct Serving {
+        var clientAttached: Bool
+        var streams: Int
+    }
+
+    var serving: Serving {
+        state.withLock { current in
+            Serving(clientAttached: current.activeSocket != nil, streams: current.streams.count)
+        }
+    }
+
     init(
         trust: TrustStore,
         pairing: PairingService,

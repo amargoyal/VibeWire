@@ -2,163 +2,197 @@
 name: VibeWire
 description: A dark instrument panel for holding a Mac in one hand — every mark on screen reports a measured value.
 colors:
-  reachable-jade: "#58D9A3"
-  degraded-sodium: "#E8B45A"
-  lost-clay: "#E4685A"
-  held-cyan: "#6BC7E8"
-  deep-ground: "#08090B"
-  screen-ground: "#0B0D10"
-  raised: "#0E1116"
-  panel: "#101318"
-  chrome: "#14171C"
-  text: "#E9EBEE"
-  text-secondary: "#949AA5"
-  text-tertiary: "#7C8493"
-  text-disabled: "#3A404A"
-  hairline-dim: "#1A1E24"
-  hairline: "#262B33"
-  stroke: "#2E343D"
-  on-jade: "#06130D"
-  on-sodium: "#170F02"
-  on-clay: "#1B0805"
-  on-cyan: "#04141B"
+  reachable-jade: "#5CE4B1"
+  degraded-sodium: "#F7C15F"
+  lost-clay: "#F37272"
+  held-violet: "#96ADFF"
+  deep-ground: "#06070A"
+  screen-ground: "#0F1114"
+  raised: "#181A1F"
+  raised-2: "#22252B"
+  chrome: "#14161A"
+  text: "#F2F3F6"
+  text-secondary: "#A5A9B1"
+  text-tertiary: "#777C84"
+  text-faint: "#5F636B"
+  text-disabled: "#3F4349"
+  hairline: "#26292F"
+  stroke: "#2F3339"
+  on-jade: "#002D1D"
+  on-sodium: "#2E1B00"
+  on-clay: "#230707"
+  on-violet: "#0E142C"
 typography:
   display:
-    fontFamily: "SF Pro (system sans)"
-    fontSize: "30pt"
-    fontWeight: 500
-    letterSpacing: "normal"
-  headline:
-    fontFamily: "SF Pro (system sans)"
-    fontSize: "27pt"
-    fontWeight: 400
-    letterSpacing: "normal"
+    fontFamily: "Instrument Sans, system sans"
+    fontSize: "38pt"
+    fontWeight: 600
+    letterSpacing: "-0.035em"
   title:
-    fontFamily: "SF Pro (system sans)"
+    fontFamily: "Instrument Sans, system sans"
+    fontSize: "26pt"
+    fontWeight: 600
+    letterSpacing: "-0.03em"
+  action:
+    fontFamily: "Instrument Sans, system sans"
     fontSize: "19pt"
-    fontWeight: 500
-    letterSpacing: "normal"
+    fontWeight: 600
+    letterSpacing: "-0.02em"
   body:
-    fontFamily: "SF Pro (system sans)"
+    fontFamily: "Instrument Sans, system sans"
     fontSize: "15pt"
     fontWeight: 400
     letterSpacing: "normal"
+  row-title:
+    fontFamily: "Instrument Sans, system sans"
+    fontSize: "15pt"
+    fontWeight: 500
+    letterSpacing: "-0.01em"
   label:
     fontFamily: "IBM Plex Mono, system monospaced"
-    fontSize: "10pt"
+    fontSize: "9pt"
     fontWeight: 400
     letterSpacing: "1.4pt"
+  label-wide:
+    fontFamily: "IBM Plex Mono, system monospaced"
+    fontSize: "9pt"
+    fontWeight: 400
+    letterSpacing: "2.4pt"
   readout:
     fontFamily: "IBM Plex Mono, system monospaced"
     fontSize: "19pt"
     fontWeight: 400
-    letterSpacing: "normal"
+    letterSpacing: "-0.02em"
+  readout-lead:
+    fontFamily: "IBM Plex Mono, system monospaced"
+    fontSize: "26pt"
+    fontWeight: 400
+    letterSpacing: "-0.03em"
   code:
     fontFamily: "IBM Plex Mono, system monospaced"
-    fontSize: "11pt"
+    fontSize: "12pt"
     fontWeight: 400
     letterSpacing: "normal"
 rounded:
-  hairline: "3pt"
-  sm: "6pt"
-  row: "8pt"
-  md: "10pt"
-  lg: "12pt"
-  sheet: "18pt"
+  screen: "3pt"
+  sm: "8pt"
+  inner: "12pt"
+  group-inner: "4pt"
+  group-outer: "16pt"
+  control: "16pt"
+  card: "20pt"
+  card-lg: "22pt"
+  drawer: "28pt"
 spacing:
   xs: "6pt"
   sm: "8pt"
   md: "12pt"
   lg: "16pt"
-  panel: "18pt"
-  gutter: "24pt"
-  section: "26pt"
+  card: "18pt"
+  gutter: "20pt"
+  section: "22pt"
 components:
   action-primary:
     backgroundColor: "{colors.reachable-jade}"
     textColor: "{colors.on-jade}"
-    typography: "{typography.title}"
-    rounded: "{rounded.md}"
-    padding: "0 22pt"
-    height: "76pt"
-  action-primary-cyan:
-    backgroundColor: "{colors.held-cyan}"
-    textColor: "{colors.on-cyan}"
-    rounded: "{rounded.md}"
-    height: "76pt"
+    typography: "{typography.action}"
+    rounded: "{rounded.card}"
+    padding: "12pt 22pt"
+    height: "68pt"
+  action-primary-violet:
+    backgroundColor: "{colors.held-violet}"
+    textColor: "{colors.on-violet}"
+    rounded: "{rounded.card}"
+    height: "68pt"
+  action-filled:
+    backgroundColor: "{colors.held-violet}"
+    textColor: "{colors.on-violet}"
+    rounded: "{rounded.control}"
+    height: "56pt"
   action-destructive:
     backgroundColor: "{colors.lost-clay}"
     textColor: "{colors.on-clay}"
-    rounded: "{rounded.md}"
+    rounded: "{rounded.control}"
     height: "60pt"
-  action-secondary:
+  action-outlined:
     backgroundColor: "transparent"
     textColor: "{colors.text-secondary}"
     typography: "{typography.label}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.control}"
     height: "44pt"
-  panel:
+  card:
     backgroundColor: "{colors.raised}"
-    rounded: "{rounded.md}"
+    rounded: "{rounded.card}"
     padding: "18pt"
-  panel-tinted:
-    backgroundColor: "rgba(88,217,163,0.05)"
-    rounded: "{rounded.md}"
+  card-tinted:
+    backgroundColor: "rgba(247,193,95,0.07)"
+    rounded: "{rounded.card}"
     padding: "18pt"
-  list-row:
-    backgroundColor: "{colors.panel}"
+  group-row:
+    backgroundColor: "{colors.raised}"
     textColor: "{colors.text}"
-    typography: "{typography.body}"
-    rounded: "{rounded.row}"
+    typography: "{typography.row-title}"
+    rounded: "{rounded.group-inner}"
     padding: "0 16pt"
-    height: "62pt"
-  list-row-selected:
-    backgroundColor: "rgba(107,199,232,0.08)"
+    height: "58pt"
+  group-row-selected:
+    backgroundColor: "rgba(150,173,255,0.12)"
     textColor: "{colors.text}"
-    rounded: "{rounded.row}"
-    height: "62pt"
-  ledger-row:
-    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.group-inner}"
+    height: "58pt"
+  timeline-row:
+    backgroundColor: "transparent"
     textColor: "{colors.text}"
     typography: "{typography.code}"
-    padding: "0 12pt"
-    height: "44pt"
-  keycap:
-    backgroundColor: "{colors.chrome}"
+    height: "40pt"
+  timeline-row-running:
+    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.inner}"
+    padding: "10pt 12pt"
+  tile:
+    backgroundColor: "{colors.raised-2}"
     textColor: "{colors.text}"
-    rounded: "{rounded.row}"
+    rounded: "{rounded.control}"
+    height: "70pt"
+  keycap:
+    backgroundColor: "{colors.raised-2}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.inner}"
     height: "46pt"
   keycap-held:
-    backgroundColor: "rgba(107,199,232,0.18)"
-    textColor: "{colors.held-cyan}"
-    rounded: "{rounded.row}"
+    backgroundColor: "rgba(150,173,255,0.20)"
+    textColor: "{colors.held-violet}"
+    rounded: "{rounded.inner}"
     height: "46pt"
-  segment-item:
+  segment-track:
     backgroundColor: "{colors.raised}"
-    textColor: "{colors.text-secondary}"
-    typography: "{typography.label}"
-    height: "44pt"
+    rounded: "{rounded.inner}"
+    padding: "3pt"
   segment-item-selected:
-    backgroundColor: "rgba(107,199,232,0.14)"
-    textColor: "{colors.held-cyan}"
+    backgroundColor: "rgba(150,173,255,0.16)"
+    textColor: "{colors.held-violet}"
     typography: "{typography.label}"
-    height: "44pt"
+    height: "38pt"
   field:
-    backgroundColor: "{colors.panel}"
+    backgroundColor: "{colors.raised-2}"
     textColor: "{colors.text}"
     typography: "{typography.code}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.inner}"
     padding: "0 12pt"
     height: "44pt"
   code-block:
     backgroundColor: "{colors.deep-ground}"
     textColor: "{colors.text}"
     typography: "{typography.code}"
-    rounded: "{rounded.sm}"
-    padding: "13pt"
+    rounded: "{rounded.inner}"
+    padding: "13pt 14pt"
+  drawer:
+    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.drawer}"
+    padding: "12pt 16pt"
 ---
 
-# Design System: VibeWire
+# Design System: VibeWire — Nightshift
 
 ## Overview
 
@@ -166,263 +200,208 @@ components:
 
 VibeWire is a gauge cluster for one machine. Every mark on the glass reports something that was actually measured — round-trip time, packet loss, megabits, the age of the last good frame, how long a tool has been waiting on an answer. Nothing on screen is decoration wearing the costume of information. When a value has not been measured, the panel prints an em dash and holds the space, because an unmeasured value and a measured zero are different facts and the interface is not allowed to blur them.
 
-The room is dark and stays dark. There is no light mode, no `colorScheme` branching, and no shadow anywhere in the app. Depth is built from five tonal grounds and a one-point hairline, the way a bezel separates one dial from the next. Type does the second half of the work: monospace with wide tracking for anything counted or named by the machine, system sans for prose the user reads at their own pace. The two never trade jobs, so the eye learns in one screen which parts of the panel are readings and which are sentences.
+Nightshift is the second turn of that system. It replaces **Longarm**, which drew the instrument out of hairlines on a near-black ground: every panel was a one-point border, every grouped list a stack of rules, and the accent was cyan. What it kept is the thesis. What changed is what carries the structure:
 
-Color is a signalling system with exactly four voices, and the most important thing about it is the split: jade, sodium and clay report what the **Mac** is doing, and cyan reports what the **user** is doing — a held modifier, an active selection, a Claude session, the caret. That separation is what lets a glance in a dark room distinguish "the link is degrading" from "I left Command switched on." It is rejected outright as a generic remote-desktop client with a gray toolbar and one undifferentiated "Connected", as a consumer chat app with bubbles and avatars, and as a neon hacker dashboard where color is atmosphere. The unhappy states — asleep, thin link, unreachable — are drawn with the same care as the happy one, because those are the states that cost the user two minutes.
+- **Filled surfaces, not hairlines.** A card is a lighter ground with a large corner, not a box drawn around nothing. Two greys apart survive a phone at minimum brightness outdoors, which a one-point line did not.
+- **Violet is the user's colour.** Held keys, focus, Claude, the current selection. Cyan sat close enough to jade on a dim screen that a glance could confuse "the link is healthy" with "I left Command switched on"; violet cannot.
+- **Grouped rows are one shape.** A list is a run of rows two points apart whose outer corners round and whose seams do not, so the group reads as one object and each row is still its own target.
+
+And four screens were re-laid-out rather than repainted. **Home shows the Mac instead of describing it** — the last frame is the hero and the way in, so the numbers shrink to one strip. **The thumb-arc hub is gone**; its actions live in a labelled rail in the letterbox band and a drawer that never covers the picture. **Claude's tool calls became a timeline** and its permission prompt moved inline, so answering one no longer hides the sentence explaining it. **Pairing is one hero and one target card** instead of a graphic, two fields, a button and a status line.
+
+The room is dark and stays dark. There is no light mode, no `colorScheme` branching, and no shadow anywhere in the app. Type does the second half of the work: monospace with wide tracking for anything counted or named by the machine, sans for prose the user reads at their own pace. The two never trade jobs.
 
 **Key Characteristics:**
-- Dark-only, five tonal grounds, zero shadows
+- Dark-only, six tonal grounds, zero shadows
 - Monospace for measured, sans for prose — never interchangeable
-- Four signal colors: three for the machine, one reserved for the user
-- Hairlines and tint-washes instead of cards
+- Four signal colours: three for the machine, one reserved for the user
+- Filled cards and grouped rows instead of borders
 - Every primary action states its own cost before it is tapped
 - Motion is 120–180 ms state change; nothing decorative moves beside live video
 
 ## Colors
 
-A near-black instrument ground carrying four saturated-but-soft signal hues, each desaturated just enough to sit on black without haloing.
+Defined in OKLCH — that is the source of truth in `web/src/design/nightshift.css` — and converted to sRGB literals for Swift, so the three clients cannot drift a step apart.
 
 ### Primary
 
-- **Reachable Jade** (`#58D9A3`): the Mac is awake and the link is healthy. Used on the condition dot, signal bars, RTT sparkline, the "View screen" action, added diff lines, git branch names, and the `✓` on a completed tool call. Never used for anything the user switched on.
-- **Held Cyan** (`#6BC7E8`): the user's own state, and nothing else. Held and latched modifiers, the active code box and caret, the selected display, the selected pad mode, Claude's turn marker and the whole Claude surface, the trackpad boundary, zoom readouts, and the hub's MODS spoke. If cyan is on screen, the user put it there.
+- **Reachable Jade** (`#5CE4B1`, `oklch(0.83 0.14 165)`): the Mac is awake and the link is healthy. The condition dot, signal bars, RTT sparkline, the "View screen" action, added diff lines, git branch names, the `✓` on a completed tool call. Never used for anything the user switched on.
+- **Held Violet** (`#96ADFF`, `oklch(0.765 0.13 272)`): the user's own state, and nothing else. Held and latched modifiers, the active code box and caret, the selected display, the selected pad mode, focus rings, Claude's turn marker and the whole Claude surface, zoom readouts. If violet is on screen, the user put it there.
 
 ### Secondary
 
-- **Degraded Sodium** (`#E8B45A`): a measured degradation, not a failure. A thin link, a stalled picture, a Mac that is asleep, a pending permission request, a modified file. Always attached to the number that justifies it (`JITTER 240MS`, `PAUSED 12S`).
+- **Degraded Sodium** (`#F7C15F`, `oklch(0.84 0.13 80)`): a measured degradation, not a failure. A thin link, a stalled picture, a Mac that is asleep, a pending permission request, a modified file. Always attached to the number that justifies it (`JITTER 240MS`, `PAUSED 12S`).
 
 ### Tertiary
 
-- **Lost Clay** (`#E4685A`): the path is gone, or the action destroys something. Unreachable card, failed exchange step, removed diff lines, revoke, and the Stop control on a running agent.
+- **Lost Clay** (`#F37272`, `oklch(0.705 0.16 22)`): the path is gone, or the action destroys something. The unreachable strip, a failed exchange step, removed diff lines, revoke, and the Stop control on a running agent.
 
 ### Neutral
 
-- **Deep Ground** (`#08090B`): the video screen and the ground behind fenced code — the darkest surface, reserved for places where the picture or the code is the content.
-- **Screen Ground** (`#0B0D10`): the standard screen background for every non-video screen.
-- **Raised** (`#0E1116`): panels, sheets, and list rows lifted one step off the ground.
-- **Panel** (`#101318`): input fields, display rows, and the pressable surfaces above them.
-- **Chrome** (`#14171C`): key caps, dock buttons, ledger backing, and the divider fill between stacked rows.
-- **Text** (`#E9EBEE`): prose and any value currently true.
-- **Text Secondary** (`#949AA5`): supporting prose, inactive labels, idle condition. 6.9:1.
-- **Text Tertiary** (`#7C8493`): mono caps headings, units, and captions — the default color of a label, and so the most-read text in the product. 4.8:1 at worst, on chrome. It carries 70 of the app's 123 label call sites; every one of them is 8–10 pt, which is why it is set to clear AA on the lightest ground rather than the darkest.
-- **Text Disabled** (`#3A404A`): 1.7:1, deliberately under the text threshold — which makes it **not a text color**. Ink for a disabled control and fills for dormant indicators only.
-- **Hairline Dim** (`#1A1E24`) / **Hairline** (`#262B33`) / **Stroke** (`#2E343D`): the three rule weights, dim for divisions inside a group, hairline for a container edge, stroke for an interactive edge.
-- **Ink colors** (`#06130D`, `#170F02`, `#1B0805`, `#04141B`): near-black text laid on a filled signal button. Each is the signal hue driven to ~7% lightness so the pairing stays in family rather than punching a hole with pure black.
+Six grounds, and every surface in the app is one of them:
+
+- **Deep** (`#06070A`) — video and code. The darkest surface, reserved for places where the picture or the listing is the content.
+- **Screen** (`#0F1114`) — the app.
+- **Raised** (`#181A1F`) — a card, a row in a group, the composer.
+- **Raised 2** (`#22252B`) — a control inside a card: a key cap, a tile, a field, a filled digit box.
+- **Chrome** (`#14161A`) / **Chrome 2** (`#191B1E`) — the same apparent step as Raised, measured against Deep rather than Screen. Used only in the remote view, where the ground is darker.
+
+Four steps of ink, each measured against the ground it lands on: **Text** 15.9:1, **Text Secondary** 7.4:1, **Text Tertiary** 4.6:1. **Text Faint** (`#5F636B`, 3.1:1) is deliberately below the body threshold — it is for the all-caps footnotes that repeat something already stated above, never for a sentence carrying information on its own. **Text Disabled** (`#3F4349`) is not for text at all: dormant indicator fills and disabled control ink only.
 
 ### Named Rules
 
-**The Two Voices Rule.** Jade, sodium and clay describe the machine. Cyan describes the user. A control may never take a machine color to mean "on", and a condition may never take cyan to mean "bad". Any new color must declare which side of that line it lives on, or it does not get added.
+**The Split-Voice Rule.** Jade, sodium and clay report what the **Mac** is doing. Violet reports what the **user** is doing. No colour crosses that line, which is what lets a glance in a dark room tell a degrading link from a latched modifier.
 
-**The Dash Rule.** A value that has not been measured renders as `—` in Text Disabled at the same size the real value will take. Never `0`, never blank, never a spinner in place of a number.
-
-**The Measured Condition Rule.** Condition is derived from measured inputs (`Condition.from(rttMillis:lossPercent:awake:)`), never set by hand at a call site. The label and the numbers beside it cannot disagree, because they come from the same expression.
-
-**The Measured Contrast Rule.** A text color is chosen by computing it against the ground it actually lands on — and against the *lightest* such ground, not the average. Dark is a product decision here, so there is no light appearance to fall back on and the palette has to carry legibility by itself. Body and label text clears 4.5:1; anything that cannot is not a text color.
-
-**The No Alpha Over Video Rule.** Nothing readable sits on the Mac's picture as translucent ink. Alpha over content nobody controls has no contrast ratio — white at 34% measures 2.9:1 over a black desktop and 1.0:1 over a white document. Marks over video are solid and carry their own ground (`.videoChip()`).
+**The Redundant-Channel Rule.** A lost condition is drawn as a **square**, every other condition as a circle. Colour alone cannot carry "this is the bad one" for a reader who cannot separate red from green, and the shape costs nothing.
 
 ## Typography
 
-**Display / Body Font:** SF Pro — the system sans, no custom brand face
-**Label / Readout / Code Font:** SF Mono. `LG.Font.mono` names IBM Plex Mono first, but nothing bundles it — there is no `UIAppFonts` key and no font file in the target — so every mono glyph in the app is the system monospace today. The branch is kept as the single place that would change if the face is ever added.
+Two families, drawn in **Instrument Sans** and **IBM Plex Mono**, falling back to the platform's own faces. The fallback is not a compromise to fix later: this page is usually served by the Mac on a local network with no route to a font CDN, and an instrument that waits on a webfont to say whether the link is up has its priorities wrong. The grammar — the weights, the tracking, the caps — is what carries the design.
 
-**Scaling:** every size answers Dynamic Type. Each call is scaled relative to the standard text style nearest its own value — a 9 pt unit label tracks `caption2`, a 19 pt readout tracks `body`, a 30 pt machine name tracks `title1` — so the roles grow at the different rates Apple already tuned rather than all inflating together. The style is derived from the size inside `LG.Font`, which is what let every existing call site gain scaling without changing. Nothing renders below **9 pt** (`LG.Font.floor`).
+- **Display** (38 / 36 / 30 / 26 pt, weight 600, tracking −0.035em): the machine name, the pairing headline, a screen title. Tight tracking and a semibold weight are what make a machine name read as a title rather than as large body copy.
+- **Body** (15 pt, 1.5 line height): prose. Row titles take weight 500 and −0.01em.
+- **Mono caps** (8–11 pt, tracking 1.4pt, 2.4pt for section headings): every readout heading, status line, unit, path, key and command.
+- **Readout** (19 pt mono, or 26 pt for the one reading that is the reason to look at the card): measured values, with the unit set at 10 pt in Text Tertiary.
 
-**Character:** A technical pairing with a strict division of labor. Mono is the machine's voice: uppercased, tracked wide (0.8–4.4 pt), and small enough that it reads as an annotation on a dial rather than a sentence. Sans is the human voice: mixed case, unmodified, used for anything written to be read as language. The contrast is the hierarchy — there is no bold-heavy type scale doing that job.
-
-### Hierarchy
-
-- **Display** (medium, 30 pt): the Mac's own name on Home, and only there. It is the largest thing in the app because the machine is the subject.
-- **Headline** (regular, 24–27 pt): the one sentence a full-screen moment turns on — "Type the six digits on your Mac.", "Trading keys.", "Its key is deleted on the Mac. There is no undo."
-- **Title** (medium, 17–22 pt): screen titles and the label on a filled primary action.
-- **Body** (regular, 13–15 pt): all prose. 15 pt for the primary sentence in a card, 13 pt for the supporting one. Always `.fixedSize(horizontal: false, vertical: true)` so a sentence is never truncated into a half-truth.
-- **Label** (regular mono, 8–13 pt, uppercased, tracking 0.8–4.4): every heading, unit, status line, and caption. 10 pt at tracking 1.4 is the default; 9 pt for the quietest captions; 2.0–4.4 tracking for section headings and the wordmark.
-- **Readout** (regular mono, 19 pt, unit at 11 pt in Text Tertiary): a measured value and its unit set as one baseline-aligned pair. 46 pt for the zoom badge, which is the one readout meant to be read mid-gesture.
-- **Code** (regular mono, 10–12 pt): tool names and targets, diff lines, the verbatim command in a permission request, fenced code in Claude's answers.
+Every size is a designed value scaled against the standard text style nearest it, so raising the OS or browser text size scales the whole instrument the way Dynamic Type does. Nothing renders below 9 pt, whatever the setting: the instrument is dense on purpose, but a 6 pt caption is not density — it is a value nobody can read.
 
 ### Named Rules
 
-**The Two Registers Rule.** Monospace is for anything the machine measured or named: values, units, paths, keys, commands, statuses. Sans is for anything written to be read as language. A label never becomes sans to look friendlier, and prose never becomes mono to look technical.
+**The Two-Families Rule.** Monospace for anything the machine measured or named. Sans for anything a person wrote. They never trade jobs, so the eye learns in one screen which parts of the panel are readings and which are sentences.
 
-**The Verbatim Rule.** A command, a path, or an error the user may need to act on is rendered mono, selectable (`.textSelection(.enabled)`), and never truncated mid-token. Truncation, when unavoidable, takes the head of a path and the middle of a target — never the tail that carries the filename.
-
-**The 9 Point Floor Rule.** Nothing renders below 9 pt at any text size. This is a deliberate departure from the platform's 11 pt floor, taken because the instrument's density is the design and a uniform 11 pt would rewrite it — but 6 pt and 7 pt captions were not density, they were unreadable. The floor is enforced inside `LG.Font`, so a call site cannot opt out by passing a smaller number.
-
-**The Growing Control Rule.** A control that stacks text sets `minHeight`, never a fixed `height`. Identical at the default size; at large sizes the control grows instead of clipping the words inside it. The 76 pt primary action is the case that proves it — a fixed height clips the preflight line, which is the sentence saying what the action costs.
+**The Lead-Reading Rule.** Where three numbers sit in a strip, one of them is why the card exists — RTT, on Home. It is set larger than the other two, because three numbers at the same size is a table and the eye has to read all of it.
 
 ## Layout
 
-One column, 24 pt gutters, set by `ScreenBody` — which also owns the ground color, extends it under the safe area, and forces `.preferredColorScheme(.dark)`. Content stays inside the safe area; only the ground and bottom sheets cross it.
+A single column bounded at 560 pt and centred, with a 20 pt gutter, on every screen but the remote view. Past **900 pt** the column stops being a column: Home becomes a picture and its actions on the left with a 320 pt rail of readings on the right, and the remote view's letterbox rail becomes a 276 pt dock down the right-hand side. The split is taken from the width of the window, never from a device class, so a tablet in Split View gets whichever layout its actual width earns.
 
-Vertical rhythm runs on a coarse scale rather than a strict grid: 12 pt between a heading and its content, 18 pt inside a panel, 22–26 pt between sections. Cards and rows carry their own interior padding (18 pt for a condition card, 16 pt horizontal for a list row, 12–14 pt for a ledger row) so the gutter never has to do two jobs.
+On the web that switch is a **container query** on the screen itself, and the DOM order is the phone's order — grid areas do the rearranging, so nothing is rendered twice and there is no `isDesktop` anywhere in the client. On iOS it is a `GeometryReader` reading the same threshold.
 
-Fixed control sizes are load-bearing, not incidental: 44 pt is the floor for anything tappable, 76 pt for the single primary action on a screen, 56 pt for a hub spoke and for the composer's send and stop, 46 pt for a key cap, 50–62 pt for list rows. The control hub is laid out on measured thumb geometry — a 210 pt arc of six 56 pt targets on a 66 pt pitch, positioned by explicit offsets from the bottom-trailing corner, ending at the two easiest positions for a right thumb.
-
-**Every screen but the remote view is one column, bounded at 560 pt (`LG.Metric.measure`) and centred in whatever is left.** A row here is a label on the left and a value on the right; run that to the glass on an iPad and the two ends stop reading as one line. Bounded, the same column reads as a deliberate panel at any width. On a phone the cap never binds — 402 pt of glass minus two gutters is 354 pt — so this is invisible until the window gets wide. It also covers landscape, iPad Split View, and a phone-width window on a tablet without a single device check.
-
-**Screens that are one column ending in a primary action set `ScreenBody(scrolls: true)`** — Home, Pairing, the combo editor. They fill the viewport when there is room, so their spacers still push the footer to the bottom edge, and scroll only once the content genuinely does not fit. Without it, landscape and the larger text sizes both push the only way forward off the screen.
-
-**Portrait** is the instrument: status strip, optional display tabs, picture, pad-mode control, then a 96 pt bottom bar holding stop and hub. **Landscape** is a different instrument rather than a stretched one — the picture takes the left, and a 231 pt right-hand dock carries controls, a modifier row, and live RTT/rate readouts, separated by a single 1 pt chrome rule.
-
-On the remote screen, the letterbox bands left by a 16:10 desktop inside a 19.5:9 phone are treated as usable surface: the trackpad is the entire glass, not just the picture, so the first accidental swipe into the dark area still moves the cursor. The picture keeps every pixel it has; the chrome lives in the bands.
-
-### Named Rules
-
-**The Held Space Rule.** A layout does not move when a value arrives. Pending values are drawn as a dashed rule or an em dash occupying the final geometry, so filling in is a substitution rather than a reflow.
-
-**The Whole Glass Rule.** On the remote screen the input surface is the full frame, including the bands. Anything drawn over the picture is `.allowsHitTesting(false)` unless it is itself a control.
-
-**The Bounded Column Rule.** Layout is driven by available width, never by device model. A column caps at `measure` and centres; a row of equal controls shares the width it is given rather than claiming a fixed one. The six pairing boxes are the case that proves it — at a fixed 48 pt they needed 333 pt inside 327 pt of iPhone SE, and overflowed the app's first screen.
+The remote view is the exception: it runs edge to edge, and the chrome lives in the letterbox bands a 16:10 desktop leaves inside a phone's glass. The trackpad reaches past the video into those bands, so the first accidental swipe in the dark area still moves the cursor — which is what teaches it.
 
 ## Elevation & Depth
 
-There are no shadows in this app — not one `.shadow()` call exists, and none should be added. Depth is entirely tonal plus a hairline, which is what keeps the interface legible beside a live video feed where a soft shadow would read as a compression artifact.
+**No shadows anywhere in the app.** Depth is six tonal grounds and a corner radius. A control that sits inside a card is one step lighter than the card; a control inside *that* is one step lighter again, and one corner step tighter. Those three steps are what make a nested control read as nested without a single line being drawn.
 
-Five grounds form the stack, each roughly two to six points of lightness apart: Deep Ground (`#08090B`) for video and code, Screen Ground (`#0B0D10`) for the page, Raised (`#0E1116`) for panels and sheets, Panel (`#101318`) for fields and pressable rows, Chrome (`#14171C`) for key caps and the fill showing between stacked rows. Because the steps are small, a 1 pt hairline is what actually separates two surfaces; the tone only says which is on top.
-
-A panel that carries a condition takes a **tint wash** instead of a new ground: the signal color at 5% opacity as fill, and the same hue at 30% as its border. That is the system's only "lift", and it is semantic — a tinted panel always means the panel is reporting that condition.
-
-The single deliberate exception is the control hub, which lays a radial gradient of Deep Ground (95% → 0%) behind its arc so six controls stay legible over moving video without dropping an opaque sheet on the picture. It is drawn as a `.background(alignment:)`, never as a stack child, because at 660 pt it is wider than the phone and would otherwise size the entire screen.
-
-### Named Rules
-
-**The No Shadow Rule.** Depth comes from tone and a hairline. If two surfaces are not separable, the fix is a hairline or a ground step — never a shadow, never a blur.
-
-**The Tint Means Condition Rule.** A colored panel wash (5% fill, 30% border) is reserved for a panel that is reporting that condition. It is never used to make an ordinary container look interesting.
+Lines survive only where a gap cannot do the job: the divider in the wide header, the top edge of a destructive drawer, the rail on the Claude timeline. Nightshift draws roughly a fifth as many of them as Longarm did.
 
 ## Shapes
 
-A four-step radius ladder — 3 pt hairline, 6 pt small, 10 pt medium, 12 pt large — with an 8 pt de facto "row" radius used for list rows, key caps, ledgers, and inline groups, and 7 pt inside the keyboard bar. Bottom sheets use an `UnevenRoundedRectangle` with 18 pt top corners only, so the sheet reads as arriving from the edge rather than floating.
+A corner ladder taken from the containment depth rather than from a t-shirt scale: **card 20**, **control 16**, **inner 12**, **small 8**, **screen 3**. A drawer takes **28** on its top corners only, larger than a card's so it reads as arriving from off-screen rather than as a card that grew. The screen radius is deliberately tight — a 22 pt rectangle with a 16 pt corner reads as a pill, not as a monitor.
 
-Circles are reserved for radial and status geometry: hub spokes and their close button, condition dots, the pairing step markers, the spinner's 0.75-trimmed arc. Capsules mark transient or dismissible things: the stop pill on the remote screen, suggestion chips, the sheet grabber, the toggle track.
+**Grouped rows use two radii.** The outer corners of the run take 16; the seams between rows take 4. That is what makes a run of rows read as one object while each row keeps its own 2 pt gap and its own tap target. The rule lives in CSS `:first-child` / `:last-child` and in a `GroupPosition` enum on iOS, so a row never has to be told where in the list it sits.
 
-**Dashed strokes mean provisional.** A 4-4 or 5-5 dash marks anything not yet real, not yet measured, or not yet chosen: the placeholder rule standing in for a value, a pending exchange step, the side-by-side option before it is picked, the add-combo slot, the trackpad boundary hint, the hub's sweep ring, and an offline display's outline. A solid stroke means the thing exists.
+Circles are reserved for status geometry: condition dots, timeline markers, the spinner's 0.75-trimmed arc, the rotation dial. Capsules mark transient things: the connection pill on the wide header, suggestion chips, the drawer grabber, the toggle track.
 
-Two custom silhouettes carry the instrument metaphor: **corner ticks** — four 11 pt L-shaped strokes inset 12 pt from the picture's edges, marking where the real pixels end so a zoomed frame never reads as a cropped one — and the **machine tiles** on the pairing screen, a 16×26 phone outline and a 30×20 display outline drawn at 1 pt, connected by the line that gives the product its name.
+**Dashed strokes mean provisional.** A 4-4 dash marks anything not yet real, not yet measured, or not yet chosen: the placeholder rule standing in for a value, a pending exchange step, the side-by-side option before it is picked, the add-combo slot, an offline display's outline. A solid stroke means the thing exists.
+
+Two custom silhouettes carry the instrument metaphor: **corner ticks** — four 11 pt L-shaped strokes inset 12 pt from the picture's edges, marking where the real pixels end so a zoomed frame never reads as a cropped one — and the **hatch**, a 135° two-grey stripe standing in for a picture that has not arrived. An empty frame, never a black one, because a black rectangle is a claim about what the Mac is displaying.
 
 ### Named Rules
 
 **The Dashed-Is-Provisional Rule.** Dashed means unmeasured, pending, or unselected. It resolves to a solid stroke the moment the thing becomes real. Dashes are never used decoratively.
 
+**The Containment-Radius Rule.** Card 20 → control 16 → inner 12. A control never takes a corner equal to or larger than the thing containing it.
+
 ## Components
 
 ### Buttons
 
-- **Shape:** gently rounded (10 pt) for filled actions, small-rounded (6 pt) for outlined ones, 8 pt for grid and dock buttons.
-- **Primary:** a 76 pt filled bar in a signal color with matching ink — jade to proceed, cyan for a user-initiated action (wake, retry, new session), sodium when the user is proceeding into a degraded state. Left column carries a 19 pt medium sans title over a 10 pt mono-caps sub-label; the glyph (`→`, `↑`, `↻`, `＋`) sits right.
-- **Sub-label is mandatory.** It states what the action will do and what it costs before the thumb commits: `MAIN · FIT · ~228MS TO FIRST FRAME`, `NUDGES THE DISPLAY · USUALLY 4S`, `AUTO-RETRY IN 14S · TAP TO GO NOW`.
-- **Secondary:** outlined, 44 pt, mono-caps label in Text Secondary over a hairline border, no fill. Takes a red tint and a 50%-opacity red border when destructive.
-- **Destructive confirm:** 60 pt filled clay with `#1B0805` ink, always paired with an outlined 52 pt keep-it action beneath, never beside.
-- **Disabled:** 45% opacity on the whole control, plus `.disabled(true)`. No separate gray palette.
-- **Pressed:** no dedicated pressed style; `.buttonStyle(.plain)` throughout, with `UIImpactFeedbackGenerator(style: .light)` on hub spokes, pad-mode switches, combos, and trackpad clicks. Touch feedback is haptic, not visual.
+- **Primary:** a 68 pt filled card in a signal colour with matching ink — jade to proceed, violet for a user-initiated action (wake, retry, new session), sodium when the user is proceeding into a degraded state. A 19 pt semibold title over a 9 pt mono-caps sub-label; the glyph (`→`, `↑`, `↻`, `＋`) sits right.
+- **Sub-label is mandatory.** It states what the action will do and what it costs before the thumb commits: `BUILT-IN · FIT · ~228MS TO FIRST FRAME`, `NUDGES THE DISPLAY · USUALLY 4S`, `AUTO-RETRY IN 14S · TAP TO GO NOW`.
+- **Filled:** 56 pt, no sub-label, `radius.control` — "Allow once", "Copy image", a destructive confirm at 60 pt.
+- **Outlined:** 44 pt minimum, mono-caps label, a one-point outline drawn *inside* the box so a row of these lines up with a filled sibling of the same declared height. Takes a clay tint and a 50 %-clay edge when destructive.
+- **Quiet:** label only, no fill and no edge — the third option on a destructive sheet, the standing grant on a permission prompt. Deliberately weightless.
+- **Disabled:** 45 % opacity on the whole control. No separate grey palette.
+- **Pressed:** no visual pressed style; touch feedback is haptic.
 
-### Chips
+### Cards and groups
 
-- **Style:** capsule outline in hairline, 44 pt tall, 14 pt horizontal padding, 10 pt mono-caps in Text Secondary.
-- **Use:** Claude follow-up suggestions only. They are shortcuts, so they never take a fill or a signal color.
-
-### Cards / Containers
-
-- **`Panel`** is the only container: 10 pt corners, Raised fill, hairline border, 18 pt interior padding. Passing a tint swaps the fill for that hue at 5% and the border for 30%.
-- **Row groups** stack their rows on a Chrome background with 1 pt spacing, then clip the whole group to 8 pt — so the divider is the backing showing through, not a drawn line.
+- **`Card`** is the filled container: `radius.card`, Raised fill, no border, 16–18 pt interior padding. Passing a tint swaps the fill for that hue at 7 % and adds a 34 % outline — the wash carries the colour, and the outline keeps the edge findable where the wash is too faint.
+- **`Group`** is a run of rows at 2 pt spacing with the two-radius corner treatment. It replaced Longarm's "stack on a chrome background and clip", which drew its dividers by letting the backing show through.
 - **No card shadows, no card gradients.**
 
-### Inputs / Fields
+### Inputs
 
-- **Text fields:** Panel fill, 6 pt corners, hairline border, 44 pt tall, mono at 13 pt. Address and key fields disable autocapitalization and autocorrect.
-- **Code boxes** (pairing): six 48×64 pt boxes over one hidden `TextField` that owns the keyboard, so paste, delete, and one-time-code autofill behave exactly as iOS users expect. The focused box takes an 8%-cyan fill, a cyan border, and a blinking 2 pt cyan caret; filled boxes show 27 pt mono.
-- **Composer:** 12 pt corners, Panel fill, 1–4 lines, 15 pt sans, paired with a 56 pt send button in solid cyan that becomes a 56 pt clay Stop while the agent is streaming.
-- **Focus:** border shifts hairline → cyan and the fill picks up an 8% cyan wash. No glow, no ring.
+- **Text fields:** Raised 2 fill, `radius.inner`, 44 pt tall, mono at 13 pt, no border. Address and key fields disable autocapitalisation and autocorrect.
+- **Code boxes** (pairing): six flexible-width 84 pt boxes over one hidden field that owns the keyboard, so paste, delete and one-time-code autofill behave exactly as the platform's users expect. The focused box takes a 12 %-violet fill, a 1.5 pt violet outline and a blinking 2 pt violet caret; a filled box takes Raised 2 and 30 pt mono; an empty one takes Raised.
+- **Composer:** `radius.card`, Raised fill, 1–4 lines, 15 pt sans, paired with a 52 pt send button in solid violet that becomes a 52 pt clay Stop while the agent is streaming.
+- **Focus:** a 2 pt violet outline at 2 pt offset. No glow.
 
 ### Navigation
 
-**Three routes and two sheets — no navigation stack, and that is deliberate.** `AppModel.route` holds only the places the app can *be*: pairing → home → remote. Settings and the Claude panel are sheets over whichever of those is showing. The app has no hierarchy to push through: Settings is not deeper than Home, it is beside it, and a stack would buy one chevron at the cost of a navigation model nothing else needs. Sheets give the dismiss gesture that was actually missing, and give it to both.
+**Three routes and two sheets — no navigation stack, and that is deliberate.** The route holds only the places the app can *be*: pairing → home → remote. Settings and the Claude panel are sheets over whichever of those is showing. Settings is not deeper than Home, it is beside it, and a stack would buy one chevron at the cost of a navigation model nothing else needs.
 
-**The remote screen keeps no edge-swipe back, on purpose.** The whole glass is the trackpad, including the letterbox bands, so an interactive pop gesture would fight the pointer for the left edge — and the one that loses is the one you reach for in the dark. It is a full-screen immersive presentation, the same exemption a camera or a video player takes; `✕` and the hub are the exits.
+**The Claude sheet opens at the height its context calls for:** half from the remote screen, where there is a live picture worth keeping in view, and full from Home, where there is nothing below to see. Derived at presentation, never remembered — a stored detent would be exactly the hand-set flag the Measured Condition Rule exists to forbid.
 
-**The Claude sheet opens at the height its context calls for:** `.medium` from the remote screen, where there is a live picture worth keeping in view, and `.large` from Home, where there is nothing below to see. Derived at presentation, never remembered — a stored detent would be exactly the hand-set flag the Measured Condition Rule exists to forbid. Both sheets set `.presentationBackground` to the screen ground, because this app has one appearance and no system materials.
-
-Screens carry their own chrome: a `ScreenHeader` with the `VibeWire` wordmark in 12 pt mono-caps at 4.1 tracking and a three-dot overflow, or a 22 pt sans title with a `DONE` action. The diff, session picker, QR scanner, and combo editor are sheets presented from within their parent — note that SwiftUI honors only the **first** `.sheet` on a given view, so a second one must be attached to a child.
-
-**Every glyph-only or outline-only target carries `.contentShape(Rectangle())`.** Hit testing follows drawn ink, so three 3 pt dots, an arrow glyph, a dashed box, and 9 pt caption text are all visually buttons and practically untappable without it.
+**Every glyph-only or outline-only target carries a full-box hit shape.** Hit testing follows drawn ink, so three 3 pt dots, an arrow glyph, a dashed box and 9 pt caption text are all visually buttons and practically untappable without it.
 
 ### Segmented control
 
-Custom, not `Picker`: equal-width 44 pt items separated by 1 pt of Hairline Dim showing through, clipped to 6 pt. Selected takes a 14% cyan wash with a cyan label; unselected sits on Raised with a Text Secondary label. An optional 5 pt dot badges a segment whose underlying thing is live. It writes its binding on every tap, so consumers must guard against re-selecting the current value.
-
-### Toggle
-
-Drawn in the system's shape but the app's colors: 52×30 capsule, cyan-30% fill with a cyan border and cyan knob when on, Chrome fill with a stroke border and a Text Tertiary knob when off. 24 pt knob, 3 pt inset.
+A padded track with a filled thumb, not a row of bordered cells: 3 pt of padding on a Raised track at `radius.inner`, with the selected item taking a 16 % violet wash and a violet label at `radius.inner − 3`. An optional 5 pt dot badges a segment whose underlying thing is live.
 
 ### Signature components
 
-**`Readout`** — a 9 pt mono-caps label over a 19 pt mono value with its unit at 11 pt in Text Tertiary, baseline-aligned with 1 pt of space. Three or four sit in a row inside a condition card. This is the atom the whole system is built from.
+**`Readout`** — a mono-caps label over a mono value with its unit at 10 pt in Text Tertiary. Three sit in a row inside the condition strip, the first at 26 pt and the others at 19. This is the atom the whole system is built from.
 
-**`ConditionDot`** — an 8 pt filled circle whose pulse rate carries meaning: 2.6 s healthy, 1.4 s degraded, a hollow ring when idle. Pulse is suppressed entirely when video is live.
+**`ConditionDot`** — a 9 pt circle whose pulse rate carries meaning: 2.6 s healthy, 1.4 s degraded, a hollow ring when idle, and a **square** when lost. Pulse is suppressed entirely when video is live.
 
-**`SignalBars`** / **`Sparkline`** — four ascending 4 pt bars for strength; twenty 4 pt bars for the 60-second RTT trace, with the most recent five drawn at full opacity and the rest at 42%, so "now" is legible inside the history.
+**The hero** — the last frame the Mac sent, at whatever age it is, as the largest thing on Home and as the button that starts the stream. A picture of the thing being reached for is a better target than a word for it. It carries two chips: the frame's age, and which display it is. When nothing has been decoded it is a hatched frame with its corner ticks.
 
-**`KeyCap`** — 46 pt (52 pt in the latch tray), Chrome fill, 8 pt corners, glyph in mono over an optional 7 pt caption. When held: 18% cyan fill, cyan border, cyan glyph, and a 5 pt cyan dot in the top-trailing corner. One held-state treatment, used identically on the hub, the modifier bar, and the key row.
+**The rail** — the control layer in the remote view's lower band. Four things left to right: what one finger does (the only mode, so the only segmented control), the keyboard, Command, and everything else. `⌘` latches directly rather than opening the drawer to it — it is the modifier a Mac actually needs, and one tap instead of two is the difference between using it and not.
 
-**`ToolRow`** — one 44 pt line per tool call: state marker (`✓` jade / `✕` clay / cyan spinner), mono name, mono target truncated at the middle, elapsed time right-aligned. Only a running call expands to show a 10 pt preview, and only a running call takes Screen Ground instead of Raised.
+**The command drawer** — what replaced the thumb arc. Six labelled tiles in a four-column grid plus a permanent modifier section, rising from the bottom edge and stopping short of the picture. The arc only fitted a right thumb, its two-word captions had to be learnt rather than read, and it sat over the one surface this app exists to show.
 
-**`PermissionSheet`** — sodium-bordered bottom sheet stating the verbatim command in a Deep Ground code box, an explanation in 13 pt sans, and how long it has been waiting. Allow-once is a 56 pt filled cyan bar; Deny is a full-width outlined clay row beneath it; "Always allow this here" is demoted to a 9 pt mono-caps text button, deliberately far from the two taps that are reversible.
+**`KeyCap`** — 46 pt (52 in the drawer), Raised 2 fill, `radius.inner`, glyph over an optional 8 pt caption. When held: 20 % violet fill, violet outline, violet glyph, and a 5 pt violet dot in the top-trailing corner. One held-state treatment, used identically in the drawer, the modifier row and the key row.
 
-**Exchange steps** — four named rows with real detail values (`ED25519`, `STORED`) and per-step markers, instead of one indeterminate spinner. A failure lands on a specific step.
+**The timeline** — Claude's tool calls. A rail down the left says these happened in sequence; a finished call is one 40 pt line (verb, target, elapsed), and the running one becomes a card with its output in it, because that is the only one whose output is still news. A boxed list of equal rows said nothing about order and made twenty calls look like a table.
 
-**Diff** — mono 11 pt on `#0B0E12`, jade on 8% jade for additions, clay on 8% clay for removals, cyan for hunk headers, Text Tertiary for metadata. Scrolls in both axes; the leading `+`/`−` is preserved so a copied diff is still a diff. The column's width is computed from the longest line rather than measured (`LG.Font.monoAdvance` — monospaced text advances 0.6 em per character), so the added and removed tints run the full width of the column instead of stopping raggedly at each line's own last character.
+**The permission card** — sodium-tinted, at the end of the transcript rather than pinned over it. The verbatim command in a Deep-ground code block, an explanation in 13 pt sans, and how long it has been waiting. Allow-once is a filled violet bar; Deny is a full-width outlined clay row beneath it; "Always allow this here" is demoted to a quiet 9 pt text button, deliberately far from the two taps that are reversible. Everything else on screen dims to 50 % and the composer says `Answer the question first…`, so there is exactly one thing to do.
 
-**`SheetDismiss`** — the way out of a sheet, defined once. `DONE` by default, `CLOSE` on the two read-only viewers, always 11 pt mono-caps in Text Secondary at a 44 pt target. Text Secondary rather than the accent is the point: every sheet can also be swiped down, so this is the second way out and never the primary action on the screen.
+**Exchange steps** — four named rows in a group, with real detail values (`ED25519`, `STORED`) and per-step markers, instead of one indeterminate spinner. A failure lands on a specific step. The running step takes a 10 % violet wash.
 
-**`VideoCaption` / `.videoChip()`** — the ground any mark needs when it sits on the picture: 6 pt horizontal, 3 pt vertical, Deep Ground at 92%. Solid text on top. Defined once so a caption, the INPUT HERE badge, and the landscape live readout cannot drift apart, and so the contrast holds over a white document as well as a black one.
+**Diff** — mono 11 pt on Deep, jade on 10 % jade for additions, clay on 10 % clay for removals, violet for hunk headers. Scrolls in both axes; the leading `+`/`−` is preserved so a copied diff is still a diff.
 
-**Markdown** — blocks split locally, inline spans through `AttributedString`. Inline code takes mono 13 pt in cyan; bullets and numbers take cyan markers at 80%; block quotes take a 2 pt cyan-35% rule; fenced code gets its own ground, horizontal scrolling, and a copy button. No bubbles — Claude's turns run the full measure under a cyan `CLAUDE` label and a hairline.
+**`VideoCaption`** — the ground any mark needs when it sits on the picture: 8 × 4 pt padding, `radius.sm`, Deep at 92 %, solid text on top. Alpha cannot be verified against content nobody controls — a caption at 34 % white measures 2.9:1 over a black desktop and 1.0:1 over a white document, which is what a text editor actually looks like.
+
+**Markdown** — no bubbles. Claude's turns run the full measure under a violet `CLAUDE` label and a hairline; inline code takes mono in violet; fenced code gets its own Deep ground, horizontal scrolling and a copy button.
+
+### The Mac host
+
+The host follows macOS rather than iOS: a menu bar item and one window. The menu opens with **three measured values before any menu item** — the machine, whether a client is attached and how many screens are going out, and which path it is on — because the reason to open that menu is almost always to check whether the Mac is still serving. Drawn as a view rather than as greyed-out menu entries, since these are readings, not disabled commands.
+
+The pairing window is the one exception to "follow the platform", and it earns it: it is the only screen a user compares side by side with the phone in their other hand. It is drawn in the app's own colours — six digit boxes, a rotation dial, one card per way in — so the digits on the Mac and the boxes on the phone look like the same instrument.
 
 ### Named Rules
 
-**The Preflight Rule.** A primary action always states, in its own sub-label, what it is about to do and what it will cost in time, resolution, or bytes.
+**The Preflight Rule.** A primary action always states, in its own sub-label, what it is about to do and what it will cost in time, resolution or bytes.
 
-**The Hit Shape Rule.** Any target whose ink does not fill its frame — glyphs, outlines, dashed boxes, caption text — must declare `.contentShape(Rectangle())`. This has caused four separate untappable controls in this codebase.
+**The Hit Shape Rule.** Any target whose ink does not fill its frame — glyphs, outlines, dashed boxes, caption text — must declare a full-box hit shape. This has caused four separate untappable controls in this codebase.
 
 **The Consequence Rule.** A destructive confirmation lists three plain sentences: what is destroyed, what it takes to undo it, and what is *not* affected. The last line is what makes the tap safe to judge one-handed.
 
-**The Reduce Motion Rule.** Reduce Motion is about the vestibular system, not about stillness. What goes is travel, scale, and spring — sheets fade in place instead of rising, the settings screen crossfades instead of pushing, the hub's spokes keep their staggered sequence but lose the scale-up, and the pairing dot rests at the midpoint of its wire instead of crossing it. What stays is anything that would otherwise state something false: the spinner keeps turning, because a frozen one says the Mac stopped answering and nothing measured that. Every loop routes through `LG.Motion.loop` / `linearLoop`, which return `nil` under the setting so `withAnimation` lands on the resting state in one step.
+**The Never-Cover-The-Picture Rule.** Nothing that can be answered, dismissed or ignored is allowed to sit over the Mac's screen. The drawer stops short of the band, the stall card sits above the rail, and the permission prompt is in the transcript. This is the rule the thumb arc broke.
+
+**The Reduce Motion Rule.** Reduce Motion is about the vestibular system, not about stillness. What goes is travel, scale and spring — sheets fade in place instead of rising. What stays is anything that would otherwise state something false: the spinner keeps turning, because a frozen one says the Mac stopped answering and nothing measured that.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** derive every displayed condition from a measured value, through `Condition.from(...)`, so the label and the numbers cannot disagree.
-- **Do** print `—` in Text Disabled for any value the host has not reported, at the size the real value will occupy.
-- **Do** reserve Held Cyan (`#6BC7E8`) for state the user created — held modifiers, active selection, focused field, Claude — and Reachable Jade / Degraded Sodium / Lost Clay for what the Mac is doing.
-- **Do** set every measured value, unit, path, key, and command in mono, and every sentence in sans.
-- **Do** give each primary action a mono-caps sub-label stating its cost (`540P · SOFT TEXT UNTIL IT RECOVERS`).
+- **Do** derive every displayed condition from a measured value, through `conditionFrom(...)` / `Condition.from(...)`, so the label and the numbers cannot disagree.
+- **Do** print `—` in Text Tertiary for any value the host has not reported, at the size the real value will occupy.
+- **Do** reserve Held Violet for state the user created — held modifiers, active selection, focused field, Claude — and jade / sodium / clay for what the Mac is doing.
+- **Do** set every measured value, unit, path, key and command in mono, and every sentence in sans.
+- **Do** give each primary action a mono-caps sub-label stating its cost.
 - **Do** name the failure with its address and verdict — list both transports, their results, and the time of last contact rather than one word for "offline".
-- **Do** add `.contentShape(Rectangle())` to any glyph-only, outline-only, or caption-sized target.
-- **Do** separate surfaces with a 1 pt hairline (`#1A1E24` inside a group, `#262B33` at a container edge, `#2E343D` on an interactive edge) and a tonal step.
-- **Do** compute a text color against the lightest ground it lands on, and clear 4.5:1 there. `chrome` (`#14171C`) is that ground, and a 7 pt key-cap caption is the case to check.
-- **Do** give any mark over the Mac's picture its own ground with `.videoChip()`.
-- **Do** hold layout with a dashed rule or em dash so nothing reflows when a value arrives.
-- **Do** keep every tappable control at 44 pt or larger, and place destructive taps a full row away from irreversible ones.
-- **Do** suppress ambient animation while video is live — pass `animated: false` the way `ConditionDot` does on the remote screen.
-- **Do** route every perpetual loop through `LG.Motion.loop` / `linearLoop`, and every edge transition through `LG.Motion.rise` / `push`, so Reduce Motion is handled once rather than per view.
-- **Do** land on a resting state that still reads correctly when a loop is suppressed — full opacity for the condition dot, midpoint for the pairing dot, outer radius for the teaching ring. A frozen mid-fade looks like a bug.
-- **Do** keep motion at 120–180 ms for state changes; the only longer motions are the hub's 0.28 s spring with an 18 ms per-spoke stagger and the deliberately slow ambient loops on screens with no picture.
+- **Do** let a group's corners come from position in the run, never from a prop passed at the call site.
+- **Do** state the OKLCH definition in the web token file and derive the Swift literal from it, so the three clients cannot drift.
 
 ### Don't:
 
-- **Don't** add a shadow, blur, or glassmorphic material. Depth is tone plus hairline, and the app has zero `.shadow()` calls today.
-- **Don't** introduce a light mode or branch on `colorScheme`. `ScreenBody` pins `.preferredColorScheme(.dark)` and the palette assumes it.
-- **Don't** use a signal color decoratively, or use cyan for a machine condition. A new color must declare which of the two voices it belongs to.
-- **Don't** set text in `textDisabled` (`#3A404A`, 1.7:1). It is ink for a disabled control and fill for a dormant dot. If a mark is meant to be read — including the em dash that says "not measured" — it takes `textTertiary`.
-- **Don't** lower a color's opacity to make it recede. Every alpha step is an unverified contrast ratio: `ink.opacity(0.66)` on the preflight line measured 4.50:1, and a 70% red count measured 3.4:1. Pick the dimmer color, or accept the solid one.
-- **Don't** render a chat bubble, avatar, or typing-dot animation in the Claude panel. Prose runs the full measure under a label.
-- **Don't** show a bare spinner in place of a value or a named step. Four named steps with real detail beat one indeterminate arc.
-- **Don't** collapse distinct failures into one message. A timeout, a refused connection, a missing permission, and a sleeping Mac are four states with four answers.
-- **Don't** wrap code or a diff. Scroll it horizontally; wrapped code lies about indentation and truncated code lies outright.
-- **Don't** pass a text size below 9, or set a fixed `height` on a control that stacks text. The floor is enforced in `LG.Font` and the growth in `minHeight`; both exist because the app has to answer the reader's text size.
-- **Don't** hard-code a hex literal that appears more than once. The two that did are now tokens: `codeGround` (`#0B0E12`, the ground under fenced code and the diff) and `onAmberWash` (`#C9A468`, prose on an amber wash). Six single-use literals remain — `#D5DBE3`, `#C3C8D0`, `#A8AEB8`, `#0D1014`, `#1E242C`, `#060709` — and are left deliberately: a local exception used once is not a system value, and promoting it would grow the palette without teaching it anything.
-- **The one non-palette color, and why.** `BreathingRing` — the touch hint that retires after three sessions — draws two concentric circles in plain white at 22% and 10% (`RemoteView.swift`, and `.breathing` in the web client's `longarm.css` sibling). Deliberately outside the palette in both clients. The ring sits on live video whose color nobody controls, and it is not reporting a condition: a green, amber, or cyan ring would claim something about the Mac's state or the user's own input that "a touch happens here" does not mean. Neutral white at low alpha is the one mark in the app that belongs to the glass rather than to the machine. It is the sole exception, and a second one needs the same argument or a palette entry.
-- **Don't** put an oversized decorative layer in a `ZStack` as a sibling. Anything wider than the phone goes in `.background(alignment:)`, or it resizes the whole screen.
-- **Don't** use dashes decoratively. A dashed stroke means unmeasured, pending, or unselected, and it resolves to solid when the thing becomes real.
-- **Don't** attach two `.sheet` modifiers to one view — SwiftUI honors only the first. Move the second onto a child.
+- **Don't** add a shadow, a gradient, or a light mode.
+- **Don't** draw a border around something that already has a fill. Two greys apart is the separation.
+- **Don't** spend violet on anything the machine did, or jade on anything the user switched on.
+- **Don't** put a control over the Mac's picture that could have gone in the band beside it.
+- **Don't** show a spinner where four named steps with real values would say the same thing and survive a failure.
+- **Don't** let a value render below 9 pt, whatever the reader's text size.
+- **Don't** use a dashed stroke decoratively — it means provisional, everywhere, or it means nothing.

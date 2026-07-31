@@ -1,28 +1,36 @@
 /**
- * 03A–03D · REMOTE VIEW, with the control layer (04) and keyboard mode (05)
- * layered on top. Ported from ios/VibeWire/Screens/RemoteView.swift.
+ * 05 · REMOTE — LIVE, 07 · TYPING, 08 · RECONNECTING, and 17 · STREAMING ON A
+ * LAPTOP. The command drawer (06) is in `CommandDrawer.tsx`.
+ * Mirrored by ios/VibeWire/Screens/RemoteView.swift.
  *
  * A 16:10 desktop inside a phone's glass leaves bands. They are used rather than
  * fought: the picture keeps every pixel it has, the chrome lives in the dark, and
  * the trackpad reaches past the video into the bands — so the first accidental
  * swipe in the dark area still moves the cursor, which is what teaches it.
  *
+ * What Nightshift changed here is the control layer, not the glass. The thumb arc
+ * is gone; its seven actions live in a labelled rail across the lower band and in
+ * a drawer that stops short of the picture. The zoom slider that ran down the
+ * right-hand edge is gone too — it was a control for a value nobody sets by hand,
+ * and the scale it reported is now one word in the caption under the picture.
+ *
  * What the browser adds over the phone, because the hardware is different:
  *
- *  - **Pointer capture.** CAPTURE POINTER takes a Pointer Lock and the Mac's cursor
- *    then tracks the real one one-to-one, at whatever rate the device reports.
- *    Escape gives it back. This is the whole reason a laptop is a better VibeWire
- *    client than a phone.
+ *  - **Pointer capture.** Taking a Pointer Lock makes the Mac's cursor track the
+ *    real one one-to-one, at whatever rate the device reports. Escape gives it
+ *    back. This is the whole reason a laptop is a better VibeWire client than a
+ *    phone.
  *  - **A real drag.** Captured, the mouse button is the Mac's mouse button: down,
- *    move, up is a drag. Uncaptured — and on touch — it is press-and-hold then move,
- *    because a finger sliding on a trackpad has always meant "move the pointer" and
- *    an uncaptured mouse is a trackpad.
+ *    move, up is a drag. Uncaptured — and on touch — it is press-and-hold then
+ *    move, because a finger sliding on a trackpad has always meant "move the
+ *    pointer" and an uncaptured mouse is a trackpad.
  *  - **Wheel and ⌃wheel.** A scroll wheel scrolls the Mac; the pinch a trackpad
  *    reports as ⌃wheel zooms, the same as a two-finger pinch on glass.
  *
- * Uncaptured, a mouse is treated exactly as a finger: it steers only while its button
- * is down. Steering on hover was the first thing tried and it is wrong — reaching for
- * the STOP button dragged the Mac's cursor across the desktop on the way.
+ * Uncaptured, a mouse is treated exactly as a finger: it steers only while its
+ * button is down. Steering on hover was the first thing tried and it is wrong —
+ * reaching for the STOP button dragged the Mac's cursor across the desktop on the
+ * way.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
@@ -31,17 +39,17 @@ import { bitrateMbps, store, type DisplayEntry } from '../app/store'
 import { hostKeyName, modifiersFrom, releaseKeyboardLock } from '../app/keymap'
 import {
   Caps,
-  ConditionDot,
+  Card,
   conditionColor,
   CornerTicks,
   KeyCap,
   MODIFIERS,
-  Panel,
   Segmented,
   Spinner,
+  Tile,
   VideoCaption,
 } from '../design/components'
-import { ControlHub } from './ControlHub'
+import { CommandDrawer } from './CommandDrawer'
 import { focusKeyboardField, isTouchPrimary, KeyboardBar, KeyboardField } from './KeyboardBar'
 import { VideoSurface } from './VideoSurface'
 
@@ -70,8 +78,8 @@ export function Remote() {
   const zoom = store.zoomScale.value
 
   // Orientation taken from the glass, not from a user-agent string. A window that
-  // is wider than it is tall is landscape whatever the device claims to be, which
-  // also covers a desktop window and a tablet in Split View without once asking
+  // is wider than it is tall gets the dock whatever the device claims to be, which
+  // also covers a laptop window and a tablet in Split View without once asking
   // what it is running on.
   useLayoutEffect(() => {
     const node = glass.current
@@ -124,7 +132,12 @@ export function Remote() {
     setPan({ x: 0, y: 0 })
   }
 
-  const applyZoom = (scale: number, focal: { x: number; y: number }, fromZoom: number, fromPan: { x: number; y: number }) => {
+  const applyZoom = (
+    scale: number,
+    focal: { x: number; y: number },
+    fromZoom: number,
+    fromPan: { x: number; y: number },
+  ) => {
     store.zoom(scale)
     // Keep whatever is under the fingers under the fingers, by moving the picture
     // rather than moving the scale origin. Anchoring the transform at the pinch
@@ -327,7 +340,10 @@ export function Remote() {
       // What a trackpad pinch looks like to a browser.
       const box = picture.current?.getBoundingClientRect()
       const focal = box
-        ? { x: event.clientX - (box.left + box.width / 2), y: event.clientY - (box.top + box.height / 2) }
+        ? {
+            x: event.clientX - (box.left + box.width / 2),
+            y: event.clientY - (box.top + box.height / 2),
+          }
         : { x: 0, y: 0 }
       const from = store.zoomScale.value
       applyZoom(from * (1 - event.deltaY / 200), focal, from, pan)
@@ -445,17 +461,13 @@ export function Remote() {
   return (
     <div
       ref={glass}
-      class="stack"
+      class="remote"
       style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'var(--lg-deep)',
+        flexDirection: landscape ? 'row' : 'column',
         // The pad is the glass: the browser must not claim these gestures for
         // scrolling or page zoom.
         touchAction: 'none',
-        userSelect: 'none',
         cursor: captured ? 'none' : padMode === 'pan' ? 'grab' : 'default',
-        overflow: 'hidden',
       }}
       {...padHandlers}
     >
@@ -482,10 +494,9 @@ export function Remote() {
       )}
 
       {zoom > 1.02 ? <Minimap /> : null}
-      <ZoomRail />
       {showZoomBadge ? <ZoomBadge /> : null}
-      {stalled ? <ReconnectingOverlay seconds={stallSeconds} /> : null}
-      {store.showHub.value ? <ControlHub /> : null}
+      {stalled ? <ReconnectingCard seconds={stallSeconds} landscape={landscape} /> : null}
+      {store.showHub.value ? <CommandDrawer /> : null}
       {store.showKeyboard.value ? <KeyboardBar /> : null}
       {/* Mounted for the whole session, not with the bar: iOS opens the keyboard only
           for a focus() that happens inside a tap handler, and a field that does not
@@ -524,17 +535,25 @@ function PortraitLayout({
       <div
         class="row"
         style={{
-          height: '40px',
+          height: '44px',
           flex: '0 0 auto',
-          paddingInline: '18px',
+          gap: '10px',
+          paddingInline: 'calc(14px + var(--safe-left)) calc(14px + var(--safe-right))',
           marginTop: 'var(--safe-top)',
         }}
       >
+        <StopButton size={36} />
         <StatusStrip />
       </div>
 
       {displays.length > 1 ? (
-        <div style={{ paddingInline: '18px', marginTop: '6px', flex: '0 0 auto' }}>
+        <div
+          style={{
+            paddingInline: 'calc(14px + var(--safe-left)) calc(14px + var(--safe-right))',
+            marginTop: '6px',
+            flex: '0 0 auto',
+          }}
+        >
           <DisplayTabs />
         </div>
       ) : null}
@@ -547,21 +566,57 @@ function PortraitLayout({
         <Picture pan={pan} pictureRef={pictureRef} captured={captured} dragging={dragging} />
       )}
 
-      <div style={{ paddingInline: '18px', marginTop: '12px', flex: '0 0 auto' }}>
-        <PadModeControl padMode={padMode} setPadMode={setPadMode} captured={captured} onCapture={onCapture} />
-      </div>
+      <PictureCaption dragging={dragging} />
 
       <span class="spacer" />
 
-      {/* The hub's own arc and its "sweep the thumb" hint land on exactly this
-          strip, so with both up the two captions overlapped and neither could be
-          read. */}
-      {showTeaching && live && !store.sideBySide.value && !store.showHub.value ? (
-        <TeachingLegend />
-      ) : null}
-
-      <BottomBar />
+      <div
+        class="stack"
+        style={{
+          gap: '10px',
+          paddingBottom: 'calc(12px + var(--safe-bottom))',
+          flex: '0 0 auto',
+        }}
+      >
+        {showTeaching && live && !store.sideBySide.value && !store.showHub.value ? (
+          <TeachingLegend />
+        ) : null}
+        <Rail padMode={padMode} setPadMode={setPadMode} captured={captured} onCapture={onCapture} />
+      </div>
     </>
+  )
+}
+
+/** Ends the session. The one control that is in the same place in every layout. */
+function StopButton({ size, label }: { size: number; label?: string }) {
+  const stalled = store.streamState.value.kind === 'stalled'
+  return (
+    <button
+      onClick={() => store.stopStream()}
+      aria-label={stalled ? 'Stop trying to reconnect' : 'Stop streaming'}
+      style={{
+        width: label ? undefined : `${size}px`,
+        height: `${size}px`,
+        flex: label ? '1 1 auto' : '0 0 auto',
+        paddingInline: label ? '18px' : 0,
+        borderRadius: 'var(--radius-inner)',
+        background: 'var(--ns-chrome-2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '9px',
+        color: 'var(--ns-text-secondary)',
+      }}
+    >
+      <span class="mono" aria-hidden="true" style={{ fontSize: 'var(--fs-14)' }}>
+        ✕
+      </span>
+      {label ? (
+        <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-text-secondary)">
+          {label}
+        </Caps>
+      ) : null}
+    </button>
   )
 }
 
@@ -570,6 +625,7 @@ function StatusStrip() {
   const state = store.streamState.value
   const link = store.link.value
   const configs = Object.values(store.videoConfigs.value)
+  const reconnecting = state.kind === 'reconnecting' || state.kind === 'stalled'
 
   const liveLabel = (() => {
     switch (state.kind) {
@@ -598,21 +654,32 @@ function StatusStrip() {
     return `H.264 · ${bitrateMbps(config).toFixed(1)} MB/S · ${config.fps}FPS`
   })()
 
+  const tone = reconnecting ? 'var(--ns-amber)' : conditionColor[condition]
+
   return (
     <>
       <span class="row" style={{ gap: '7px' }}>
-        <ConditionDot
-          condition={condition}
-          size={6}
-          // Nothing decorative moves next to a live video feed.
-          animated={state.kind !== 'live'}
+        <span
+          class={
+            reconnecting
+              ? 'dot dot--pulse dot--pulse-fast'
+              : state.kind === 'live'
+                ? 'dot'
+                : 'dot dot--pulse'
+          }
+          aria-hidden="true"
+          // Nothing decorative moves next to a live video feed; a stall is not
+          // decoration.
+          style={{ width: '6px', height: '6px', background: tone }}
         />
-        <Caps size="var(--fs-10)" color={conditionColor[condition]}>
+        <Caps size="var(--fs-10)" tracking="0.14em" color={tone}>
           {liveLabel}
         </Caps>
       </span>
       <span class="spacer" />
-      <Caps size="var(--fs-10)">{codecLabel}</Caps>
+      <Caps size="var(--fs-9)" tracking="0.1em">
+        {reconnecting ? '—' : codecLabel}
+      </Caps>
     </>
   )
 }
@@ -629,16 +696,19 @@ function DisplayTabs() {
   const selection = store.sideBySide.value ? -1 : (store.selectedDisplay.value?.id ?? 0)
 
   return (
-    <Segmented
-      label="Which display"
-      options={options}
-      selection={selection}
-      onSelect={(value) => {
-        if (value === -1) store.selectBothDisplays()
-        else store.selectDisplay(value)
-        store.startStream()
-      }}
-    />
+    <div data-nopad>
+      <Segmented
+        label="Which display"
+        onGlass
+        options={options}
+        selection={selection}
+        onSelect={(value) => {
+          if (value === -1) store.selectBothDisplays()
+          else store.selectDisplay(value)
+          store.startStream()
+        }}
+      />
+    </div>
   )
 }
 
@@ -653,7 +723,7 @@ function pictureAspect(): number {
 function stallTint(): string | null {
   const kind = store.streamState.value.kind
   return kind === 'stalled' || kind === 'reconnecting'
-    ? 'color-mix(in srgb, var(--lg-amber) 70%, transparent)'
+    ? 'color-mix(in srgb, var(--ns-amber) 80%, transparent)'
     : null
 }
 
@@ -668,17 +738,9 @@ function Picture({
   captured: boolean
   dragging: boolean
 }) {
-  const display = store.selectedDisplay.value
   const tint = stallTint()
   const state = store.streamState.value
   const renderer = store.selectedRenderer()
-
-  const caption = (() => {
-    if (state.kind === 'stalled') return 'LAST GOOD FRAME'
-    if (dragging) return 'DRAGGING · LIFT TO DROP'
-    if (!display) return ''
-    return `${display.name.toUpperCase()} · ${display.width} × ${display.height} · LIVE`
-  })()
 
   return (
     <div
@@ -693,7 +755,7 @@ function Picture({
 
       {/* Corner ticks stay forever — they mark the edge of the real pixels so a
           zoomed picture never looks like a cropped one. */}
-      <CornerTicks color={tint ?? 'color-mix(in srgb, var(--lg-cyan) 75%, transparent)'} />
+      <CornerTicks color={tint ?? 'color-mix(in srgb, var(--ns-accent) 75%, transparent)'} />
 
       {state.kind === 'starting' ? (
         <div
@@ -721,15 +783,18 @@ function Picture({
           }}
         >
           <p
-            class="wrap video-chip"
+            class="wrap"
             style={{
               margin: 0,
               maxWidth: '38ch',
+              padding: '14px 16px',
+              borderRadius: 'var(--radius-control)',
               fontSize: 'var(--fs-13)',
               lineHeight: 1.45,
-              color: 'var(--lg-on-amber-wash)',
-              borderLeft: '2px solid var(--lg-amber)',
-              padding: '12px 14px',
+              color: 'var(--ns-on-amber-wash)',
+              background: 'color-mix(in srgb, var(--ns-deep) 92%, transparent)',
+              outline: '1px solid color-mix(in srgb, var(--ns-amber) 34%, transparent)',
+              outlineOffset: '-1px',
             }}
           >
             The Mac is sending video this browser cannot decode: {renderer.failure}
@@ -737,27 +802,62 @@ function Picture({
         </div>
       ) : null}
 
-      <div
-        style={{
-          position: 'absolute',
-          left: '10px',
-          bottom: '26px',
-          opacity: store.showHub.value ? 0 : 1,
-        }}
-      >
-        <VideoCaption color={tint ?? 'var(--lg-text-secondary)'}>{caption}</VideoCaption>
-      </div>
-
       {captured ? (
-        <div style={{ position: 'absolute', right: '10px', bottom: '26px' }}>
-          <VideoCaption color="var(--lg-cyan)">POINTER CAPTURED · ESC RELEASES</VideoCaption>
+        <div style={{ position: 'absolute', right: '14px', bottom: '14px' }}>
+          <VideoCaption color="var(--ns-accent)">POINTER CAPTURED · ESC RELEASES</VideoCaption>
+        </div>
+      ) : null}
+
+      {dragging ? (
+        <div style={{ position: 'absolute', left: '14px', bottom: '14px' }}>
+          <VideoCaption color="var(--ns-accent)">DRAGGING · LIFT TO DROP</VideoCaption>
         </div>
       ) : null}
     </div>
   )
 }
 
-// MARK: 03C — side by side
+/**
+ * What is on screen and at what scale, stated in the band rather than over the
+ * picture. This is where the zoom rail's reading went: a slider nobody drags is
+ * not worth 128px of the right-hand edge, but the number it carried is.
+ */
+function PictureCaption({ dragging }: { dragging: boolean }) {
+  const display = store.selectedDisplay.value
+  const state = store.streamState.value
+  const zoom = store.zoomScale.value
+  const tint = stallTint()
+
+  const left = (() => {
+    if (state.kind === 'stalled' || state.kind === 'reconnecting') return 'LAST GOOD FRAME'
+    if (dragging) return 'DRAGGING · LIFT TO DROP'
+    if (!display) return ''
+    return `${display.name.toUpperCase()} · ${display.width} × ${display.height}`
+  })()
+
+  return (
+    <div
+      class="row"
+      style={{
+        paddingInline: 'calc(14px + var(--safe-left)) calc(14px + var(--safe-right))',
+        paddingTop: '12px',
+        flex: '0 0 auto',
+      }}
+    >
+      {left ? <VideoCaption color={tint ?? 'var(--ns-text-secondary)'}>{left}</VideoCaption> : null}
+      <span class="spacer" />
+      <Caps
+        size="var(--fs-9)"
+        tracking="0.1em"
+        color={zoom > 1.02 ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
+      >
+        {zoom > 1.02 ? `${zoom.toFixed(1)}×` : '1.0× FIT'}
+      </Caps>
+    </div>
+  )
+}
+
+// MARK: — side by side
 
 function SideBySidePanes() {
   const displays = store.displays.value
@@ -780,19 +880,21 @@ function SideBySidePanes() {
               style={{ opacity: focused ? 1 : 0.55 }}
             />
             {focused ? (
-              <CornerTicks color="color-mix(in srgb, var(--lg-cyan) 80%, transparent)" />
+              <CornerTicks color="color-mix(in srgb, var(--ns-accent) 80%, transparent)" />
             ) : null}
             <div
               class="row"
-              style={{ position: 'absolute', left: '10px', bottom: '20px', gap: '8px' }}
+              style={{ position: 'absolute', left: '14px', bottom: '14px', gap: '8px' }}
             >
               {focused ? (
                 <Caps
                   class="video-chip"
                   size="var(--fs-9)"
-                  color="var(--lg-cyan)"
+                  tracking="0.1em"
+                  color="var(--ns-accent)"
                   style={{
-                    outline: '1px solid color-mix(in srgb, var(--lg-cyan) 50%, transparent)',
+                    outline: '1px solid color-mix(in srgb, var(--ns-accent) 50%, transparent)',
+                    outlineOffset: '-1px',
                   }}
                 >
                   INPUT HERE
@@ -822,125 +924,29 @@ function paneAspect(display: DisplayEntry): number {
 
 // MARK: Overlays
 
+/**
+ * What the glass does, said once, in the band under the picture.
+ *
+ * The breathing ring that used to sit above this text is gone with the arc: it
+ * marked a place to touch, and now that the whole glass is the pad and the
+ * controls are labelled, the sentence is the whole instruction.
+ */
 function TeachingLegend() {
   return (
-    <div
-      class="stack"
+    <Caps
+      size="var(--fs-9)"
+      tracking="0.16em"
       style={{
-        gap: '12px',
-        alignItems: 'center',
-        paddingBottom: '24px',
-        pointerEvents: 'none',
-        flex: '0 0 auto',
-      }}
-      aria-hidden="true"
-    >
-      <span class="breathing" />
-      <Caps
-        size="var(--fs-10)"
-        tracking="0.16em"
-        style={{ textAlign: 'center', lineHeight: 1.9 }}
-      >
-        {matchMedia('(pointer: fine)').matches
-          ? 'DRAG ANYWHERE ON THE GLASS · CAPTURE POINTER FREES IT\nWHEEL SCROLLS · ⌃WHEEL ZOOMS'
-          : 'MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS'}
-      </Caps>
-      <style>{`
-        /* The two whites here are outside the Longarm palette on purpose, and they
-           are the iOS values verbatim (RemoteView.swift, BreathingRing). This ring
-           sits on live video whose colour nobody controls, and it is not reporting a
-           condition — a palette colour would say something about the Mac's state that
-           "a touch happens here" does not mean. Neutral white at low alpha is the one
-           mark in the app that belongs to the glass rather than to the machine. */
-        .breathing {
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          border: 1px solid rgba(255,255,255,0.22);
-          position: relative;
-        }
-        .breathing::after {
-          content: '';
-          position: absolute;
-          inset: -1px;
-          border-radius: 50%;
-          border: 1px solid rgba(255,255,255,0.10);
-          animation: lg-breathe 2.8s ease-out infinite;
-        }
-        /* Scaling out from a point is the textbook Reduce Motion trigger, so with
-           the setting on the ring holds its outer position: two concentric circles
-           that still read as "a touch happens here", with the legend beside them
-           carrying the actual instruction. */
-        @keyframes lg-breathe {
-          from { transform: scale(1); opacity: 0.55; }
-          to { transform: scale(1.7); opacity: 0; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .breathing::after { animation: none; transform: scale(1.45); opacity: 0.28; }
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function ZoomRail() {
-  const zoom = store.zoomScale.value
-  const filled = Math.max(2, ((zoom - 1) / 5) * 128)
-  return (
-    <div
-      class="row"
-      aria-hidden="true"
-      style={{
-        position: 'absolute',
-        right: 'calc(20px + var(--safe-right))',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        gap: '8px',
+        textAlign: 'center',
+        lineHeight: 1.8,
+        paddingInline: '14px',
         pointerEvents: 'none',
       }}
     >
-      <Caps
-        size="var(--fs-10)"
-        tracking="0.1em"
-        color={zoom > 1.02 ? 'var(--lg-cyan)' : 'var(--lg-text-secondary)'}
-      >
-        {zoom > 1.02 ? `${zoom.toFixed(1)}×` : '1.0× FIT'}
-      </Caps>
-      <span style={{ position: 'relative', width: '11px', height: '128px' }}>
-        <span
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: '4px',
-            width: '3px',
-            height: '128px',
-            borderRadius: 'var(--radius-pill)',
-            background: '#1E242C',
-          }}
-        />
-        <span
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: '4px',
-            width: '3px',
-            height: `${filled}px`,
-            borderRadius: 'var(--radius-pill)',
-            background: 'color-mix(in srgb, var(--lg-cyan) 50%, transparent)',
-          }}
-        />
-        <span
-          style={{
-            position: 'absolute',
-            bottom: `${filled}px`,
-            left: 0,
-            width: '11px',
-            height: '2px',
-            background: 'var(--lg-cyan)',
-          }}
-        />
-      </span>
-    </div>
+      {matchMedia('(pointer: fine)').matches
+        ? 'DRAG ANYWHERE ON THE GLASS · ESC RELEASES A CAPTURE\nWHEEL SCROLLS · ⌃WHEEL ZOOMS'
+        : 'MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS'}
+    </Caps>
   )
 }
 
@@ -959,10 +965,10 @@ function ZoomBadge() {
         pointerEvents: 'none',
       }}
     >
-      <span class="mono" style={{ fontSize: 'var(--fs-46)', fontWeight: 500 }}>
+      <span class="mono" style={{ fontSize: 'var(--fs-46)', fontWeight: 500, letterSpacing: '-0.03em' }}>
         {store.zoomScale.value.toFixed(1)}×
       </span>
-      <Caps size="var(--fs-10)" tracking="0.2em" color="var(--lg-cyan)">
+      <Caps size="var(--fs-10)" tracking="0.2em" color="var(--ns-accent)">
         DOUBLE-TAP FITS
       </Caps>
     </div>
@@ -980,8 +986,8 @@ function Minimap() {
       aria-hidden="true"
       style={{
         position: 'absolute',
-        top: 'calc(66px + var(--safe-top))',
-        right: 'calc(20px + var(--safe-right))',
+        top: 'calc(62px + var(--safe-top))',
+        right: 'calc(16px + var(--safe-right))',
         gap: '6px',
         alignItems: 'flex-end',
         pointerEvents: 'none',
@@ -992,8 +998,10 @@ function Minimap() {
           position: 'relative',
           width: '78px',
           height: '49px',
-          background: 'color-mix(in srgb, var(--lg-deep) 80%, transparent)',
-          border: '1px solid var(--lg-stroke)',
+          borderRadius: 'var(--radius-small)',
+          background: 'color-mix(in srgb, var(--ns-deep) 88%, transparent)',
+          outline: '1px solid var(--ns-stroke)',
+          outlineOffset: '-1px',
           display: 'block',
         }}
       >
@@ -1005,8 +1013,9 @@ function Minimap() {
             transform: 'translate(-50%, -50%)',
             width: `${78 / zoom}px`,
             height: `${49 / zoom}px`,
-            background: 'color-mix(in srgb, var(--lg-cyan) 16%, transparent)',
-            border: '1px solid var(--lg-cyan)',
+            background: 'color-mix(in srgb, var(--ns-accent) 18%, transparent)',
+            outline: '1px solid var(--ns-accent)',
+            outlineOffset: '-1px',
           }}
         />
       </span>
@@ -1017,58 +1026,81 @@ function Minimap() {
   )
 }
 
-/** A stall looks like a stall: it says how old the picture is, that input is
- *  queued rather than lost, and when it will stop trying. */
-function ReconnectingOverlay({ seconds }: { seconds: number }) {
+/**
+ * A stall looks like a stall: it says how old the picture is, that input is queued
+ * rather than lost, and when it will stop trying.
+ *
+ * It sits above the rail rather than over the picture, because the frozen frame is
+ * the thing being explained and covering it is what made this banner confusing on
+ * the phone.
+ */
+function ReconnectingCard({ seconds, landscape }: { seconds: number; landscape: boolean }) {
   const rows: [string, string, string][] = [
-    ['QUEUED INPUT', `${store.queuedInputCount.value} EVENTS`, 'var(--lg-text)'],
-    ['DROPPING TO', '540P ON RESUME', 'var(--lg-amber)'],
-    ['GIVING UP AT', '30S', 'var(--lg-text)'],
+    ['QUEUED INPUT', `${store.queuedInputCount.value} EVENTS`, 'var(--ns-text)'],
+    ['DROPPING TO', '540P ON RESUME', 'var(--ns-amber)'],
+    ['GIVING UP AT', '30S', 'var(--ns-text)'],
   ]
   return (
     <div
       role="status"
+      data-nopad
       style={{
         position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 'calc(108px + var(--safe-bottom))',
-        paddingInline: '18px',
+        left: 'calc(14px + var(--safe-left))',
+        right: landscape
+          ? 'calc(min(276px, 38vw) + 14px)'
+          : 'calc(14px + var(--safe-right))',
+        bottom: landscape
+          ? 'calc(88px + var(--safe-bottom))'
+          : 'calc(78px + var(--safe-bottom))',
+        maxWidth: 'var(--measure)',
       }}
     >
-      <Panel tint="var(--lg-amber)">
-        <div class="stack" style={{ padding: '18px' }}>
-          <div class="row">
-            <Spinner size={16} color="var(--lg-amber)" />
-            <Caps size="var(--fs-12)" color="var(--lg-amber)" weight={500}>
+      <Card tint="var(--ns-amber)" style={{ padding: '16px 18px 18px' }}>
+        <div class="stack" style={{ gap: '13px' }}>
+          <div class="row" style={{ gap: '10px' }}>
+            <Spinner size={16} color="var(--ns-amber)" />
+            <Caps size="var(--fs-11)" tracking="0.16em" color="var(--ns-amber)" weight={500}>
               RECONNECTING
             </Caps>
           </div>
-          <p class="wrap" style={{ margin: '12px 0 0', fontSize: 'var(--fs-15)', lineHeight: 1.45 }}>
+          <p class="prose wrap">
             The picture above is {seconds}.0 seconds old. Keys and taps are being held, not dropped.
           </p>
-          <div class="stack" style={{ gap: '8px', marginTop: '14px' }}>
+          <div class="stack" style={{ gap: '8px' }}>
             {rows.map(([label, value, color]) => (
               <div key={label} class="row">
-                <Caps size="var(--fs-10)" tracking="0.1em">
+                <Caps size="var(--fs-9)" tracking="0.1em">
                   {label}
                 </Caps>
                 <span class="spacer" />
-                <Caps size="var(--fs-10)" tracking="0.1em" color={color}>
+                <Caps size="var(--fs-9)" tracking="0.1em" color={color}>
                   {value}
                 </Caps>
               </div>
             ))}
           </div>
         </div>
-      </Panel>
+      </Card>
     </div>
   )
 }
 
-// MARK: Pad mode
+// MARK: - The rail
 
-function PadModeControl({
+/**
+ * The control layer, in the lower letterbox band.
+ *
+ * Four things, left to right: what one finger does, the keyboard, the Command key,
+ * and everything else. The first is the only one that is a mode, so it is the only
+ * one drawn as a segmented control; the other three are 52px squares in the order
+ * they are reached for.
+ *
+ * ⌘ latches Command directly rather than opening the drawer to it. It is the
+ * modifier a Mac actually needs — ⌘Tab, ⌘Space, ⌘W — and putting it one tap away
+ * instead of two is the difference between using it and not.
+ */
+function Rail({
   padMode,
   setPadMode,
   captured,
@@ -1079,47 +1111,114 @@ function PadModeControl({
   captured: boolean
   onCapture: () => void
 }) {
+  const stalled = store.streamState.value.kind === 'stalled'
   const fine = matchMedia('(pointer: fine)').matches
+  const cmdHeld = store.heldModifiers.value.includes('cmd')
+
+  if (stalled) {
+    return (
+      <div class="remote__rail" data-nopad>
+        <StopButton size={52} label="STOP TRYING" />
+        <button
+          class="rail-button"
+          disabled
+          aria-label="Keyboard, unavailable while reconnecting"
+          style={{ color: 'var(--ns-text-disabled)' }}
+        >
+          <span class="mono" style={{ fontSize: 'var(--fs-15)' }}>
+            ⌨
+          </span>
+        </button>
+        <DrawerButton />
+      </div>
+    )
+  }
+
   return (
-    <div class="row" style={{ gap: '8px' }} data-nopad>
-      <PadModeButton
-        mode="pointer"
-        current={padMode}
-        onSelect={setPadMode}
-        glyph="⌖"
-        label="POINTER"
-        hint="One finger moves the Mac’s pointer"
-      />
-      <PadModeButton
-        mode="pan"
-        current={padMode}
-        onSelect={setPadMode}
-        glyph="✥"
-        label="MOVE VIEW"
-        hint="One finger moves the picture"
-      />
+    <div class="remote__rail" data-nopad>
+      <div
+        class="segmented segmented--onGlass"
+        role="tablist"
+        aria-label="What one finger does"
+        style={{ flex: '1 1 auto', height: '52px', borderRadius: 'var(--radius-control)' }}
+      >
+        <PadModeTab
+          mode="pointer"
+          current={padMode}
+          onSelect={setPadMode}
+          glyph="⌖"
+          label="POINTER"
+          hint="One finger moves the Mac’s pointer"
+        />
+        <PadModeTab
+          mode="pan"
+          current={padMode}
+          onSelect={setPadMode}
+          glyph="✥"
+          label="VIEW"
+          hint="One finger moves the picture"
+        />
+      </div>
+
       {fine && !captured ? (
         <button
+          class="rail-button"
           onClick={onCapture}
+          aria-label="Capture the pointer"
           title="Locks this machine’s pointer to the Mac’s. Escape releases it."
-          style={{
-            flex: '1 1 0',
-            height: '40px',
-            borderRadius: 'var(--radius-row)',
-            border: '1px solid color-mix(in srgb, var(--lg-cyan) 50%, transparent)',
-            background: 'color-mix(in srgb, var(--lg-cyan) 12%, transparent)',
-          }}
         >
-          <Caps size="var(--fs-9)" tracking="0.12em" color="var(--lg-cyan)">
-            CAPTURE POINTER
-          </Caps>
+          <span class="mono" style={{ fontSize: 'var(--fs-15)', color: 'var(--ns-accent)' }}>
+            ⌖
+          </span>
         </button>
-      ) : null}
+      ) : (
+        <button
+          class="rail-button"
+          onClick={() => {
+            focusKeyboardField()
+            store.showKeyboard.value = true
+          }}
+          aria-label="Keyboard"
+        >
+          <span class="mono" style={{ fontSize: 'var(--fs-15)' }}>
+            ⌨
+          </span>
+        </button>
+      )}
+
+      <button
+        class={cmdHeld ? 'rail-button rail-button--held' : 'rail-button'}
+        onClick={() => store.toggleModifier('cmd')}
+        aria-label="Command"
+        aria-pressed={cmdHeld}
+        title={cmdHeld ? 'Command is held. Activate to release.' : 'Latch Command'}
+      >
+        <span class="mono" style={{ fontSize: 'var(--fs-15)', color: 'inherit' }}>
+          ⌘
+        </span>
+      </button>
+
+      <DrawerButton />
     </div>
   )
 }
 
-function PadModeButton({
+function DrawerButton() {
+  return (
+    <button
+      class="rail-button rail-button--accent"
+      onClick={() => (store.showHub.value = !store.showHub.value)}
+      aria-label="Commands"
+      aria-expanded={store.showHub.value}
+    >
+      <span class="mono" style={{ fontSize: 'var(--fs-15)' }}>
+        ⋯
+      </span>
+    </button>
+  )
+}
+
+function PadModeTab({
   mode,
   current,
   onSelect,
@@ -1137,32 +1236,27 @@ function PadModeButton({
   const selected = mode === current
   return (
     <button
-      onClick={() => onSelect(mode)}
-      aria-pressed={selected}
+      role="tab"
+      aria-selected={selected}
       aria-label={label}
       title={hint}
-      style={{
-        flex: '1 1 0',
-        height: '40px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '7px',
-        borderRadius: 'var(--radius-row)',
-        border: `1px solid ${
-          selected ? 'color-mix(in srgb, var(--lg-cyan) 50%, transparent)' : 'var(--lg-hairline)'
-        }`,
-        background: selected ? 'color-mix(in srgb, var(--lg-cyan) 12%, transparent)' : 'transparent',
-        color: selected ? 'var(--lg-cyan)' : 'var(--lg-text-secondary)',
-      }}
+      onClick={() => onSelect(mode)}
+      style={{ minHeight: '46px', borderRadius: 'var(--radius-inner)' }}
     >
-      <span class="mono" aria-hidden="true" style={{ fontSize: 'var(--fs-13)' }}>
+      <span
+        class="mono"
+        aria-hidden="true"
+        style={{
+          fontSize: 'var(--fs-13)',
+          color: selected ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)',
+        }}
+      >
         {glyph}
       </span>
       <Caps
         size="var(--fs-9)"
-        tracking="0.12em"
-        color={selected ? 'var(--lg-cyan)' : 'var(--lg-text-secondary)'}
+        tracking="0.1em"
+        color={selected ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
       >
         {label}
       </Caps>
@@ -1170,89 +1264,7 @@ function PadModeButton({
   )
 }
 
-// MARK: Bottom bar
-
-function BottomBar() {
-  const stalled = store.streamState.value.kind === 'stalled'
-  return (
-    <div
-      class="row"
-      data-nopad
-      style={{
-        height: '96px',
-        flex: '0 0 auto',
-        paddingInline: 'calc(20px + var(--safe-left))',
-        paddingBottom: 'var(--safe-bottom)',
-      }}
-    >
-      <button
-        onClick={() => store.stopStream()}
-        aria-label={stalled ? 'Stop trying to reconnect' : 'Stop streaming'}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '10px',
-          height: 'var(--hub-button)',
-          minWidth: 'var(--hub-button)',
-          paddingInline: stalled ? '20px' : 0,
-          borderRadius: 'var(--radius-pill)',
-          background: 'color-mix(in srgb, var(--lg-chrome) 86%, transparent)',
-          border: '1px solid var(--lg-hairline)',
-          color: 'var(--lg-text-secondary)',
-        }}
-      >
-        <span class="mono" aria-hidden="true" style={{ fontSize: 'var(--fs-17)' }}>
-          ✕
-        </span>
-        {stalled ? (
-          <Caps size="var(--fs-11)" tracking="0.12em" color="var(--lg-text-secondary)">
-            STOP TRYING
-          </Caps>
-        ) : null}
-      </button>
-
-      <span class="spacer" />
-
-      <button
-        onClick={() => (store.showHub.value = !store.showHub.value)}
-        aria-label="Control hub"
-        aria-expanded={store.showHub.value}
-        style={{
-          width: 'var(--hub-button)',
-          height: 'var(--hub-button)',
-          borderRadius: '50%',
-          background: 'color-mix(in srgb, var(--lg-chrome) 92%, transparent)',
-          border: '1px solid var(--lg-stroke)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <span class="stack" style={{ gap: '4px' }} aria-hidden="true">
-          {[0, 1, 2].map((row) => (
-            <span key={row} class="row" style={{ gap: '4px' }}>
-              {[0, 1, 2].map((column) => (
-                <span
-                  key={column}
-                  class="dot"
-                  style={{
-                    width: '3px',
-                    height: '3px',
-                    background:
-                      row === 2 || store.showHub.value ? 'var(--lg-cyan)' : 'var(--lg-text)',
-                  }}
-                />
-              ))}
-            </span>
-          ))}
-        </span>
-      </button>
-    </div>
-  )
-}
-
-// MARK: - Landscape — a different instrument, not a stretched portrait
+// MARK: - Landscape and the laptop — a different instrument, not a stretched portrait
 
 function LandscapeLayout({
   pan,
@@ -1271,109 +1283,190 @@ function LandscapeLayout({
 }) {
   const display = store.selectedDisplay.value
   const tint = stallTint()
+  const zoom = store.zoomScale.value
+  const fine = matchMedia('(pointer: fine)').matches
 
   return (
-    <div class="row" style={{ flex: '1 1 auto', minHeight: 0, gap: 0, alignItems: 'stretch' }}>
-      <div class="stack" style={{ flex: '1 1 auto', minWidth: 0 }}>
+    <>
+      <div class="remote__stage">
+        <div
+          class="row"
+          style={{
+            height: '52px',
+            flex: '0 0 auto',
+            gap: '12px',
+            paddingInline: 'calc(22px + var(--safe-left)) 22px',
+            marginTop: 'var(--safe-top)',
+          }}
+        >
+          <StopButton size={34} />
+          <StatusStrip />
+        </div>
+
         <div
           ref={pictureRef}
-          style={{ position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex' }}
+          style={{
+            position: 'relative',
+            flex: '1 1 auto',
+            minHeight: 0,
+            display: 'flex',
+            paddingInline: 'calc(22px + var(--safe-left)) 22px',
+          }}
         >
           <VideoSurface
             renderer={store.selectedRenderer()}
             aspect={pictureAspect()}
-            transform={`translate(${pan.x}px, ${pan.y}px) scale(${store.zoomScale.value})`}
+            transform={`translate(${pan.x}px, ${pan.y}px) scale(${zoom})`}
           />
-          <CornerTicks color="color-mix(in srgb, var(--lg-cyan) 75%, transparent)" />
+          <CornerTicks color={tint ?? 'color-mix(in srgb, var(--ns-accent) 75%, transparent)'} />
           <div
             class="row"
             style={{
               position: 'absolute',
-              left: 'calc(24px + var(--safe-left))',
-              bottom: '22px',
+              left: 'calc(36px + var(--safe-left))',
+              bottom: '14px',
               gap: '10px',
             }}
           >
-            <span class="row video-chip" style={{ gap: '6px' }}>
-              <ConditionDot condition={store.condition.value} size={5} animated={false} />
-              <Caps size="var(--fs-9)" color={conditionColor[store.condition.value]}>
-                {store.streamState.value.kind === 'live'
-                  ? `LIVE ${store.link.value.rttMillis == null ? '—' : Math.round(store.link.value.rttMillis)}MS`
-                  : store.streamState.value.kind.toUpperCase()}
-              </Caps>
-            </span>
-            <VideoCaption color={tint ?? 'var(--lg-text-secondary)'}>
-              {display
-                ? `${display.name.toUpperCase()} · ${display.width} × ${display.height} · LIVE`
-                : ''}
+            <VideoCaption color={tint ?? 'var(--ns-text-secondary)'}>
+              {display ? `${display.name.toUpperCase()} · ${display.width} × ${display.height}` : ''}
             </VideoCaption>
           </div>
           {captured ? (
-            <div style={{ position: 'absolute', right: '18px', bottom: '22px' }}>
-              <VideoCaption color="var(--lg-cyan)">POINTER CAPTURED · ESC RELEASES</VideoCaption>
+            <div style={{ position: 'absolute', right: '36px', bottom: '14px' }}>
+              <VideoCaption color="var(--ns-accent)">POINTER CAPTURED · ESC RELEASES</VideoCaption>
             </div>
           ) : null}
         </div>
 
         <div
+          class="row"
+          data-nopad
           style={{
-            paddingInline: 'calc(24px + var(--safe-left))',
-            paddingBottom: 'calc(12px + var(--safe-bottom))',
+            height: '64px',
             flex: '0 0 auto',
+            gap: '10px',
+            paddingInline: 'calc(22px + var(--safe-left)) 22px',
+            paddingBottom: 'var(--safe-bottom)',
           }}
         >
-          <PadModeControl
-            padMode={padMode}
-            setPadMode={setPadMode}
-            captured={captured}
-            onCapture={onCapture}
-          />
+          <div
+            class="segmented segmented--onGlass"
+            role="tablist"
+            aria-label="What the pointer does"
+            style={{ height: '44px', borderRadius: 'var(--radius-inner)', flex: '0 0 auto' }}
+          >
+            <PadModeTab
+              mode="pointer"
+              current={padMode}
+              onSelect={setPadMode}
+              glyph="⌖"
+              label="POINTER"
+              hint="Drag moves the Mac’s pointer"
+            />
+            <PadModeTab
+              mode="pan"
+              current={padMode}
+              onSelect={setPadMode}
+              glyph="✥"
+              label="VIEW"
+              hint="Drag moves the picture"
+            />
+          </div>
+          {fine && !captured ? (
+            <button
+              class="outlined"
+              onClick={onCapture}
+              title="Locks this machine’s pointer to the Mac’s. Escape releases it."
+              style={
+                {
+                  width: 'auto',
+                  paddingInline: '16px',
+                  minHeight: '44px',
+                  flex: '0 0 auto',
+                  '--edge': 'color-mix(in srgb, var(--ns-accent) 45%, transparent)',
+                } as Record<string, string>
+              }
+            >
+              <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-accent)">
+                CAPTURE POINTER
+              </Caps>
+            </button>
+          ) : null}
+          <span class="spacer" />
+          <Caps size="var(--fs-9)" tracking="0.12em" class="ellipsis">
+            {`${
+              fine ? 'WHEEL SCROLLS · ⌃WHEEL ZOOMS' : 'TWO FINGERS SCROLL · PINCH ZOOMS'
+            } · ${zoom > 1.02 ? `${zoom.toFixed(1)}×` : '1.0× FIT'}`}
+          </Caps>
         </div>
       </div>
 
-      <LandscapeDock />
-    </div>
+      <Dock />
+    </>
   )
 }
 
-function LandscapeDock() {
+/**
+ * The rail, unrolled.
+ *
+ * A landscape window has height to spare on the right and no thumb reaching around
+ * the corner, so the four tiles that live in a drawer on a phone are simply on
+ * screen, the modifiers are a permanent row, and the three readings that a phone
+ * has no room for — RTT, rate, and which window has focus — are stated at the
+ * bottom. FRONTMOST is the one that stops a typed command going into the wrong
+ * window, and it is the reason this dock is worth its 276px.
+ */
+function Dock() {
   const link = store.link.value
+  const held = store.heldModifiers.value
+
   return (
-    <div
-      class="stack"
-      data-nopad
-      style={{
-        width: '231px',
-        flex: '0 0 auto',
-        gap: '14px',
-        padding: '22px',
-        paddingTop: 'calc(22px + var(--safe-top))',
-        paddingBottom: 'calc(22px + var(--safe-bottom))',
-        paddingRight: 'calc(22px + var(--safe-right))',
-        borderLeft: '1px solid var(--lg-chrome)',
-      }}
-    >
+    <div class="remote__dock" data-nopad>
       <div class="row">
-        <Caps size="var(--fs-9)" tracking="0.2em">
+        <Caps size="var(--fs-9)" tracking="var(--caps-tracking-wide)">
           CONTROLS
         </Caps>
         <span class="spacer" />
         <Caps
           size="var(--fs-9)"
-          color={store.scrollLock.value ? 'var(--lg-cyan)' : 'var(--lg-text-tertiary)'}
+          tracking="0.14em"
+          color={store.scrollLock.value ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
         >
           {store.scrollLock.value ? 'LOCK' : 'FREE'}
         </Caps>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-        <DockButton label="⌨ KEYS" spoken="Keyboard" onClick={() => {
+        <Tile
+          glyph="⌨"
+          caption="KEYS"
+          spoken="Keyboard"
+          onClick={() => {
             focusKeyboardField()
             store.showKeyboard.value = true
-          }} />
-        <DockButton label="⛶ SHOT" spoken="Screenshot the Mac" onClick={() => void store.hub('shot')} />
-        <DockButton label="COPY ←" spoken="Copy from the Mac" onClick={() => void store.hub('copy')} />
-        <DockButton label="PASTE →" spoken="Paste to the Mac" onClick={() => void store.hub('paste')} />
+          }}
+        />
+        <Tile
+          glyph="⛶"
+          caption="SHOT"
+          spoken="Screenshot the Mac"
+          onClick={() => void store.hub('shot')}
+        />
+        <Tile
+          glyph="←"
+          caption="COPY"
+          glyphSize="var(--fs-13)"
+          spoken="Copy from the Mac"
+          onClick={() => void store.hub('copy')}
+        />
+        <Tile
+          glyph="→"
+          caption="PASTE"
+          glyphSize="var(--fs-13)"
+          spoken="Paste to the Mac"
+          onClick={() => void store.hub('paste')}
+        />
       </div>
 
       <div class="row" style={{ gap: '6px' }}>
@@ -1381,8 +1474,9 @@ function LandscapeDock() {
           <KeyCap
             key={spec.name}
             glyph={spec.glyph}
-            fontSize="var(--fs-13)"
-            isHeld={store.heldModifiers.value.includes(spec.name)}
+            fontSize="var(--fs-14)"
+            height={46}
+            isHeld={held.includes(spec.name)}
             onClick={() => store.toggleModifier(spec.name)}
           />
         ))}
@@ -1390,88 +1484,58 @@ function LandscapeDock() {
 
       <span class="spacer" />
 
-      <div class="stack" style={{ gap: '9px' }}>
-        <DockReadout label="RTT" value={link.rttMillis == null ? '—' : `${Math.round(link.rttMillis)} MS`} />
+      <div class="stack" style={{ gap: '11px' }}>
+        <DockReadout
+          label="RTT"
+          value={link.rttMillis == null ? '—' : `${Math.round(link.rttMillis)} MS`}
+        />
         <DockReadout label="RATE" value={`${link.downMbps.toFixed(1)} MB/S`} />
-        <div class="hairline" style={{ background: 'var(--lg-chrome)' }} />
-        <div class="row" style={{ gap: '8px' }}>
-          <button
-            onClick={() => {
-              store.presented.value = 'claude'
-              store.listClaudeSessions()
-            }}
-            style={{
+        <DockReadout label="FRONTMOST" value={link.frontmostApp || '—'} />
+      </div>
+
+      <div class="row" style={{ gap: '8px' }}>
+        <button
+          class="outlined"
+          onClick={() => {
+            store.presented.value = 'claude'
+            store.listClaudeSessions()
+          }}
+          style={
+            {
               flex: '1 1 auto',
-              height: '50px',
-              borderRadius: 'var(--radius-row)',
-              background: 'color-mix(in srgb, var(--lg-cyan) 10%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--lg-cyan) 40%, transparent)',
-            }}
-          >
-            <Caps size="var(--fs-10)" tracking="0.12em" color="var(--lg-cyan)">
-              CLAUDE
-            </Caps>
-          </button>
-          <button
-            onClick={() => store.stopStream()}
-            aria-label="Stop streaming"
-            style={{
-              width: '50px',
-              height: '50px',
-              flex: '0 0 auto',
-              borderRadius: 'var(--radius-row)',
-              background: 'var(--lg-chrome)',
-              border: '1px solid var(--lg-hairline)',
-              color: 'var(--lg-text-secondary)',
-            }}
-          >
-            <span class="mono" style={{ fontSize: 'var(--fs-15)' }}>
-              ✕
-            </span>
-          </button>
-        </div>
+              minHeight: '50px',
+              background: 'color-mix(in srgb, var(--ns-accent) 12%, transparent)',
+              '--edge': 'color-mix(in srgb, var(--ns-accent) 40%, transparent)',
+            } as Record<string, string>
+          }
+        >
+          <Caps size="var(--fs-10)" tracking="0.14em" color="var(--ns-accent)">
+            CLAUDE
+          </Caps>
+        </button>
+        <button
+          class="rail-button"
+          onClick={() => store.stopStream()}
+          aria-label="Stop streaming"
+          style={{ width: '50px', height: '50px', background: 'var(--ns-raised)' }}
+        >
+          <span class="mono" style={{ fontSize: 'var(--fs-14)', color: 'var(--ns-text-secondary)' }}>
+            ✕
+          </span>
+        </button>
       </div>
     </div>
-  )
-}
-
-function DockButton({
-  label,
-  spoken,
-  onClick,
-}: {
-  label: string
-  spoken: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      // The visible labels carry a glyph and a direction arrow — "⌨ KEYS",
-      // "COPY ←" — which is legible and unspeakable.
-      aria-label={spoken}
-      style={{
-        minHeight: '50px',
-        borderRadius: 'var(--radius-row)',
-        background: 'var(--lg-chrome)',
-        border: '1px solid var(--lg-hairline)',
-      }}
-    >
-      <Caps size="var(--fs-10)" tracking="0.08em" color="var(--lg-text)">
-        {label}
-      </Caps>
-    </button>
   )
 }
 
 function DockReadout({ label, value }: { label: string; value: string }) {
   return (
     <div class="row">
-      <Caps size="var(--fs-9)" tracking="0.12em">
+      <Caps size="var(--fs-9)" tracking="0.14em">
         {label}
       </Caps>
-      <span class="spacer" />
-      <Caps size="var(--fs-9)" tracking="0.12em" color="var(--lg-text)">
+      <span class="spacer" style={{ minWidth: '8px' }} />
+      <Caps size="var(--fs-11)" tracking="0" color="var(--ns-text)" class="ellipsis">
         {value}
       </Caps>
     </div>

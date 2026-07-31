@@ -1,6 +1,6 @@
 /**
- * The live diff for one file Claude is editing.
- * Ported from ios/VibeWire/Screens/DiffView.swift.
+ * 12 · LIVE DIFF — one file Claude is editing.
+ * Mirrored by ios/VibeWire/Screens/DiffView.swift.
  *
  * The host re-sends the patch after every tool result while this is open, so the
  * view is a window onto the working tree rather than a snapshot: an edit lands here
@@ -12,7 +12,8 @@
 import { useEffect } from 'preact/hooks'
 
 import { store } from '../app/store'
-import { Caps, ScreenBody, SheetDismiss, Spinner } from '../design/components'
+import { Caps, ScreenBody, SectionLabel, SheetDismiss, Spinner } from '../design/components'
+import { RatioBars } from './ClaudePanel'
 
 type LineKind = 'added' | 'removed' | 'hunk' | 'meta' | 'context'
 
@@ -35,16 +36,16 @@ function kindOf(line: string): LineKind {
 }
 
 const FOREGROUND: Record<LineKind, string> = {
-  added: 'var(--lg-green)',
-  removed: 'var(--lg-red)',
-  hunk: 'var(--lg-cyan)',
-  meta: 'var(--lg-text-tertiary)',
-  context: 'var(--lg-context)',
+  added: 'var(--ns-green)',
+  removed: 'var(--ns-red)',
+  hunk: 'var(--ns-accent)',
+  meta: 'var(--ns-text-tertiary)',
+  context: 'var(--ns-context)',
 }
 
 const BACKGROUND: Record<LineKind, string> = {
-  added: 'color-mix(in srgb, var(--lg-green) 8%, transparent)',
-  removed: 'color-mix(in srgb, var(--lg-red) 8%, transparent)',
+  added: 'color-mix(in srgb, var(--ns-green) 10%, transparent)',
+  removed: 'color-mix(in srgb, var(--ns-red) 10%, transparent)',
   hunk: 'transparent',
   meta: 'transparent',
   context: 'transparent',
@@ -76,28 +77,24 @@ export function DiffView() {
   return (
     <div class="sheet" role="dialog" aria-label={`Live diff for ${path ?? ''}`}>
       <ScreenBody>
-        <div class="stack" style={{ gap: '8px', marginTop: '24px', flex: '0 0 auto' }}>
-          <div class="row">
-            <Caps size="var(--fs-10)" tracking="0.2em" color="var(--lg-cyan)">
-              LIVE DIFF
-            </Caps>
-            <span class="spacer" />
-            <SheetDismiss title="CLOSE" onClick={() => store.closeDiff()} />
-          </div>
-          <span class="mono ellipsis ellipsis--head" style={{ fontSize: 'var(--fs-12)' }}>
+        <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
+          <SectionLabel style={{ color: 'var(--ns-accent)' }}>LIVE DIFF</SectionLabel>
+          <span class="spacer" />
+          <SheetDismiss title="CLOSE" onClick={() => store.closeDiff()} />
+        </div>
+
+        <div class="row" style={{ gap: '10px', marginTop: '10px', flex: '0 0 auto' }}>
+          <span class="mono ellipsis ellipsis--head" style={{ fontSize: 'var(--fs-13)' }}>
             <span>{path ?? ''}</span>
           </span>
+          <span class="spacer" style={{ minWidth: '8px' }} />
+          <RatioBars added={added} removed={removed} />
         </div>
 
         {patch.length === 0 ? (
           <div
             class="stack"
-            style={{
-              flex: '1 1 auto',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-            }}
+            style={{ flex: '1 1 auto', alignItems: 'center', justifyContent: 'center', gap: '12px' }}
           >
             <Spinner size={20} />
             <Caps size="var(--fs-10)" tracking="0.14em">
@@ -115,12 +112,11 @@ export function DiffView() {
               minHeight: 0,
               marginTop: '14px',
               overflow: 'auto',
-              background: 'var(--lg-code)',
-              border: '1px solid var(--lg-hairline-dim)',
-              borderRadius: 'var(--radius-row)',
+              background: 'var(--ns-deep)',
+              borderRadius: 'var(--radius-control)',
             }}
           >
-            <div style={{ minWidth: 'min-content', paddingBlock: '10px' }}>
+            <div style={{ minWidth: 'min-content', paddingBlock: '12px' }}>
               {lines.map((line, index) => {
                 const kind = kindOf(line)
                 return (
@@ -129,8 +125,8 @@ export function DiffView() {
                     class="mono"
                     style={{
                       fontSize: 'var(--fs-11)',
-                      lineHeight: 1.5,
-                      padding: '1px 10px',
+                      lineHeight: 1.6,
+                      padding: '1px 12px',
                       whiteSpace: 'pre',
                       color: FOREGROUND[kind],
                       background: BACKGROUND[kind],
@@ -153,10 +149,10 @@ export function DiffView() {
             flex: '0 0 auto',
           }}
         >
-          <Caps size="var(--fs-10)" tracking="0.12em" color="var(--lg-green)">
+          <Caps size="var(--fs-10)" tracking="0.12em" color="var(--ns-green)">
             {`+${added}`}
           </Caps>
-          <Caps size="var(--fs-10)" tracking="0.12em" color="var(--lg-red)">
+          <Caps size="var(--fs-10)" tracking="0.12em" color="var(--ns-red)">
             {`−${removed}`}
           </Caps>
           <span class="spacer" />

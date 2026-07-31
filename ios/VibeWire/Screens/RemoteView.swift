@@ -58,7 +58,7 @@ struct RemoteView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                LG.Color.deepGround.ignoresSafeArea()
+                NS.Color.deepGround.ignoresSafeArea()
 
                 if isLandscape {
                     landscapeLayout
@@ -70,7 +70,7 @@ struct RemoteView: View {
                 if case .stalled = model.streamState { reconnectingOverlay }
                 if case .reconnecting = model.streamState { reconnectingOverlay }
 
-                if model.showHub { ControlHubView() }
+                if model.showHub { CommandDrawerView() }
             }
             // Nothing layered on the glass gets to resize the glass.
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -100,12 +100,15 @@ struct RemoteView: View {
 
     private func portraitLayout(in geometry: GeometryProxy) -> some View {
         VStack(spacing: 0) {
-            statusStrip
-                .padding(.horizontal, 18)
-                .frame(height: 40)
+            HStack(spacing: 10) {
+                stopButton(size: 36)
+                statusStrip
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
 
             if model.displays.count > 1 {
-                displayTabs.padding(.horizontal, 18).padding(.top, 6)
+                displayTabs.padding(.horizontal, 14).padding(.top, 6)
             }
 
             Spacer(minLength: 0)
@@ -116,20 +119,21 @@ struct RemoteView: View {
                 picture
             }
 
-            padModeControl
-                .padding(.horizontal, 18)
+            pictureCaptionRow
+                .padding(.horizontal, 14)
                 .padding(.top, 12)
 
             Spacer(minLength: 0)
 
-            // The hub's own arc and its "swipe the thumb" hint land on exactly
-            // this strip, so with both up the two captions overlapped and
-            // neither could be read.
-            if showTeachingOverlay && model.streamState == .live && !model.sideBySide && !model.showHub {
-                teachingLegend.padding(.bottom, 24)
+            VStack(spacing: 10) {
+                if showTeachingOverlay && model.streamState == .live
+                    && !model.sideBySide && !model.showHub {
+                    teachingLegend
+                }
+                rail
             }
-
-            bottomBar.frame(height: 96)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 12)
         }
         // The pad is the whole glass, not just the picture.
         .contentShape(Rectangle())
@@ -157,14 +161,8 @@ struct RemoteView: View {
         .overlay(alignment: .topTrailing) {
             if model.zoomScale > 1.02 { minimap.padding(.top, 66).padding(.trailing, 20) }
         }
-        .overlay(alignment: .trailing) {
-            zoomRail.padding(.trailing, 20)
-        }
         .overlay {
             if showZoomBadge { zoomBadge }
-        }
-        .overlay(alignment: .top) {
-            if showTeachingOverlay && !model.sideBySide { trackpadBoundary }
         }
     }
 
@@ -261,14 +259,14 @@ struct RemoteView: View {
 
             // Corner ticks stay forever — they mark the edge of the real pixels
             // so a zoomed picture never looks like a cropped one.
-            CornerTicks(color: stallTint ?? LG.Color.cyan.opacity(0.75))
+            CornerTicks(color: stallTint ?? NS.Color.accent.opacity(0.75))
 
             if model.streamState == .starting {
-                Spinner(color: LG.Color.cyan).frame(width: 24, height: 24)
+                Spinner(size: 24, color: NS.Color.accent)
             }
         }
         .overlay(alignment: .bottomLeading) {
-            VideoCaption(pictureCaption, color: stallTint ?? LG.Color.textSecondary)
+            VideoCaption(pictureCaption, color: stallTint ?? NS.Color.textSecondary)
                 .padding(.leading, 10)
                 .padding(.bottom, 26)
                 // The hub's hint text sits on this exact line, and two 8pt
@@ -295,8 +293,8 @@ struct RemoteView: View {
     /// Amber ticks and caption while stalled: the frozen frame keeps its
     /// geometry but stops claiming to be live.
     private var stallTint: Color? {
-        if case .stalled = model.streamState { return LG.Color.amber.opacity(0.7) }
-        if case .reconnecting = model.streamState { return LG.Color.amber.opacity(0.7) }
+        if case .stalled = model.streamState { return NS.Color.amber.opacity(0.7) }
+        if case .reconnecting = model.streamState { return NS.Color.amber.opacity(0.7) }
         return nil
     }
 
@@ -311,7 +309,7 @@ struct RemoteView: View {
                         .opacity(model.inputPane == index ? 1 : 0.55)
 
                     if model.inputPane == index {
-                        CornerTicks(color: LG.Color.cyan.opacity(0.8))
+                        CornerTicks(color: NS.Color.accent.opacity(0.8))
                     }
                 }
                 .overlay(alignment: .bottomLeading) {
@@ -320,9 +318,9 @@ struct RemoteView: View {
                             // Cyan at 16% over video was the same unverifiable
                             // bet the captions were making, and this badge is
                             // the one that says where input lands.
-                            MonoCaps("INPUT HERE", size: 9, color: LG.Color.cyan, tracking: 1.4)
+                            MonoCaps("INPUT HERE", size: 9, color: NS.Color.accent, tracking: 1.4)
                                 .videoChip()
-                                .overlay(Rectangle().stroke(LG.Color.cyan.opacity(0.5), lineWidth: 1))
+                                .overlay(Rectangle().stroke(NS.Color.accent.opacity(0.5), lineWidth: 1))
                         }
                         VideoCaption(
                             model.inputPane == index
@@ -331,14 +329,14 @@ struct RemoteView: View {
                             // The unfocused pane is dimmed by its own opacity
                             // already; taking the text down as well stacked two
                             // reductions on one caption.
-                            color: LG.Color.textSecondary
+                            color: NS.Color.textSecondary
                         )
                     }
                     .padding(.leading, 10)
                     .padding(.bottom, 20)
                 }
                 .onTapGesture {
-                    withAnimation(LG.Motion.stateChange) {
+                    withAnimation(NS.Motion.stateChange) {
                         model.inputPane = index
                         model.selectDisplay(display.id)
                     }
@@ -349,66 +347,15 @@ struct RemoteView: View {
 
     // MARK: Overlays
 
-    /// Reaches past the video into the bands, so the pad is visibly bigger than
-    /// the picture.
-    private var trackpadBoundary: some View {
-        RoundedRectangle(cornerRadius: 14)
-            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
-            .foregroundStyle(LG.Color.cyan.opacity(0.28))
-            .padding(.horizontal, 10)
-            .padding(.top, 150)
-            .padding(.bottom, 96)
-            .overlay(alignment: .topLeading) {
-                MonoCaps("TRACKPAD", size: 9, color: LG.Color.cyan.opacity(0.7), tracking: 1.8)
-                    .padding(.horizontal, 8)
-                    .background(LG.Color.deepGround)
-                    .offset(x: 30, y: 142)
-            }
-            .overlay(alignment: .bottomTrailing) {
-                MonoCaps("TAP = CLICK", size: 9, color: LG.Color.cyan.opacity(0.5), tracking: 1.8)
-                    .padding(.horizontal, 8)
-                    .background(LG.Color.deepGround)
-                    .offset(x: -30, y: -88)
-            }
-            .allowsHitTesting(false)
-    }
-
     private var teachingLegend: some View {
-        VStack(spacing: 12) {
-            BreathingRing()
-            MonoCaps(
-                "MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS",
-                size: 10,
-                tracking: 1.6
-            )
-            .multilineTextAlignment(.center)
-            .lineSpacing(6)
-        }
-        .allowsHitTesting(false)
-    }
-
-    private var zoomRail: some View {
-        HStack(spacing: 8) {
-            MonoCaps(
-                model.zoomScale > 1.02
-                    ? String(format: "%.1f×", model.zoomScale)
-                    : "1.0× FIT",
-                size: 10,
-                color: model.zoomScale > 1.02 ? LG.Color.cyan : LG.Color.textSecondary,
-                tracking: 1
-            )
-            ZStack(alignment: .bottom) {
-                Capsule().fill(Color(hex: 0x1E242C)).frame(width: 3, height: 128)
-                Capsule()
-                    .fill(LG.Color.cyan.opacity(0.5))
-                    .frame(width: 3, height: max(2, (model.zoomScale - 1) / 5 * 128))
-                Rectangle()
-                    .fill(LG.Color.cyan)
-                    .frame(width: 11, height: 2)
-                    .offset(y: -max(0, (model.zoomScale - 1) / 5 * 128))
-            }
-            .frame(width: 11, height: 128)
-        }
+        MonoCaps(
+            "MOVE ANYWHERE ON THE GLASS\nTWO FINGERS SCROLL · PINCH ZOOMS",
+            size: 9,
+            tracking: 1.6
+        )
+        .multilineTextAlignment(.center)
+        .lineSpacing(6)
+        .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
     }
 
@@ -416,9 +363,9 @@ struct RemoteView: View {
     private var zoomBadge: some View {
         VStack(spacing: 6) {
             Text(String(format: "%.1f×", model.zoomScale))
-                .font(LG.Font.mono(46, weight: .medium))
-                .foregroundStyle(LG.Color.text)
-            MonoCaps("HOLD TO LOCK · DOUBLE-TAP FITS", size: 10, color: LG.Color.cyan, tracking: 2)
+                .font(NS.Font.mono(46, weight: .medium))
+                .foregroundStyle(NS.Color.text)
+            MonoCaps("DOUBLE-TAP FITS", size: 10, color: NS.Color.accent, tracking: 2)
         }
         .allowsHitTesting(false)
         .transition(.opacity)
@@ -430,13 +377,13 @@ struct RemoteView: View {
         VStack(alignment: .trailing, spacing: 6) {
             ZStack(alignment: .center) {
                 Rectangle()
-                    .fill(LG.Color.deepGround.opacity(0.8))
+                    .fill(NS.Color.deepGround.opacity(0.8))
                     .frame(width: 78, height: 49)
-                    .overlay(Rectangle().stroke(LG.Color.stroke, lineWidth: 1))
+                    .overlay(Rectangle().stroke(NS.Color.stroke, lineWidth: 1))
                 Rectangle()
-                    .fill(LG.Color.cyan.opacity(0.16))
+                    .fill(NS.Color.accent.opacity(0.16))
                     .frame(width: 78 / model.zoomScale, height: 49 / model.zoomScale)
-                    .overlay(Rectangle().stroke(LG.Color.cyan, lineWidth: 1))
+                    .overlay(Rectangle().stroke(NS.Color.accent, lineWidth: 1))
             }
             MonoCaps(
                 model.displays.first(where: \.selected).map { "\($0.name.uppercased()) REGION" } ?? "REGION",
@@ -452,30 +399,30 @@ struct RemoteView: View {
     private var reconnectingOverlay: some View {
         VStack {
             Spacer()
-            Panel(tint: LG.Color.amber) {
+            Card(tint: NS.Color.amber) {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 10) {
-                        Spinner(color: LG.Color.amber).frame(width: 16, height: 16)
-                        MonoCaps("RECONNECTING", size: 12, color: LG.Color.amber, weight: .medium)
+                        Spinner(size: 16, color: NS.Color.amber)
+                        MonoCaps("RECONNECTING", size: 11, color: NS.Color.amber, tracking: 1.6, weight: .medium)
                     }
 
                     Text("The picture above is \(stallSeconds).0 seconds old. Keys and taps are being held, not dropped.")
-                        .font(LG.Font.sans(15))
-                        .foregroundStyle(LG.Color.text)
+                        .font(NS.Font.sans(15))
+                        .foregroundStyle(NS.Color.text)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 12)
 
                     VStack(spacing: 8) {
-                        overlayRow("QUEUED INPUT", "\(queuedCount) EVENTS", LG.Color.text)
-                        overlayRow("DROPPING TO", "540P ON RESUME", LG.Color.amber)
-                        overlayRow("GIVING UP AT", "30S", LG.Color.text)
+                        overlayRow("QUEUED INPUT", "\(queuedCount) EVENTS", NS.Color.text)
+                        overlayRow("DROPPING TO", "540P ON RESUME", NS.Color.amber)
+                        overlayRow("GIVING UP AT", "30S", NS.Color.text)
                     }
                     .padding(.top, 14)
                 }
                 .padding(18)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 108)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 78)
         }
     }
 
@@ -496,49 +443,132 @@ struct RemoteView: View {
         return false
     }
 
-    private var bottomBar: some View {
+    /// Ends the session. The one control that is in the same place in every
+    /// layout.
+    private func stopButton(size: CGFloat, label: String? = nil) -> some View {
+        Button {
+            model.stopStream()
+        } label: {
+            HStack(spacing: 9) {
+                Text("✕").font(NS.Font.mono(14))
+                if let label {
+                    MonoCaps(label, size: 9, color: NS.Color.textSecondary, tracking: 1.4)
+                }
+            }
+            .foregroundStyle(NS.Color.textSecondary)
+            .frame(maxWidth: label == nil ? nil : .infinity)
+            .frame(width: label == nil ? size : nil, height: size)
+            .background(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.chrome2)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("stopStream")
+        .accessibilityLabel(isStalled ? "Stop trying to reconnect" : "Stop streaming")
+    }
+
+    /// What is on screen and at what scale, stated in the band rather than over
+    /// the picture. This is where the zoom rail's reading went: a slider nobody
+    /// drags is not worth 128pt of the right-hand edge, but the number it
+    /// carried is.
+    private var pictureCaptionRow: some View {
         HStack {
-            Button {
-                model.stopStream()
-            } label: {
-                Group {
-                    if case .stalled = model.streamState {
-                        HStack(spacing: 10) {
-                            Text("✕").font(LG.Font.mono(15))
-                            MonoCaps("STOP TRYING", size: 11, color: LG.Color.textSecondary, tracking: 1.2)
-                        }
-                        .padding(.horizontal, 20)
-                        .frame(height: LG.Metric.hubButton)
-                    } else {
-                        Text("✕")
-                            .font(LG.Font.mono(17))
-                            .frame(width: LG.Metric.hubButton, height: LG.Metric.hubButton)
+            if !pictureCaption.isEmpty {
+                VideoCaption(pictureCaption, color: stallTint ?? NS.Color.textSecondary)
+            }
+            Spacer(minLength: 8)
+            MonoCaps(
+                model.zoomScale > 1.02
+                    ? String(format: "%.1f×", model.zoomScale)
+                    : "1.0× FIT",
+                size: 9,
+                color: model.zoomScale > 1.02 ? NS.Color.accent : NS.Color.textTertiary,
+                tracking: 1
+            )
+        }
+    }
+
+    /// The control layer, in the lower letterbox band.
+    ///
+    /// Four things, left to right: what one finger does, the keyboard, the
+    /// Command key, and everything else. The first is the only one that is a
+    /// mode, so it is the only one drawn as a segmented control; the other three
+    /// are 52pt squares in the order they are reached for.
+    ///
+    /// ⌘ latches Command directly rather than opening the drawer to it. It is
+    /// the modifier a Mac actually needs — ⌘Tab, ⌘Space, ⌘W — and putting it one
+    /// tap away instead of two is the difference between using it and not.
+    @ViewBuilder
+    private var rail: some View {
+        if isStalled {
+            HStack(spacing: 8) {
+                stopButton(size: NS.Metric.railButton, label: "STOP TRYING")
+                railButton(glyph: "⌨", label: "Keyboard", enabled: false) {}
+                drawerButton
+            }
+        } else {
+            HStack(spacing: 8) {
+                padModeControl
+                railButton(glyph: "⌨", label: "Keyboard") { model.showKeyboard = true }
+                railButton(
+                    glyph: "⌘",
+                    label: "Command",
+                    held: model.heldModifiers.contains("cmd")
+                ) {
+                    model.toggleModifier("cmd")
+                }
+                drawerButton
+            }
+        }
+    }
+
+    private var drawerButton: some View {
+        Button {
+            withAnimation(NS.Motion.stateChange) { model.showHub.toggle() }
+        } label: {
+            Text("⋯")
+                .font(NS.Font.mono(15))
+                .foregroundStyle(NS.Color.text)
+                .frame(width: NS.Metric.railButton, height: NS.Metric.railButton)
+                .background(
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                        .fill(NS.Color.raised2)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("hub")
+        .accessibilityLabel("Commands")
+    }
+
+    private func railButton(
+        glyph: String,
+        label: String,
+        held: Bool = false,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(glyph)
+                .font(NS.Font.mono(15))
+                .foregroundStyle(
+                    held ? NS.Color.accent : (enabled ? NS.Color.text : NS.Color.textDisabled)
+                )
+                .frame(width: NS.Metric.railButton, height: NS.Metric.railButton)
+                .background(
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                        .fill(held ? NS.Color.accent.opacity(0.20) : NS.Color.chrome)
+                )
+                .overlay {
+                    if held {
+                        RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                            .stroke(NS.Color.accent, lineWidth: 1)
                     }
                 }
-                .foregroundStyle(LG.Color.textSecondary)
-                .background(Capsule().fill(LG.Color.chrome.opacity(0.86)))
-                .overlay(Capsule().stroke(LG.Color.hairline, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("stopStream")
-            .accessibilityLabel(isStalled ? "Stop trying to reconnect" : "Stop streaming")
-
-            Spacer()
-
-            Button {
-                withAnimation(LG.Motion.stateChange) { model.showHub.toggle() }
-            } label: {
-                HubGlyph(active: model.showHub)
-                    .frame(width: LG.Metric.hubButton, height: LG.Metric.hubButton)
-                    .background(Circle().fill(LG.Color.chrome.opacity(0.92)))
-                    .overlay(Circle().stroke(LG.Color.stroke, lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("hub")
-            .accessibilityLabel("Control hub")
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 0)
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(held ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: Landscape — a different instrument, not a stretched portrait
@@ -552,7 +582,7 @@ struct RemoteView: View {
                     .scaleEffect(model.zoomScale, anchor: .center)
                     .offset(pan)
                     .clipped()
-                CornerTicks(color: LG.Color.cyan.opacity(0.75))
+                CornerTicks(color: NS.Color.accent.opacity(0.75))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -579,8 +609,8 @@ struct RemoteView: View {
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
-                        Circle().fill(LG.Color.green).frame(width: 5, height: 5)
-                        MonoCaps(liveLabel, size: 9, color: LG.Color.green, tracking: 1.4)
+                        Circle().fill(NS.Color.green).frame(width: 5, height: 5)
+                        MonoCaps(liveLabel, size: 9, color: NS.Color.green, tracking: 1.4)
                     }
                     .videoChip()
 
@@ -596,7 +626,7 @@ struct RemoteView: View {
             }
 
             landscapeDock
-                .frame(width: 231)
+                .frame(width: 276)
         }
     }
 
@@ -608,16 +638,24 @@ struct RemoteView: View {
                 MonoCaps(
                     model.scrollLock ? "LOCK" : "FREE",
                     size: 9,
-                    color: model.scrollLock ? LG.Color.cyan : LG.Color.textTertiary,
+                    color: model.scrollLock ? NS.Color.accent : NS.Color.textTertiary,
                     tracking: 1.4
                 )
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                dockButton("⌨ KEYS", spoken: "Keyboard") { model.showKeyboard = true }
-                dockButton("⛶ SHOT", spoken: "Screenshot the Mac") { model.hub("shot") }
-                dockButton("COPY ←", spoken: "Copy from the Mac") { model.hub("copy") }
-                dockButton("PASTE →", spoken: "Paste to the Mac") { model.hub("paste") }
+                Tile(glyph: "⌨", caption: "KEYS", spoken: "Keyboard") {
+                    model.showKeyboard = true
+                }
+                Tile(glyph: "⛶", caption: "SHOT", spoken: "Screenshot the Mac") {
+                    model.hub("shot")
+                }
+                Tile(glyph: "←", caption: "COPY", glyphSize: 13, spoken: "Copy from the Mac") {
+                    model.hub("copy")
+                }
+                Tile(glyph: "→", caption: "PASTE", glyphSize: 13, spoken: "Paste to the Mac") {
+                    model.hub("paste")
+                }
             }
 
             HStack(spacing: 6) {
@@ -638,21 +676,22 @@ struct RemoteView: View {
             VStack(spacing: 9) {
                 dockReadout("RTT", model.link.rttMillis.map { "\(Int($0)) MS" } ?? "—")
                 dockReadout("RATE", String(format: "%.1f MB/S", model.link.downMbps))
-                Hairline(color: LG.Color.chrome)
+                dockReadout("FRONTMOST", model.link.frontmostApp.isEmpty ? "—" : model.link.frontmostApp)
                 HStack(spacing: 8) {
                     Button {
                         model.presented = .claude
                         model.listClaudeSessions()
                     } label: {
-                        MonoCaps("CLAUDE", size: 10, color: LG.Color.cyan, tracking: 1.2)
+                        MonoCaps("CLAUDE", size: 10, color: NS.Color.accent, tracking: 1.4)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
                             .background(
-                                RoundedRectangle(cornerRadius: 8).fill(LG.Color.cyan.opacity(0.10))
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                    .fill(NS.Color.accent.opacity(0.12))
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(LG.Color.cyan.opacity(0.4), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                    .stroke(NS.Color.accent.opacity(0.4), lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -661,13 +700,12 @@ struct RemoteView: View {
                         model.stopStream()
                     } label: {
                         Text("✕")
-                            .font(LG.Font.mono(15))
-                            .foregroundStyle(LG.Color.textSecondary)
+                            .font(NS.Font.mono(14))
+                            .foregroundStyle(NS.Color.textSecondary)
                             .frame(width: 50, height: 50)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.chrome))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(LG.Color.hairline, lineWidth: 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                    .fill(NS.Color.raised)
                             )
                     }
                     .buttonStyle(.plain)
@@ -675,37 +713,16 @@ struct RemoteView: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 22)
-        .overlay(alignment: .leading) {
-            Rectangle().fill(LG.Color.chrome).frame(width: 1)
-        }
-    }
-
-    private func dockButton(
-        _ title: String,
-        spoken: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            MonoCaps(title, size: 10, color: LG.Color.text, tracking: 0.8)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 50)
-                .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.chrome))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairline, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        // The visible labels carry a glyph and a direction arrow — "⌨ KEYS",
-        // "COPY ←" — which is legible and unspeakable.
-        .accessibilityLabel(spoken)
+        .padding(.vertical, 24)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(NS.Color.screenGround)
     }
 
     private func dockReadout(_ label: String, _ value: String) -> some View {
         HStack {
             MonoCaps(label, size: 9, tracking: 1.2)
             Spacer()
-            MonoCaps(value, size: 9, color: LG.Color.text, tracking: 1.2)
+            MonoCaps(value, size: 9, color: NS.Color.text, tracking: 1.2)
         }
     }
 
@@ -803,7 +820,7 @@ struct RemoteView: View {
                 isPinching = false
                 pinchStart = model.zoomScale
                 panStart = pan
-                withAnimation(LG.Motion.stateChange) { showZoomBadge = false }
+                withAnimation(NS.Motion.stateChange) { showZoomBadge = false }
             }
     }
 
@@ -833,7 +850,7 @@ struct RemoteView: View {
 
     /// Pointer or pan, sitting under the picture in both orientations.
     private var padModeControl: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 3) {
             padModeButton(
                 .pointer,
                 symbol: "cursorarrow",
@@ -843,10 +860,16 @@ struct RemoteView: View {
             padModeButton(
                 .pan,
                 symbol: "arrow.up.and.down.and.arrow.left.and.right",
-                label: "MOVE VIEW",
+                label: "VIEW",
                 hint: "ONE FINGER MOVES THE PICTURE"
             )
         }
+        .padding(3)
+        .frame(height: NS.Metric.railButton)
+        .background(
+            RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                .fill(NS.Color.chrome.opacity(0.92))
+        )
     }
 
     private func padModeButton(
@@ -857,32 +880,24 @@ struct RemoteView: View {
     ) -> some View {
         let selected = padMode == mode
         return Button {
-            withAnimation(LG.Motion.stateChange) { padMode = mode }
+            withAnimation(NS.Motion.stateChange) { padMode = mode }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
-            HStack(spacing: 7) {
+            HStack(spacing: 6) {
                 Image(systemName: symbol)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                 MonoCaps(
                     label,
                     size: 9,
-                    color: selected ? LG.Color.cyan : LG.Color.textSecondary,
-                    tracking: 1.2
+                    color: selected ? NS.Color.accent : NS.Color.textTertiary,
+                    tracking: 1
                 )
             }
-            .foregroundStyle(selected ? LG.Color.cyan : LG.Color.textSecondary)
-            .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .foregroundStyle(selected ? NS.Color.accent : NS.Color.textTertiary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(selected ? LG.Color.cyan.opacity(0.12) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        selected ? LG.Color.cyan.opacity(0.5) : LG.Color.hairline,
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
+                    .fill(selected ? NS.Color.accent.opacity(0.16) : Color.clear)
             )
             .contentShape(Rectangle())
         }
@@ -918,7 +933,7 @@ struct RemoteView: View {
     }
 
     private func resetView() {
-        withAnimation(LG.Motion.stateChange) {
+        withAnimation(NS.Motion.stateChange) {
             model.resetZoom()
             pinchStart = 1
             isPinching = false
@@ -970,105 +985,6 @@ struct RemoteView: View {
                 if queued != queuedCount { queuedCount = queued }
             } else if queuedCount != 0 {
                 queuedCount = 0
-            }
-        }
-    }
-}
-
-// MARK: - Pieces
-
-/// The corner ticks that mark the true edge of the captured pixels.
-struct CornerTicks: View {
-    var color: Color
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                tick(.topLeading, in: geometry)
-                tick(.topTrailing, in: geometry)
-                tick(.bottomLeading, in: geometry)
-                tick(.bottomTrailing, in: geometry)
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func tick(_ corner: Alignment, in geometry: GeometryProxy) -> some View {
-        let size: CGFloat = 11
-        return Path { path in
-            switch corner {
-            case .topLeading:
-                path.move(to: CGPoint(x: 0, y: size))
-                path.addLine(to: .zero)
-                path.addLine(to: CGPoint(x: size, y: 0))
-            case .topTrailing:
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: size, y: 0))
-                path.addLine(to: CGPoint(x: size, y: size))
-            case .bottomLeading:
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: 0, y: size))
-                path.addLine(to: CGPoint(x: size, y: size))
-            default:
-                path.move(to: CGPoint(x: size, y: 0))
-                path.addLine(to: CGPoint(x: size, y: size))
-                path.addLine(to: CGPoint(x: 0, y: size))
-            }
-        }
-        .stroke(color, lineWidth: 1)
-        .frame(width: size, height: size)
-        .position(
-            x: corner == .topLeading || corner == .bottomLeading ? 12 + size / 2
-                : geometry.size.width - 12 - size / 2,
-            y: corner == .topLeading || corner == .topTrailing ? 12 + size / 2
-                : geometry.size.height - 12 - size / 2
-        )
-    }
-}
-
-/// The touch hint that retires after three sessions.
-///
-/// Scaling out from a point is the textbook Reduce Motion trigger, so with the
-/// setting on the ring holds its outer position instead: two concentric circles
-/// that still read as "a touch happens here", with the legend beside them
-/// carrying the actual instruction.
-struct BreathingRing: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var expanded = false
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(.white.opacity(0.22), lineWidth: 1)
-                .frame(width: 30, height: 30)
-            Circle()
-                .stroke(.white.opacity(0.10), lineWidth: 1)
-                .frame(width: 30, height: 30)
-                .scaleEffect(reduceMotion ? 1.45 : (expanded ? 1.7 : 1))
-                .opacity(reduceMotion ? 0.28 : (expanded ? 0 : 0.55))
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 2.8).repeatForever(autoreverses: false)) {
-                expanded = true
-            }
-        }
-    }
-}
-
-struct HubGlyph: View {
-    var active: Bool
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ForEach(0..<3, id: \.self) { row in
-                HStack(spacing: 4) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        Circle()
-                            .fill(row == 2 || active ? LG.Color.cyan : LG.Color.text)
-                            .frame(width: 3, height: 3)
-                    }
-                }
             }
         }
     }

@@ -31,7 +31,7 @@ struct KeyboardBarView: View {
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
-            .background(LG.Color.deepGround.opacity(0.96))
+            .background(NS.Color.deepGround.opacity(0.96))
 
             // Invisible field that owns the system keyboard. Everything typed
             // is forwarded as unicode so autocorrect and emoji work.
@@ -49,17 +49,17 @@ struct KeyboardBarView: View {
                 }
         }
         .onAppear { focused = true }
-        .transition(LG.Motion.rise(reduced: reduceMotion))
+        .transition(NS.Motion.rise(reduced: reduceMotion))
     }
 
     /// What is being typed into, named.
     private var typingIntoBanner: some View {
         HStack(spacing: 10) {
             Caret().frame(width: 2, height: 18)
-            MonoCaps("TYPING INTO", size: 11, color: LG.Color.cyan, tracking: 0.6)
+            MonoCaps("TYPING INTO", size: 11, color: NS.Color.accent, tracking: 0.6)
             Text(model.link.frontmostApp.isEmpty ? "Unknown window" : model.link.frontmostApp)
-                .font(LG.Font.sans(14))
-                .foregroundStyle(LG.Color.text)
+                .font(NS.Font.sans(14))
+                .foregroundStyle(NS.Color.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
             MonoCaps(
@@ -72,8 +72,8 @@ struct KeyboardBarView: View {
                 focused = false
             } label: {
                 Text("✕")
-                    .font(LG.Font.mono(13))
-                    .foregroundStyle(LG.Color.textSecondary)
+                    .font(NS.Font.mono(13))
+                    .foregroundStyle(NS.Color.textSecondary)
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
@@ -85,10 +85,10 @@ struct KeyboardBarView: View {
         .padding(.leading, 14)
         .frame(height: 46)
         .background(
-            RoundedRectangle(cornerRadius: 8).fill(LG.Color.cyan.opacity(0.06))
+            RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.accent.opacity(0.10))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8).stroke(LG.Color.cyan.opacity(0.28), lineWidth: 1)
+            RoundedRectangle(cornerRadius: NS.Metric.radiusControl).stroke(NS.Color.accent.opacity(0.30), lineWidth: 1)
         )
     }
 
@@ -121,15 +121,12 @@ struct KeyboardBarView: View {
             model.key(code)
         } label: {
             Text(label)
-                .font(LG.Font.mono(11))
+                .font(NS.Font.mono(11))
                 .tracking(0.6)
-                .foregroundStyle(LG.Color.text)
+                .foregroundStyle(NS.Color.text)
                 .padding(.horizontal, 12)
                 .frame(height: 46)
-                .background(RoundedRectangle(cornerRadius: 7).fill(LG.Color.chrome))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7).stroke(LG.Color.stroke, lineWidth: 1)
-                )
+                .background(RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.chrome2))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -138,21 +135,18 @@ struct KeyboardBarView: View {
     private var arrowCluster: some View {
         HStack(spacing: 0) {
             arrowKey("←", code: "arrowLeft")
-            Rectangle().fill(LG.Color.hairlineDim).frame(width: 1, height: 34)
+            Rectangle().fill(NS.Color.hairlineDim).frame(width: 1, height: 34)
             VStack(spacing: 0) {
                 arrowKey("↑", code: "arrowUp", height: 23, size: 10)
                 arrowKey("↓", code: "arrowDown", height: 23, size: 10)
             }
             .frame(width: 26)
-            Rectangle().fill(LG.Color.hairlineDim).frame(width: 1, height: 34)
+            Rectangle().fill(NS.Color.hairlineDim).frame(width: 1, height: 34)
             arrowKey("→", code: "arrowRight")
         }
         .frame(maxWidth: .infinity)
         .frame(height: 46)
-        .background(RoundedRectangle(cornerRadius: 7).fill(LG.Color.raised))
-        .overlay(
-            RoundedRectangle(cornerRadius: 7).stroke(LG.Color.hairlineDim, lineWidth: 1)
-        )
+        .background(RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.raised))
     }
 
     private func arrowKey(_ glyph: String, code: String, height: CGFloat = 34, size: CGFloat = 12) -> some View {
@@ -160,8 +154,8 @@ struct KeyboardBarView: View {
             model.key(code)
         } label: {
             Text(glyph)
-                .font(LG.Font.mono(size))
-                .foregroundStyle(LG.Color.textSecondary)
+                .font(NS.Font.mono(size))
+                .foregroundStyle(NS.Color.textSecondary)
                 .frame(width: 26, height: height)
                 // An arrow glyph is mostly empty space, and these keys have no
                 // fill behind them, so only the strokes were hittable.
@@ -191,14 +185,11 @@ struct KeyboardBarView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     Text(label(for: combo))
-                        .font(LG.Font.mono(12))
-                        .foregroundStyle(LG.Color.text)
+                        .font(NS.Font.mono(12))
+                        .foregroundStyle(NS.Color.text)
                         .padding(.horizontal, 13)
                         .frame(height: 44)
-                        .background(RoundedRectangle(cornerRadius: 7).fill(LG.Color.panel))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7).stroke(LG.Color.hairline, lineWidth: 1)
-                        )
+                        .background(RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.raised))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(spokenCombo(combo))
@@ -208,14 +199,14 @@ struct KeyboardBarView: View {
                 showComboEditor = true
             } label: {
                 Text("+")
-                    .font(LG.Font.mono(11))
-                    .foregroundStyle(LG.Color.textTertiary)
+                    .font(NS.Font.mono(11))
+                    .foregroundStyle(NS.Color.textTertiary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 7)
+                        RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
                             .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                            .foregroundStyle(LG.Color.hairline)
+                            .foregroundStyle(NS.Color.hairline)
                     )
                     // The dashed box is an outline, not a fill, so only the
                     // plus sign itself answered a tap.
@@ -295,16 +286,13 @@ struct ComboEditor: View {
                 }
 
                 TextField("key", text: $letter)
-                    .font(LG.Font.mono(15))
-                    .foregroundStyle(LG.Color.text)
+                    .font(NS.Font.mono(15))
+                    .foregroundStyle(NS.Color.text)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding(.horizontal, 14)
                     .frame(height: 52)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.panel))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairline, lineWidth: 1)
-                    )
+                    .background(RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.raised))
 
                 Spacer()
 
@@ -312,8 +300,8 @@ struct ComboEditor: View {
                     title: "Add combo",
                     detail: "APPEARS IN ROW TWO",
                     glyph: "＋",
-                    tint: LG.Color.cyan,
-                    ink: LG.Color.onCyan,
+                    tint: NS.Color.accent,
+                    ink: NS.Color.onAccent,
                     enabled: !letter.isEmpty && !selectedModifiers.isEmpty
                 ) {
                     combos.append(Array(selectedModifiers.sorted()) + [letter.lowercased()])

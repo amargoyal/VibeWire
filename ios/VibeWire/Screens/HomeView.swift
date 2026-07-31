@@ -1,28 +1,38 @@
 import SwiftUI
 
-/// 02A–02D · HOME · the condition report.
+/// 03 · HOME — THE CONSOLE and 04 · HOME — UNREACHABLE.
 ///
-/// Answers three questions before the thumb moves — is it awake, is the link
-/// good enough, which displays exist — then offers one 76pt way in. The three
-/// unhappy states are designed with the same care as the happy one, because
-/// those are the ones that waste the two minutes.
+/// Home shows the Mac instead of describing it.
+///
+/// The screen used to answer three questions in prose and numbers — is it awake,
+/// is the link good enough, which displays exist — and then offer a way in at the
+/// bottom. Every one of those answers is still here and still measured, but the
+/// last frame the Mac sent is now the largest thing on the screen and is itself
+/// the way in, so the numbers shrink to one strip and the displays to one row of
+/// chips.
+///
+/// The three unhappy states are designed with the same care as the happy one,
+/// because those are the ones that waste the two minutes.
+///
+/// Past `NS.Metric.wide` the same content becomes two columns rather than a phone
+/// column stranded in the middle of an iPad: the picture and the way in on the
+/// left, the readings on a rail to the right. Nothing is rendered twice — the
+/// pieces are the same views in a different container.
 struct HomeView: View {
     @Environment(AppModel.self) private var model
     @State private var retryCountdown = 22
 
     private enum Posture {
-        case awake       // 02A
-        case weak        // 02B
-        case asleep      // 02C
+        case awake
+        case weak
+        case asleep
         case connecting  // opening the socket — not a claim about the Mac
-        case unreachable // 02D
+        case unreachable
     }
 
     private var posture: Posture {
         switch model.connection {
         case .failed, .idle, .unauthorized:
-            // Both arms of the ternary that used to be here returned the same
-            // thing, so the pairing check never meant anything.
             return .unreachable
         case .reconnecting:
             return .unreachable
@@ -38,88 +48,149 @@ struct HomeView: View {
         }
     }
 
+    private var condition: Condition {
+        switch posture {
+        case .awake: return .reachable
+        case .weak: return .degraded
+        case .unreachable: return .lost
+        case .asleep, .connecting: return .idle
+        }
+    }
+
     var body: some View {
-        ScreenBody(scrolls: true) {
-            VStack(alignment: .leading, spacing: 0) {
-                ScreenHeader { model.presented = .settings }
+        GeometryReader { proxy in
+            let wide = proxy.size.width >= NS.Metric.wide
 
-                machineTitle.padding(.top, 22)
+            ScreenBody(scrolls: !wide, wide: wide) {
+                VStack(alignment: .leading, spacing: 0) {
+                    topBar(wide: wide)
 
-                conditionCard.padding(.top, 24)
+                    if wide {
+                        HStack(alignment: .top, spacing: 22) {
+                            VStack(alignment: .leading, spacing: 16) {
+                                hero
+                                HStack(spacing: 10) { footer }
+                            }
+                            .frame(maxWidth: .infinity)
 
-                if posture != .unreachable {
-                    MonoCaps("DISPLAYS", size: 10, tracking: 2)
-                        .padding(.top, 26)
-                    displayList.padding(.top, 12)
-                } else {
-                    MonoCaps("MOST LIKELY, IN ORDER", size: 10, tracking: 2)
-                        .padding(.top, 26)
-                    causeList.padding(.top, 12)
+                            VStack(alignment: .leading, spacing: 14) { rail }
+                                .frame(width: NS.Metric.rail)
+                        }
+                        .padding(.top, 4)
+                        .padding(.bottom, 20)
+                    } else {
+                        machineTitle.padding(.top, 10)
+                        hero.padding(.top, 14)
+                        VStack(alignment: .leading, spacing: 14) { rail }
+                            .padding(.top, 14)
+                        Spacer(minLength: 14)
+                        VStack(spacing: 9) { footer }
+                            .padding(.bottom, 20)
+                    }
                 }
-
-                Spacer(minLength: 12)
-
-                footer
             }
-            .padding(.bottom, 20)
         }
         .task { await countdownLoop() }
     }
 
-    // MARK: Title
+    // MARK: The bar and the title
+
+    /// On a phone the machine name is a 36pt heading under this bar. Where there
+    /// is room it moves up into the bar beside the wordmark, with the link
+    /// condition as a pill on the right — a 36pt name above a two-column layout
+    /// is a title for a page rather than a label for the left-hand picture.
+    private func topBar(wide: Bool) -> some View {
+        HStack(spacing: 18) {
+            MonoCaps(
+                "VibeWire",
+                size: 11,
+                color: NS.Color.textSecondary,
+                tracking: 3.5,
+                weight: .medium
+            )
+
+            if wide {
+                Rectangle()
+                    .fill(NS.Color.hairline)
+                    .frame(width: 1, height: 20)
+                HStack(spacing: 10) {
+                    ConditionDot(condition: condition, size: 8)
+                    Text(model.hostName)
+                        .font(NS.Font.sans(19, weight: .semibold))
+                        .tracking(-0.4)
+                        .foregroundStyle(NS.Color.text)
+                    MonoCaps(machineLine.text, size: 10, color: machineLine.tone, tracking: 1)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if wide {
+                MonoCaps(pillLabel, size: 10, color: condition.color, tracking: 1.4)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 36)
+                    .background(Capsule().fill(condition.color.opacity(0.12)))
+            }
+
+            OverflowButton { model.presented = .settings }
+        }
+        .frame(minHeight: 40)
+        .padding(.vertical, 10)
+    }
+
+    private var pillLabel: String {
+        switch posture {
+        case .awake, .weak:
+            let rtt = model.link.rttMillis.map { "\(Int($0))MS" } ?? "—"
+            return "\(transportLabel) · \(rtt)"
+        case .asleep: return "ASLEEP"
+        case .connecting: return "CONNECTING"
+        case .unreachable: return "UNREACHABLE"
+        }
+    }
 
     private var machineTitle: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(model.hostName)
-                .font(LG.Font.sans(30, weight: .medium))
-                .foregroundStyle(posture == .asleep ? LG.Color.textSecondary : LG.Color.text)
-            subtitle
-        }
-    }
-
-    @ViewBuilder
-    private var subtitle: some View {
-        switch posture {
-        case .awake:
-            MonoCaps(
-                [model.hostModel, "MACOS \(model.hostOS)", transportLabel]
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " · "),
-                size: 11,
-                tracking: 1
-            )
-        case .weak:
-            HStack(spacing: 4) {
-                MonoCaps("LINK IS THIN OVER", size: 11, tracking: 1)
-                MonoCaps(transportLabel, size: 11, color: LG.Color.amber, tracking: 1)
-            }
-        case .asleep:
-            MonoCaps(
-                "\(model.link.onPower ? "ON POWER" : "ON BATTERY") · DISPLAY OFF",
-                size: 11,
-                tracking: 1
-            )
-        case .connecting:
-            MonoCaps(
-                "\(model.link.onPower ? "ON POWER" : "ON BATTERY") · AWAITING HEARTBEAT",
-                size: 11,
-                tracking: 1
-            )
-        case .unreachable:
-            HStack(spacing: 4) {
-                MonoCaps("NO PATH TO THE MAC ·", size: 11, tracking: 1)
-                MonoCaps(
-                    model.transport.tailscaleRunning ? "TAILSCALE UP" : "TAILSCALE DOWN",
-                    size: 11,
-                    color: LG.Color.red,
-                    tracking: 1
+            HStack(spacing: 10) {
+                ConditionDot(condition: condition)
+                DisplayTitle(
+                    model.hostName,
+                    size: 36,
+                    color: posture == .asleep ? NS.Color.textSecondary : NS.Color.text
                 )
             }
+            MonoCaps(machineLine.text, size: 10, color: machineLine.tone, tracking: 1)
+                .padding(.leading, 19)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// The caption under the machine name: what it is, and how this client
+    /// reaches it.
+    private var machineLine: (text: String, tone: Color) {
+        switch posture {
+        case .awake:
+            let parts = [model.hostModel, "MACOS \(model.hostOS)", transportLabel]
+                .filter { !$0.isEmpty }
+            return (parts.joined(separator: " · "), NS.Color.textTertiary)
+        case .weak:
+            return ("LINK IS THIN OVER \(transportLabel)", NS.Color.amber)
+        case .asleep:
+            return ("\(model.link.onPower ? "ON POWER" : "ON BATTERY") · DISPLAY OFF", NS.Color.textTertiary)
+        case .connecting:
+            return (
+                "\(model.link.onPower ? "ON POWER" : "ON BATTERY") · AWAITING HEARTBEAT",
+                NS.Color.textTertiary
+            )
+        case .unreachable:
+            let tailscale = model.transport.tailscaleRunning ? "TAILSCALE UP" : "TAILSCALE DOWN"
+            return ("NO PATH TO THE MAC · \(tailscale)", NS.Color.red)
         }
     }
 
-    /// Names the phone's radio alongside the path. "You are on GUEST-5G"
-    /// is usually the actual bug, so it is stated rather than implied.
+    /// Names the phone's radio alongside the path. "You are on GUEST-5G" is
+    /// usually the actual bug, so it is stated rather than implied.
     private var transportLabel: String {
         let radio = model.linkMonitor.description
         switch model.transport.path {
@@ -130,150 +201,205 @@ struct HomeView: View {
         }
     }
 
-    // MARK: Condition card
+    // MARK: The hero
+
+    /// The Mac's screen, at whatever age it is, and the way in.
+    ///
+    /// The whole rectangle is the button. A picture of the thing being reached
+    /// for is a better target than a word for it, and it is the one control on
+    /// this screen that does not have to be read to be understood. When there is
+    /// nothing to show it stays a hatched frame with its corner ticks — an empty
+    /// frame, never a black one, because a black rectangle is a claim about what
+    /// the Mac is displaying.
+    private var hero: some View {
+        let lost = posture == .unreachable
+        let renderer = model.renderer(forDisplay: model.displays.first(where: \.selected)?.id ?? 0)
+        let painted = renderer.framesRendered > 0
+        let openable = posture == .awake || posture == .weak
+
+        return Button {
+            if openable { model.startStream() } else { model.requestLastFrame() }
+        } label: {
+            ZStack {
+                Hatch()
+
+                if painted {
+                    VideoSurface(renderer: renderer)
+                } else {
+                    MonoCaps(
+                        lost ? "LAST FRAME" : "MAC SCREEN",
+                        size: 10,
+                        color: NS.Color.textDisabled,
+                        tracking: NS.Metric.capsTrackingWide
+                    )
+                }
+
+                CornerTicks(color: lost ? NS.Color.red.opacity(0.7) : NS.Color.accent.opacity(0.7))
+
+                VStack {
+                    VideoCaption(ageChip.text, color: ageChip.tone)
+                        .padding(.top, 14)
+                    Spacer(minLength: 0)
+                    if let display = model.displays.first(where: \.selected) {
+                        VideoCaption("\(display.name.uppercased()) · \(display.width) × \(display.height)")
+                            .padding(.bottom, 14)
+                    }
+                }
+            }
+            // The lost screen keeps a smaller picture: the causes underneath it
+            // are what the user came to read, and a full-height frame of
+            // three-hour-old pixels pushes them off the screen.
+            .frame(minHeight: lost ? 128 : 226, maxHeight: lost ? 128 : .infinity)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: NS.Metric.radiusCardLarge))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(openable ? "View the Mac’s screen" : "Ask the Mac for its last frame")
+    }
+
+    private var ageChip: (text: String, tone: Color) {
+        guard let age = model.lastFrameAgeSeconds else {
+            return ("NO FRAME YET", NS.Color.textSecondary)
+        }
+        if age < 60 { return ("LAST FRAME · \(age)S AGO", NS.Color.green) }
+        if age < 3600 { return ("LAST FRAME · \(age / 60)M AGO", NS.Color.textSecondary) }
+        return ("\(age / 3600)H OLD · TAP TO OPEN", NS.Color.amber)
+    }
+
+    // MARK: The rail
 
     @ViewBuilder
-    private var conditionCard: some View {
-        switch posture {
-        case .awake, .weak:
-            liveCard
-        case .connecting:
-            connectingCard
-        case .asleep:
-            asleepCard
-        case .unreachable:
-            unreachableCard
+    private var rail: some View {
+        conditionStrip
+
+        if posture == .unreachable {
+            causes
+        } else {
+            displays
         }
     }
 
-    private var liveCard: some View {
+    @ViewBuilder
+    private var conditionStrip: some View {
+        switch posture {
+        case .awake, .weak: liveStrip
+        case .connecting: pendingStrip(label: "CONNECTING", detail: "WAITING FOR THE FIRST HEARTBEAT")
+        case .asleep: asleepStrip
+        case .unreachable: unreachableStrip
+        }
+    }
+
+    /// One card, one strip of readings.
+    ///
+    /// RTT is set larger than loss and downstream beside it, because three
+    /// numbers at the same size is a table and the eye has to read all of it.
+    /// RTT is the one that decides whether this session is going to be worth
+    /// having.
+    private var liveStrip: some View {
         let condition = model.link.condition
-        return Panel(tint: condition.color) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    ConditionDot(condition: condition)
+        let degraded = condition == .degraded
+        let valueColor = degraded ? NS.Color.amber : NS.Color.text
+
+        return Card {
+            VStack(alignment: .leading, spacing: 15) {
+                HStack(spacing: 9) {
                     MonoCaps(
-                        condition == .degraded ? "AWAKE · THIN LINK" : "AWAKE · REACHABLE",
-                        size: 13,
+                        degraded ? "THIN LINK" : "REACHABLE",
+                        size: 10,
                         color: condition.color,
+                        tracking: 1.8,
                         weight: .medium
                     )
-                    Spacer(minLength: 0)
-                    SignalBars(filled: model.link.signalBars, color: condition.color)
+                    Spacer(minLength: 8)
+                    Sparkline(values: model.link.rttHistory, color: condition.color)
+                        .frame(maxWidth: 150)
+                    MonoCaps("60S", size: 8, tracking: 1.2)
                 }
 
-                HStack(spacing: 26) {
+                HStack(alignment: .bottom, spacing: 20) {
                     Readout(
                         label: "RTT",
                         value: model.link.rttMillis.map { String(Int($0)) },
                         unit: "MS",
-                        valueColor: condition == .degraded ? LG.Color.amber : LG.Color.text
+                        valueColor: valueColor,
+                        lead: true
                     )
                     Readout(
                         label: "LOSS",
                         value: String(format: "%.1f", model.link.lossPercent),
                         unit: "%",
-                        valueColor: condition == .degraded ? LG.Color.amber : LG.Color.text
+                        valueColor: degraded ? NS.Color.amber : NS.Color.textSecondary
                     )
                     Readout(
                         label: "DOWN",
                         value: String(format: "%.1f", model.link.downMbps),
-                        unit: "MB",
-                        valueColor: condition == .degraded ? LG.Color.amber : LG.Color.text
+                        unit: "MB/S",
+                        valueColor: degraded ? NS.Color.amber : NS.Color.textSecondary
                     )
+                    Spacer(minLength: 0)
                 }
-                .padding(.top, 18)
-
-                HStack(spacing: 10) {
-                    Sparkline(values: model.link.rttHistory, color: condition.color)
-                    MonoCaps(
-                        condition == .degraded
-                            ? "JITTER \(model.link.jitterMillis.map { String(Int($0)) } ?? "—")MS"
-                            : "60S RTT",
-                        size: 9,
-                        tracking: 1.2
-                    )
-                }
-                .padding(.top, 16)
             }
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
         }
     }
 
-    /// Dashed rules replace live values. The layout does not move when it
-    /// wakes — it just fills in.
-    /// 02C. The Mac answered and told us it is asleep, so this states that
-    /// rather than pretending the socket is still being opened. The "Wake it"
-    /// action underneath belongs to this card, not to the connecting one.
-    private var asleepCard: some View {
-        Panel(tint: LG.Color.amber) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    ConditionDot(condition: .idle)
-                    MonoCaps("ASLEEP", size: 13, color: LG.Color.amber, weight: .medium)
-                    Spacer(minLength: 0)
-                    SignalBars(filled: 0, color: LG.Color.stroke)
+    /// The Mac answered and told us it is asleep, so this states that rather
+    /// than pretending the socket is still being opened. A dashed rule replaces
+    /// live values; the layout does not move when it wakes — it just fills in.
+    private var asleepStrip: some View {
+        Card(tint: NS.Color.amber) {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(spacing: 9) {
+                    ConditionDot(condition: .idle, size: 7)
+                    MonoCaps("ASLEEP", size: 10, color: NS.Color.amber, tracking: 1.8, weight: .medium)
                 }
-
                 Text("The Mac is reachable but its display is off. Waking it takes a few seconds.")
-                    .font(LG.Font.sans(15))
-                    .foregroundStyle(LG.Color.text)
+                    .font(NS.Font.sans(15))
+                    .foregroundStyle(NS.Color.text)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 14)
-
-                DashedRule().padding(.top, 16)
-
+                DashedRule()
                 MonoCaps(
                     model.link.onPower ? "ON POWER · WILL ANSWER" : "ON BATTERY · MAY NOT ANSWER",
                     size: 9,
                     tracking: 1.2
                 )
-                .padding(.top, 12)
             }
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 17)
         }
     }
 
-    private var connectingCard: some View {
-        Panel {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    ConditionDot(condition: .idle)
-                    MonoCaps("CONNECTING", size: 13, color: LG.Color.textSecondary, weight: .medium)
-                    Spacer(minLength: 0)
-                    SignalBars(filled: 0, color: LG.Color.stroke)
+    private func pendingStrip(label: String, detail: String) -> some View {
+        Card {
+            VStack(alignment: .leading, spacing: 15) {
+                HStack(spacing: 9) {
+                    ConditionDot(condition: .idle, size: 7)
+                    MonoCaps(label, size: 10, color: NS.Color.textSecondary, tracking: 1.8, weight: .medium)
                 }
-
-                HStack(spacing: 26) {
-                    Readout(label: "RTT", value: nil, unit: "MS")
+                HStack(alignment: .bottom, spacing: 20) {
+                    Readout(label: "RTT", value: nil, unit: "MS", lead: true)
                     Readout(label: "LOSS", value: nil, unit: "%")
-                    Readout(label: "AGENT", value: "IDLE", unit: "", valueColor: LG.Color.textSecondary)
+                    Readout(label: "DOWN", value: nil, unit: "MB/S")
+                    Spacer(minLength: 0)
                 }
-                .padding(.top, 18)
-
-                DashedRule().padding(.top, 16)
-
-                MonoCaps("WAITING FOR THE FIRST HEARTBEAT", size: 9, tracking: 1.2)
-                    .padding(.top, 12)
+                DashedRule()
+                MonoCaps(detail, size: 9, tracking: 1.2)
             }
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
         }
     }
 
-    /// Both transports listed with their own verdict. A failure with an
-    /// address, not one vague "offline".
-    private var unreachableCard: some View {
-        Panel(tint: LG.Color.red) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    Rectangle().fill(LG.Color.red).frame(width: 8, height: 8)
-                    MonoCaps("UNREACHABLE", size: 13, color: LG.Color.red, weight: .medium)
-                }
-
+    /// Both transports listed with their own verdict. A failure with an address,
+    /// not one vague "offline".
+    private var unreachableStrip: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 13) {
                 Text(reconnectSentence)
-                    .font(LG.Font.sans(15))
-                    .foregroundStyle(LG.Color.text)
-                    .padding(.top, 14)
+                    .font(NS.Font.sans(15, weight: .medium))
+                    .foregroundStyle(NS.Color.text)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 VStack(spacing: 9) {
                     transportRow(
@@ -283,38 +409,36 @@ struct HomeView: View {
                     )
                     transportRow(
                         "RELAY · \(model.transport.relayName ?? model.transport.cloudflareHostname ?? "NOT CONFIGURED")",
-                        verdict: model.transport.path == .relay ? "OK"
+                        verdict: model.transport.path == .relay
+                            ? "OK"
                             : (model.transport.cloudflareRunning ? "NO HOST" : "OFF"),
                         ok: model.transport.path == .relay
                     )
-                    transportRow(
-                        "LAST CONTACT",
-                        verdict: lastContactLabel,
-                        ok: nil
-                    )
+                    transportRow("LAST CONTACT", verdict: lastContactLabel, ok: nil)
                 }
-                .padding(.top, 16)
             }
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 17)
         }
     }
 
     private func transportRow(_ label: String, verdict: String, ok: Bool?) -> some View {
-        HStack {
-            MonoCaps(label, size: 10, tracking: 1)
+        HStack(spacing: 8) {
+            MonoCaps(label, size: 9, tracking: 1)
+                .lineLimit(1)
             Spacer(minLength: 8)
             MonoCaps(
                 verdict,
-                size: 10,
-                color: ok == true ? LG.Color.green : (ok == nil ? LG.Color.textSecondary : LG.Color.red),
-                tracking: 1
+                size: 9,
+                color: ok == true ? NS.Color.green : (ok == nil ? NS.Color.textSecondary : NS.Color.red),
+                tracking: 1.2
             )
         }
     }
 
     private var reconnectSentence: String {
         if case .reconnecting(let attempt, _) = model.connection {
-            return "Tried \(attempt) time\(attempt == 1 ? "" : "s"). Nothing answered."
+            return "Tried \(attempt) time\(attempt == 1 ? "" : "s"). Nothing answered on either path."
         }
         return "Nothing answered on either path."
     }
@@ -327,231 +451,203 @@ struct HomeView: View {
         return "\(Int(elapsed / 3600))H AGO"
     }
 
-    // MARK: Lists
+    // MARK: Displays
 
-    /// A connected, awake Mac reporting no displays is not an empty list — it
-    /// is almost always Screen Recording permission missing, because that is
-    /// what ScreenCaptureKit returns nothing without. The host only says so
-    /// when a stream is actually requested, so until then this screen offered
-    /// a heading over nothing and a button reading "NO DISPLAY".
+    /// A connected, awake Mac reporting no displays is not an empty list — it is
+    /// almost always Screen Recording permission missing, because that is what
+    /// ScreenCaptureKit returns nothing without.
     private var noDisplays: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("The Mac answered, but reports no displays.")
-                .font(LG.Font.sans(15))
-                .foregroundStyle(LG.Color.text)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Screen Recording permission is the usual cause. On the Mac: System Settings → Privacy & Security → Screen Recording → VibeWire.")
-                .font(LG.Font.sans(13))
-                .foregroundStyle(LG.Color.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+        Card(tint: NS.Color.amber) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("The Mac answered, but reports no displays.")
+                    .font(NS.Font.sans(15))
+                    .foregroundStyle(NS.Color.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Screen Recording permission is the usual cause. On the Mac: System Settings → Privacy & Security → Screen Recording → VibeWire.")
+                    .font(NS.Font.sans(13))
+                    .foregroundStyle(NS.Color.onAmberWash)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
-                .fill(LG.Color.amber.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
-                .stroke(LG.Color.amber.opacity(0.30), lineWidth: 1)
-        )
     }
 
-    private var displayList: some View {
-        VStack(spacing: 8) {
-            if model.displays.isEmpty { noDisplays }
+    /// Which screen, as a row of chips.
+    ///
+    /// A display is a shape and one word, and both fit in a 64pt chip laid
+    /// across one row under the readings. The full name and resolution are on
+    /// the hero's own caption and in the accessibility label, so nothing is
+    /// lost by not spelling them out twice.
+    private var displays: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("DISPLAYS")
 
-            ForEach(model.displays) { display in
-                DisplayRow(
-                    display: display,
-                    degraded: posture == .weak,
-                    dimmed: posture == .asleep
-                ) {
-                    model.selectDisplay(display.id)
-                }
-            }
-
-            if model.displays.count > 1 {
-                Button {
-                    model.selectBothDisplays()
-                } label: {
-                    HStack(spacing: 12) {
-                        HStack(spacing: 3) {
-                            ForEach(0..<2, id: \.self) { _ in
-                                RoundedRectangle(cornerRadius: 2)
-                                    .stroke(LG.Color.textTertiary, lineWidth: 1)
-                                    .frame(width: 15, height: 20)
-                            }
+            if model.displays.isEmpty {
+                noDisplays
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(model.displays) { display in
+                        DisplayChip(
+                            display: display,
+                            degraded: posture == .weak,
+                            dimmed: posture == .asleep
+                        ) {
+                            model.selectDisplay(display.id)
                         }
-                        MonoCaps(
-                            posture == .weak ? "SIDE BY SIDE · NEEDS 3 MB" : "SIDE BY SIDE · BOTH",
-                            size: 11,
-                            color: posture == .weak ? LG.Color.textTertiary : LG.Color.textSecondary,
-                            tracking: 1.2
-                        )
-                        Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 50)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                            .foregroundStyle(model.sideBySide ? LG.Color.cyan : LG.Color.hairline)
-                    )
+
+                    if model.displays.count > 1 {
+                        Button {
+                            model.selectBothDisplays()
+                        } label: {
+                            VStack(spacing: 6) {
+                                HStack(spacing: 2) {
+                                    ForEach(0..<2, id: \.self) { _ in
+                                        RoundedRectangle(cornerRadius: NS.Metric.radiusScreen)
+                                            .stroke(NS.Color.textTertiary, lineWidth: 1)
+                                            .frame(width: 11, height: 15)
+                                    }
+                                }
+                                MonoCaps("BOTH", size: 8, tracking: 1.2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 64)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                                    .foregroundStyle(model.sideBySide ? NS.Color.accent : NS.Color.stroke)
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(posture == .weak)
+                        .opacity(posture == .weak ? 0.55 : 1)
+                        .accessibilityLabel(
+                            posture == .weak
+                                ? "Side by side, needs 3 megabits"
+                                : "Both displays side by side"
+                        )
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(posture == .weak)
             }
         }
     }
 
     /// Causes ranked by likelihood rather than alphabetised.
-    private var causeList: some View {
-        VStack(spacing: 1) {
-            causeRow("01", "The Mac is asleep, or VibeWire is not running on it.", LG.Color.red)
-            causeRow(
+    private var causes: some View {
+        let rows: [(String, String, Color)] = [
+            ("01", "The Mac is asleep, or VibeWire is not running on it.", NS.Color.red),
+            (
                 "02",
                 model.transport.tailscaleRunning
                     ? "You are off the tailnet, or the Mac dropped off it."
                     : "Tailscale is not running on the Mac.",
-                LG.Color.amber
-            )
-            causeRow("03", "A VPN on the Mac is eating the route.", LG.Color.textTertiary)
+                NS.Color.amber
+            ),
+            ("03", "A VPN on the Mac is eating the route.", NS.Color.textTertiary),
+        ]
+
+        return VStack(alignment: .leading, spacing: 9) {
+            SectionLabel("MOST LIKELY, IN ORDER")
+            VStack(spacing: NS.Metric.groupGap) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    HStack(alignment: .top, spacing: 12) {
+                        MonoCaps(row.0, size: 10, color: row.2, tracking: 0)
+                        Text(row.1)
+                            .font(NS.Font.sans(13))
+                            .foregroundStyle(
+                                row.2 == NS.Color.textTertiary ? NS.Color.textSecondary : NS.Color.text
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+                    .frame(minHeight: 50)
+                    .groupedRow(GroupPosition.at(index, of: rows.count))
+                }
+            }
         }
-        .background(LG.Color.hairlineDim)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairlineDim, lineWidth: 1)
-        )
     }
 
-    private func causeRow(_ number: String, _ text: String, _ color: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            MonoCaps(number, size: 10, color: color, tracking: 0)
-            Text(text)
-                .font(LG.Font.sans(14))
-                .foregroundStyle(color == LG.Color.textTertiary ? LG.Color.textSecondary : LG.Color.text)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 15)
-        .background(LG.Color.raised)
-    }
-
-    // MARK: Footer
+    // MARK: The way forward
 
     @ViewBuilder
     private var footer: some View {
         switch posture {
         case .awake:
-            VStack(spacing: 14) {
-                PrimaryAction(
-                    title: "View screen",
-                    detail: preflightLabel,
-                    glyph: "→",
-                    tint: LG.Color.green,
-                    ink: LG.Color.onGreen,
-                    // Nothing to open, and the card above now says why.
-                    enabled: !model.displays.isEmpty
-                ) {
-                    model.startStream()
-                }
-                claudeHandle
+            PrimaryAction(
+                title: "View screen",
+                detail: preflightLabel,
+                glyph: "→",
+                tint: NS.Color.green,
+                ink: NS.Color.onGreen,
+                // Nothing to open, and the strip above now says why.
+                enabled: !model.displays.isEmpty
+            ) {
+                model.startStream()
             }
+            claudeHandle
 
         case .weak:
-            VStack(spacing: 14) {
-                HStack(spacing: 11) {
-                    Rectangle().fill(LG.Color.amber).frame(width: 2)
-                    Text("Text will be soft until the link recovers. Pointer input stays instant — only video is throttled.")
-                        .font(LG.Font.sans(13))
-                        .foregroundStyle(LG.Color.onAmberWash)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.leading, 12)
+            Text("Text will be soft until the link recovers. Pointer input stays instant — only video is throttled.")
+                .font(NS.Font.sans(13))
+                .foregroundStyle(NS.Color.onAmberWash)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 13)
-                .background(LG.Color.amber.opacity(0.07))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                        .fill(NS.Color.amber.opacity(0.08))
+                )
 
-                PrimaryAction(
-                    title: "View screen anyway",
-                    detail: "540P · SOFT TEXT UNTIL IT RECOVERS",
-                    glyph: "→",
-                    tint: LG.Color.amber,
-                    ink: LG.Color.onAmber
-                ) {
-                    model.startStream()
-                }
-                claudeHandle
+            PrimaryAction(
+                title: "View screen anyway",
+                detail: "540P · SOFT TEXT UNTIL IT RECOVERS",
+                glyph: "→",
+                tint: NS.Color.amber,
+                ink: NS.Color.onAmber
+            ) {
+                model.startStream()
             }
+            claudeHandle
 
         case .connecting:
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Waiting on the Mac to answer. Nothing is being retried in a loop — the battery is not the price of an unanswered question.")
-                    .font(LG.Font.sans(13))
-                    .foregroundStyle(LG.Color.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text("Waiting on the Mac to answer. Nothing is being retried in a loop — the battery is not the price of an unanswered question.")
+                .font(NS.Font.sans(13))
+                .foregroundStyle(NS.Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
         case .asleep:
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Its display is off. Waking it is a nudge, not a restart — anything you had open stays open.")
-                    .font(LG.Font.sans(13))
-                    .foregroundStyle(LG.Color.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            Text("Its display is off. Waking it is a nudge, not a restart — anything you had open stays open.")
+                .font(NS.Font.sans(13))
+                .foregroundStyle(NS.Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-                PrimaryAction(
-                    title: "Wake it",
-                    detail: model.link.canWake
-                        ? "NUDGES THE DISPLAY · USUALLY 4S"
-                        : "MAC IS ON BATTERY — MAY NOT ANSWER",
-                    glyph: "↑",
-                    tint: LG.Color.cyan,
-                    ink: LG.Color.onCyan
-                ) {
-                    model.wake()
-                }
+            PrimaryAction(
+                title: "Wake it",
+                detail: model.link.canWake
+                    ? "NUDGES THE DISPLAY · USUALLY 4S"
+                    : "MAC IS ON BATTERY — MAY NOT ANSWER",
+                glyph: "↑",
+                tint: NS.Color.accent,
+                ink: NS.Color.onAccent
+            ) {
+                model.wake()
             }
 
         case .unreachable:
-            VStack(spacing: 12) {
-                Button {
-                    model.requestLastFrame()
-                } label: {
-                    HStack(spacing: 12) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .stroke(LG.Color.textTertiary, lineWidth: 1)
-                            .frame(width: 30, height: 20)
-                        MonoCaps("SHOW LAST FRAME", size: 11, color: LG.Color.textSecondary, tracking: 1)
-                        Spacer(minLength: 0)
-                        MonoCaps(
-                            model.lastFrameAgeSeconds.map { "\($0 / 3600)H OLD" } ?? "IF ANY",
-                            size: 10,
-                            tracking: 0
-                        )
-                    }
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 56)
-                    .background(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusMedium).fill(LG.Color.panel)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: LG.Metric.radiusMedium)
-                            .stroke(LG.Color.hairline, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-
-                PrimaryAction(
-                    title: "Try again",
-                    detail: "AUTO-RETRY IN \(retryCountdown)S · TAP TO GO NOW",
-                    glyph: "↻",
-                    tint: LG.Color.cyan,
-                    ink: LG.Color.onCyan
-                ) {
-                    retryCountdown = 22
-                    model.retry()
-                }
+            PrimaryAction(
+                title: "Try again",
+                detail: "AUTO-RETRY IN \(retryCountdown)S · TAP TO GO NOW",
+                glyph: "↻",
+                tint: NS.Color.accent,
+                ink: NS.Color.onAccent
+            ) {
+                retryCountdown = 22
+                model.retry()
             }
         }
     }
@@ -564,30 +660,62 @@ struct HomeView: View {
         return "\(name) · \(ladder) · ~\(estimate)MS TO FIRST FRAME"
     }
 
+    /// Claude, as a row rather than a caption with a link in it. It is a second
+    /// destination from this screen, not a footnote about one.
     private var claudeHandle: some View {
-        HStack {
-            MonoCaps(
-                model.sessionCount > 0 ? "SESSION \(model.sessionCount) THIS LAUNCH" : "NO SESSION YET",
-                size: 10,
-                tracking: 1.2
-            )
-            Spacer()
-            Button {
-                model.presented = .claude
-                model.listClaudeSessions()
-            } label: {
-                MonoCaps("CLAUDE ⌃", size: 10, color: LG.Color.cyan, tracking: 1.2)
-                    .padding(.horizontal, 12)
-                    .frame(height: LG.Metric.minimumTarget)
-                    .contentShape(Rectangle())
+        let detail: String = {
+            if !model.claudeCwd.isEmpty {
+                let short = model.claudeCwd
+                    .replacingOccurrences(
+                        of: "^/Users/[^/]+",
+                        with: "~",
+                        options: .regularExpression
+                    )
+                    .uppercased()
+                return model.sessionCount > 0
+                    ? "\(model.sessionCount) SESSION\(model.sessionCount == 1 ? "" : "S") · \(short) OPEN"
+                    : short
             }
-            .buttonStyle(.plain)
+            return model.sessionCount > 0
+                ? "\(model.sessionCount) SESSION\(model.sessionCount == 1 ? "" : "S") THIS LAUNCH"
+                : "NO SESSION YET"
+        }()
+
+        return Button {
+            model.presented = .claude
+            model.listClaudeSessions()
+        } label: {
+            HStack(spacing: 13) {
+                Circle().fill(NS.Color.accent).frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Claude Code")
+                        .font(NS.Font.sans(15, weight: .medium))
+                        .tracking(-0.2)
+                        .foregroundStyle(NS.Color.text)
+                    MonoCaps(detail, size: 9, tracking: 1)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Text("↗")
+                    .font(NS.Font.mono(15))
+                    .foregroundStyle(NS.Color.accent)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .frame(minHeight: 62)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.raised)
+            )
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Claude Code")
+        .accessibilityValue(detail)
     }
 
     /// The countdown only exists on the unreachable screen, but this used to
     /// re-assign it every second on every other one — rebuilding the condition
-    /// card, the display list and the footer once a second to write the number
+    /// strip, the display row and the footer once a second to write the number
     /// 22 over the number 22.
     private func countdownLoop() async {
         while !Task.isCancelled {
@@ -605,56 +733,61 @@ struct HomeView: View {
     }
 }
 
-struct DisplayRow: View {
+/// The phone form of a display choice: a shape and one word.
+struct DisplayChip: View {
     let display: DisplayEntry
     var degraded: Bool
     var dimmed: Bool
     let action: () -> Void
 
+    /// "Built-in Liquid Retina XDR" in a 64pt chip is one long ellipsis, so the
+    /// chip takes the word that distinguishes it from the other one on the desk.
+    private var shortName: String {
+        let name = display.name.uppercased()
+        if name.contains("BUILT-IN") { return "BUILT-IN" }
+        return name.split(separator: " ").first.map(String.init) ?? name
+    }
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(display.selected ? LG.Color.cyan.opacity(0.14) : .clear)
-                    .frame(width: 34, height: 22)
+            VStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: NS.Metric.radiusScreen)
+                    .fill(display.selected ? NS.Color.accent.opacity(0.20) : .clear)
+                    .frame(width: 26, height: 17)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 2)
+                        RoundedRectangle(cornerRadius: NS.Metric.radiusScreen)
                             .strokeBorder(
                                 style: StrokeStyle(lineWidth: 1, dash: dimmed ? [3, 3] : [])
                             )
-                            .foregroundStyle(display.selected ? LG.Color.cyan : LG.Color.textTertiary)
+                            .foregroundStyle(display.selected ? NS.Color.accent : NS.Color.textTertiary)
                     )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(display.name)
-                        .font(LG.Font.sans(15))
-                        .foregroundStyle(dimmed ? LG.Color.textTertiary : LG.Color.text)
-                    MonoCaps(
-                        degraded && display.selected
-                            ? "WILL OPEN AT 540P"
-                            : (dimmed ? "LAST KNOWN \(display.width) × \(display.height)" : display.resolutionLabel),
-                        size: 10,
-                        color: degraded && display.selected ? LG.Color.amber : LG.Color.textTertiary,
-                        tracking: 1
-                    )
-                }
-
-                Spacer(minLength: 0)
-
+                MonoCaps(
+                    degraded && display.selected
+                        ? "540P"
+                        : (dimmed ? "\(display.width)×\(display.height)" : shortName),
+                    size: 8,
+                    color: degraded && display.selected
+                        ? NS.Color.amber
+                        : (display.selected ? NS.Color.accent : NS.Color.textSecondary),
+                    tracking: 1.2
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, 6)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 64)
+            .background(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                    .fill(display.selected ? NS.Color.accent.opacity(0.12) : NS.Color.raised)
+            )
+            .overlay {
                 if display.selected {
-                    MonoCaps("SELECTED", size: 10, color: LG.Color.cyan, tracking: 1.4)
+                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                        .stroke(NS.Color.accent.opacity(0.5), lineWidth: 1)
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 62)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(display.selected ? LG.Color.cyan.opacity(0.08) : LG.Color.panel)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(display.selected ? LG.Color.cyan : LG.Color.hairline, lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -664,8 +797,6 @@ struct DisplayRow: View {
                 ? "Last known \(display.width) by \(display.height)"
                 : "\(display.width) by \(display.height)"
         )
-        .accessibilityAddTraits(
-            display.selected ? [.isButton, .isSelected] : .isButton
-        )
+        .accessibilityAddTraits(display.selected ? [.isButton, .isSelected] : .isButton)
     }
 }

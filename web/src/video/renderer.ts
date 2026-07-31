@@ -66,7 +66,10 @@ export class VideoRenderer {
     this.canvas.style.width = '100%'
     this.canvas.style.height = '100%'
     this.canvas.style.objectFit = 'contain'
-    this.canvas.style.background = '#0E1013'
+    // The Nightshift `deep`, so a canvas with nothing decoded into it yet is the
+    // same colour as the band around it rather than a lighter rectangle
+    // announcing that a picture failed to arrive.
+    this.canvas.style.background = '#06070A'
     this.context = this.canvas.getContext('2d', { alpha: false, desynchronized: true })
   }
 

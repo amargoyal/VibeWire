@@ -26,6 +26,7 @@ import {
   MODIFIERS,
   PrimaryAction,
   ScreenBody,
+  SectionLabel,
   SheetDismiss,
 } from '../design/components'
 
@@ -149,11 +150,15 @@ export function KeyboardBar() {
       class="stack sheet--bottom"
       data-nopad
       style={{
-        background: 'color-mix(in srgb, var(--lg-deep) 96%, transparent)',
+        position: 'fixed',
+        inset: 'auto 0 0 0',
+        zIndex: 60,
+        background: 'color-mix(in srgb, var(--ns-deep) 96%, transparent)',
         paddingBottom: 'calc(8px + var(--safe-bottom))',
+        animation: 'ns-rise var(--state-change) ease-out',
       }}
     >
-      <div style={{ padding: '0 18px 12px' }}>
+      <div style={{ padding: '0 10px 8px' }}>
         <TypingIntoBanner
           onClose={() => {
             store.showKeyboard.value = false
@@ -162,7 +167,7 @@ export function KeyboardBar() {
         />
       </div>
 
-      <div class="stack" style={{ gap: '6px', paddingInline: '8px' }}>
+      <div class="stack" style={{ gap: '5px', paddingInline: '8px' }}>
         {/* Row one: hardware a touch device lacks. Arrows stay a single grouped cap
             so the shape is findable by feel — a flat row of four identical keys
             never is. */}
@@ -173,7 +178,8 @@ export function KeyboardBar() {
             <KeyCap
               key={spec.name}
               glyph={spec.glyph}
-              width={46}
+              width={44}
+              height={46}
               fontSize="var(--fs-14)"
               isHeld={store.heldModifiers.value.includes(spec.name)}
               onClick={() => store.toggleModifier(spec.name)}
@@ -196,10 +202,9 @@ export function KeyboardBar() {
               style={{
                 flex: '1 1 0',
                 minWidth: 0,
-                height: 'var(--target)',
-                borderRadius: 'var(--radius-key)',
-                background: 'var(--lg-panel)',
-                border: '1px solid var(--lg-hairline)',
+                height: '44px',
+                borderRadius: 'var(--radius-inner)',
+                background: 'var(--ns-raised)',
               }}
             >
               <span class="mono" style={{ fontSize: 'var(--fs-12)' }}>
@@ -211,15 +216,15 @@ export function KeyboardBar() {
             onClick={() => setShowEditor(true)}
             aria-label="Add a key combination"
             style={{
-              flex: '1 1 0',
+              flex: '0.6 1 0',
               minWidth: 0,
-              height: 'var(--target)',
-              borderRadius: 'var(--radius-key)',
-              border: '1px dashed var(--lg-hairline)',
-              color: 'var(--lg-text-tertiary)',
+              height: '44px',
+              borderRadius: 'var(--radius-inner)',
+              border: '1px dashed var(--ns-stroke)',
+              color: 'var(--ns-text-tertiary)',
             }}
           >
-            <span class="mono" style={{ fontSize: 'var(--fs-11)' }}>
+            <span class="mono" style={{ fontSize: 'var(--fs-12)' }}>
               ＋
             </span>
           </button>
@@ -242,6 +247,7 @@ export function KeyboardBar() {
         <Caps
           size="var(--fs-9)"
           tracking="0.12em"
+          color="var(--ns-text-faint)"
           style={{ paddingInline: '18px', marginTop: '10px', lineHeight: 1.7 }}
         >
           {`THIS KEYBOARD GOES STRAIGHT TO THE MAC · ${BROWSER_RESERVED.join(' ')} STAY WITH THE BROWSER`}
@@ -274,19 +280,23 @@ function TypingIntoBanner({ onClose }: { onClose: () => void }) {
       role="status"
       aria-label={`Typing into ${app || 'an unknown window'}`}
       style={{
-        gap: '10px',
-        height: '46px',
+        gap: '11px',
+        height: '50px',
         paddingLeft: '14px',
-        borderRadius: 'var(--radius-row)',
-        background: 'color-mix(in srgb, var(--lg-cyan) 6%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--lg-cyan) 28%, transparent)',
+        borderRadius: 'var(--radius-control)',
+        background: 'color-mix(in srgb, var(--ns-accent) 10%, transparent)',
+        outline: '1px solid color-mix(in srgb, var(--ns-accent) 30%, transparent)',
+        outlineOffset: '-1px',
       }}
     >
       <Caret height={18} />
-      <Caps size="var(--fs-11)" tracking="0.06em" color="var(--lg-cyan)">
+      <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-accent)">
         TYPING INTO
       </Caps>
-      <span class="ellipsis" style={{ fontSize: 'var(--fs-14)' }}>
+      <span
+        class="ellipsis"
+        style={{ fontSize: 'var(--fs-14)', fontWeight: 500, letterSpacing: '-0.01em' }}
+      >
         {app || 'Unknown window'}
       </span>
       <span class="spacer" />
@@ -300,7 +310,7 @@ function TypingIntoBanner({ onClose }: { onClose: () => void }) {
           width: 'var(--target)',
           height: 'var(--target)',
           flex: '0 0 auto',
-          color: 'var(--lg-text-secondary)',
+          color: 'var(--ns-text-secondary)',
         }}
       >
         <span class="mono" style={{ fontSize: 'var(--fs-13)' }}>
@@ -318,11 +328,10 @@ function TextKey({ label, code }: { label: string; code: string }) {
       aria-label={label}
       style={{
         height: '46px',
-        paddingInline: '12px',
+        paddingInline: '13px',
         flex: '0 0 auto',
-        borderRadius: 'var(--radius-key)',
-        background: 'var(--lg-chrome)',
-        border: '1px solid var(--lg-stroke)',
+        borderRadius: 'var(--radius-inner)',
+        background: 'var(--ns-chrome-2)',
       }}
     >
       <span class="mono" style={{ fontSize: 'var(--fs-11)', letterSpacing: '0.06em' }}>
@@ -339,20 +348,20 @@ function ArrowCluster() {
       style={{
         gap: 0,
         flex: '1 1 auto',
+        minWidth: 0,
         height: '46px',
-        borderRadius: 'var(--radius-key)',
-        background: 'var(--lg-raised)',
-        border: '1px solid var(--lg-hairline-dim)',
+        borderRadius: 'var(--radius-inner)',
+        background: 'var(--ns-chrome)',
         justifyContent: 'center',
       }}
     >
       <ArrowKey glyph="←" code="arrowLeft" name="Left arrow" height={34} />
-      <span style={{ width: '1px', height: '34px', background: 'var(--lg-hairline-dim)' }} />
+      <span style={{ width: '1px', height: '30px', background: 'var(--ns-stroke)' }} />
       <div class="stack" style={{ width: '26px' }}>
         <ArrowKey glyph="↑" code="arrowUp" name="Up arrow" height={23} size="var(--fs-10)" />
         <ArrowKey glyph="↓" code="arrowDown" name="Down arrow" height={23} size="var(--fs-10)" />
       </div>
-      <span style={{ width: '1px', height: '34px', background: 'var(--lg-hairline-dim)' }} />
+      <span style={{ width: '1px', height: '30px', background: 'var(--ns-stroke)' }} />
       <ArrowKey glyph="→" code="arrowRight" name="Right arrow" height={34} />
     </div>
   )
@@ -381,7 +390,7 @@ function ArrowKey({
         width: '26px',
         height: `${height}px`,
         flex: '0 0 auto',
-        color: 'var(--lg-text-secondary)',
+        color: 'var(--ns-text-secondary)',
       }}
     >
       <span class="mono" style={{ fontSize: size }}>
@@ -422,10 +431,8 @@ function ComboEditor({
   return (
     <div class="sheet" role="dialog" aria-label="New combo">
       <ScreenBody scrolls>
-        <div class="row" style={{ marginTop: '24px' }}>
-          <Caps size="var(--fs-10)" tracking="0.2em">
-            NEW COMBO
-          </Caps>
+        <div class="row" style={{ minHeight: '40px', marginTop: '16px' }}>
+          <SectionLabel>NEW COMBO</SectionLabel>
           <span class="spacer" />
           <SheetDismiss title="CLOSE" onClick={onClose} />
         </div>
@@ -464,9 +471,8 @@ function ComboEditor({
             height: '52px',
             paddingInline: '14px',
             fontSize: 'var(--fs-15)',
-            background: 'var(--lg-panel)',
-            border: '1px solid var(--lg-hairline)',
-            borderRadius: 'var(--radius-row)',
+            background: 'var(--ns-raised)',
+            borderRadius: 'var(--radius-control)',
           }}
         />
 
@@ -477,8 +483,8 @@ function ComboEditor({
             title="Add combo"
             detail="APPEARS IN ROW TWO"
             glyph="＋"
-            tint="var(--lg-cyan)"
-            ink="var(--lg-on-cyan)"
+            tint="var(--ns-accent)"
+            ink="var(--ns-on-accent)"
             enabled={letter.trim().length > 0 && selected.length > 0}
             onClick={() => onAdd([...[...selected].sort(), letter.trim().toLowerCase()])}
           />

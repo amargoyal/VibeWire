@@ -1,10 +1,9 @@
 /**
- * The Longarm component set, ported from ios/VibeWire/Design/Components.swift.
+ * The Nightshift component set.
  *
  * Each of these exists because the same mark appears on more than one screen and
- * must not drift between them. The comments that explain *why* a value is what
- * it is are carried over verbatim from the phone, because the reason is the part
- * that would otherwise be lost.
+ * must not drift between them. The comments that explain *why* a value is what it
+ * is are the part that would otherwise be lost.
  */
 
 import type { ComponentChildren, JSX } from 'preact'
@@ -15,17 +14,17 @@ export type Condition = 'reachable' | 'degraded' | 'lost' | 'idle'
 
 /** One colour per condition, chosen once here so no screen invents its own. */
 export const conditionColor: Record<Condition, string> = {
-  reachable: 'var(--lg-green)',
-  degraded: 'var(--lg-amber)',
-  lost: 'var(--lg-red)',
-  idle: 'var(--lg-text-secondary)',
+  reachable: 'var(--ns-green)',
+  degraded: 'var(--ns-amber)',
+  lost: 'var(--ns-red)',
+  idle: 'var(--ns-text-secondary)',
 }
 
 export const conditionInk: Record<Condition, string> = {
-  reachable: 'var(--lg-on-green)',
-  degraded: 'var(--lg-on-amber)',
-  lost: 'var(--lg-on-red)',
-  idle: 'var(--lg-text)',
+  reachable: 'var(--ns-on-green)',
+  degraded: 'var(--ns-on-amber)',
+  lost: 'var(--ns-on-red)',
+  idle: 'var(--ns-text)',
 }
 
 /**
@@ -63,7 +62,7 @@ interface CapsProps {
 export function Caps({
   children,
   size = 'var(--fs-10)',
-  color = 'var(--lg-text-tertiary)',
+  color = 'var(--ns-text-tertiary)',
   tracking = 'var(--caps-tracking)',
   weight,
   class: className,
@@ -88,25 +87,54 @@ export function Caps({
 }
 
 /**
+ * The app's one heading. `level` picks the size; there is no separate typeface,
+ * weight or colour decision to make at a call site.
+ */
+export function Display({
+  children,
+  level = 38,
+  color,
+  style,
+}: {
+  children: ComponentChildren
+  level?: 38 | 36 | 30 | 26
+  color?: string
+  style?: JSX.CSSProperties
+}) {
+  const modifier = level === 38 ? '' : ` display--${level}`
+  return (
+    <h1 class={`display${modifier}`} style={{ color, ...style }}>
+      {children}
+    </h1>
+  )
+}
+
+/**
  * A measured value with its unit set smaller and dimmer, e.g. `18ms`.
  *
  * Spoken as one reading rather than three fragments. Left to itself a screen
  * reader announces "RTT", "18", "MS" as separate elements, which is three swipes
  * to learn one number.
+ *
+ * `lead` is the one reading on a card that is the reason to look at it — the RTT
+ * on the condition strip. It is set larger than the two beside it, because three
+ * numbers at the same size is a table and the eye has to read all of it.
  */
 export function Readout({
   label,
   value,
   unit,
-  valueColor = 'var(--lg-text)',
+  valueColor = 'var(--ns-text)',
+  lead = false,
 }: {
   label: string
   value: string | null
   unit: string
   valueColor?: string
+  lead?: boolean
 }) {
   const spokenUnit =
-    { MS: 'milliseconds', '%': 'percent', MB: 'megabits per second' }[
+    { MS: 'milliseconds', '%': 'percent', 'MB/S': 'megabits per second' }[
       unit.toUpperCase()
     ] ?? unit
   const spoken =
@@ -115,31 +143,45 @@ export function Readout({
   return (
     <div
       class="stack"
-      style={{ gap: '5px' }}
+      style={{ gap: '4px' }}
       role="group"
       aria-label={label}
       aria-roledescription={spoken}
     >
-      <Caps size="var(--fs-9)">{label}</Caps>
+      <Caps size="var(--fs-8)" tracking="0.18em">
+        {label}
+      </Caps>
       {value == null ? (
         // A dash, never a zero. An unmeasured value is not the same thing as a
         // measured zero — which makes the dash a reading, so it is legible like
         // one. Dimmer than a real value, never fainter than the label above it.
         <span
           class="mono"
-          style={{ fontSize: 'var(--fs-19)', color: 'var(--lg-text-tertiary)' }}
+          style={{
+            fontSize: lead ? 'var(--fs-26)' : 'var(--fs-19)',
+            lineHeight: 1,
+            color: 'var(--ns-text-tertiary)',
+          }}
           aria-hidden="true"
         >
           —
         </span>
       ) : (
-        <span class="row row--baseline" style={{ gap: '1px' }} aria-hidden="true">
-          <span class="mono" style={{ fontSize: 'var(--fs-19)', color: valueColor }}>
+        <span class="row row--baseline" style={{ gap: '2px' }} aria-hidden="true">
+          <span
+            class="mono"
+            style={{
+              fontSize: lead ? 'var(--fs-26)' : 'var(--fs-19)',
+              lineHeight: lead ? 1 : 1.2,
+              letterSpacing: lead ? '-0.03em' : '-0.02em',
+              color: valueColor,
+            }}
+          >
             {value}
           </span>
           <span
             class="mono"
-            style={{ fontSize: 'var(--fs-11)', color: 'var(--lg-text-tertiary)' }}
+            style={{ fontSize: 'var(--fs-10)', color: 'var(--ns-text-tertiary)' }}
           >
             {unit}
           </span>
@@ -154,14 +196,14 @@ export function Readout({
 export function VideoCaption({
   children,
   size = 'var(--fs-9)',
-  color = 'var(--lg-text-secondary)',
+  color = 'var(--ns-text-secondary)',
 }: {
   children: ComponentChildren
   size?: string
   color?: string
 }) {
   return (
-    <Caps class="video-chip" size={size} color={color}>
+    <Caps class="video-chip" size={size} color={color} tracking="0.1em">
       {children}
     </Caps>
   )
@@ -177,8 +219,8 @@ export function DashedRule() {
   return <div class="dashed-rule" />
 }
 
-/** The bordered box used for status cards and grouped rows. */
-export function Panel({
+/** The filled card used for status readouts and grouped content. */
+export function Card({
   tint,
   children,
   style,
@@ -189,7 +231,7 @@ export function Panel({
 }) {
   return (
     <div
-      class={tint ? 'panel panel--tinted' : 'panel'}
+      class={tint ? 'card card--tinted' : 'card'}
       style={{ ...(tint ? { '--tint': tint } : {}), ...style } as JSX.CSSProperties}
     >
       {children}
@@ -197,26 +239,67 @@ export function Panel({
   )
 }
 
+/**
+ * A run of rows that reads as one object.
+ *
+ * The corner rounding lives in CSS on `:first-child` / `:last-child`, so a row
+ * never has to be told where in the list it sits — which is what used to make
+ * inserting one at the top a two-file change.
+ */
+export function Group({
+  children,
+  style,
+}: {
+  children: ComponentChildren
+  style?: JSX.CSSProperties
+}) {
+  return (
+    <div class="group" style={style}>
+      {children}
+    </div>
+  )
+}
+
+/** A section heading over a group or a card. */
+export function SectionLabel({
+  children,
+  style,
+}: {
+  children: ComponentChildren
+  style?: JSX.CSSProperties
+}) {
+  return (
+    <Caps size="var(--fs-9)" tracking="var(--caps-tracking-wide)" style={style}>
+      {children}
+    </Caps>
+  )
+}
+
 // MARK: - Indicators
 
 /**
- * The pulsing condition dot.
+ * The condition dot.
+ *
+ * A lost condition is drawn square rather than round: colour alone cannot carry
+ * "this is the bad one" for a reader who cannot separate red from green, and the
+ * shape is the redundant channel that costs nothing.
  *
  * `animated` is suppressed while video is on screen — nothing decorative moves
  * next to a live feed.
  */
 export function ConditionDot({
   condition,
-  size = 8,
+  size = 9,
   animated = true,
 }: {
   condition: Condition
   size?: number
   animated?: boolean
 }) {
-  const pulses = animated && condition !== 'idle'
+  const pulses = animated && condition !== 'idle' && condition !== 'lost'
   const classes = [
     'dot',
+    condition === 'lost' ? 'dot--square' : '',
     condition === 'idle' ? 'dot--idle' : '',
     pulses ? 'dot--pulse' : '',
     pulses && condition === 'degraded' ? 'dot--pulse-fast' : '',
@@ -228,8 +311,8 @@ export function ConditionDot({
     <span
       class={classes}
       // The condition is always spelled out in the label beside this dot —
-      // "AWAKE · REACHABLE" — so announcing the dot as well is one more swipe to
-      // reach the same fact.
+      // "REACHABLE" — so announcing the dot as well is one more swipe to reach
+      // the same fact.
       aria-hidden="true"
       style={{
         width: `${size}px`,
@@ -243,15 +326,15 @@ export function ConditionDot({
 /** Four ascending bars. Signal strength, drawn the same way everywhere. */
 export function SignalBars({ filled, color }: { filled: number; color: string }) {
   return (
-    // Strength is a picture of the condition the card already states, and the
-    // RTT and loss readouts carry the numbers behind it.
-    <span class="bars" aria-hidden="true">
+    // Strength is a picture of the condition the card already states, and the RTT
+    // and loss readouts carry the numbers behind it.
+    <span class="bars" style={{ height: '14px' }} aria-hidden="true">
       {[0, 1, 2, 3].map((index) => (
         <i
           key={index}
           style={{
-            height: `${6 + index * 3.4}px`,
-            background: index < filled ? color : 'var(--lg-stroke)',
+            height: `${5 + index * 3}px`,
+            background: index < filled ? color : 'var(--ns-stroke)',
           }}
         />
       ))}
@@ -261,16 +344,18 @@ export function SignalBars({ filled, color }: { filled: number; color: string })
 
 /**
  * The 60-second RTT trace. Spiky means jittery, and the most recent five samples
- * are drawn brighter so "now" is legible.
+ * are drawn at full strength so "now" is legible.
  */
 export function Sparkline({
   values,
   color,
-  height = 22,
+  height = 18,
+  grow = false,
 }: {
   values: number[]
   color: string
   height?: number
+  grow?: boolean
 }) {
   const recent = values.slice(-20)
   const peak = Math.max(...values, 1)
@@ -279,12 +364,23 @@ export function Sparkline({
   return (
     // Sixty bars is not something to hear one at a time. The trace shows jitter;
     // the RTT readout beside it is the number that matters.
-    <span class="spark" style={{ color, height: `${height}px` }} aria-hidden="true">
+    <span
+      class="spark"
+      style={{
+        color,
+        height: `${height}px`,
+        ...(grow ? { flex: '1 1 auto' } : {}),
+      }}
+      aria-hidden="true"
+    >
       {recent.map((value, index) => (
         <i
           key={index}
           class={index >= brightFrom ? 'spark--now' : undefined}
-          style={{ height: `${Math.max(6, (value / peak) * height)}px` }}
+          style={{
+            height: `${Math.max(5, (value / peak) * height)}px`,
+            ...(grow ? { flex: '1 1 0', width: 'auto' } : {}),
+          }}
         />
       ))}
     </span>
@@ -294,24 +390,24 @@ export function Sparkline({
 /**
  * The one loop that keeps running under Reduce Motion.
  *
- * A small rotating arc is not a vestibular trigger, and the platform keeps its
- * own progress indicators turning under the setting for the same reason. A
- * frozen spinner would say the host had stopped answering — a claim about the
- * Mac that nothing measured, which is exactly what this app refuses to make.
+ * A small rotating arc is not a vestibular trigger, and the platform keeps its own
+ * progress indicators turning under the setting for the same reason. A frozen
+ * spinner would say the host had stopped answering — a claim about the Mac that
+ * nothing measured, which is exactly what this app refuses to make.
  */
 export function Spinner({
-  size = 18,
-  color = 'var(--lg-cyan)',
+  size = 16,
+  color = 'var(--ns-accent)',
 }: {
   size?: number
   color?: string
 }) {
   return (
     <span
-      class="lg-spinner"
+      class="spinner"
       role="progressbar"
       aria-label="Working"
-      style={{ width: `${size}px`, height: `${size}px`, color }}
+      style={{ width: `${size}px`, height: `${size}px`, color, flex: '0 0 auto' }}
     />
   )
 }
@@ -320,15 +416,45 @@ export function Caret({ height = 26 }: { height?: number }) {
   return <span class="caret" aria-hidden="true" style={{ height: `${height}px` }} />
 }
 
+/**
+ * The countdown to the next pairing code, drawn as a sweep rather than as a
+ * number that ticks. The number is beside it — this says at a glance whether
+ * there is time to finish typing.
+ */
+export function RotatesIn({
+  fraction,
+  size = 14,
+  background = 'var(--ns-screen)',
+}: {
+  fraction: number
+  size?: number
+  background?: string
+}) {
+  return (
+    <span
+      class="rotates"
+      aria-hidden="true"
+      style={
+        {
+          width: `${size}px`,
+          height: `${size}px`,
+          '--sweep': `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`,
+          '--hole': background,
+        } as JSX.CSSProperties
+      }
+    />
+  )
+}
+
 // MARK: - Controls
 
-/** The 76px primary action, with its preflight line. */
+/** The primary action, with its preflight line. */
 export function PrimaryAction({
   title,
   detail,
   glyph,
-  tint = 'var(--lg-green)',
-  ink = 'var(--lg-on-green)',
+  tint = 'var(--ns-green)',
+  ink = 'var(--ns-on-green)',
   enabled = true,
   onClick,
 }: {
@@ -346,14 +472,14 @@ export function PrimaryAction({
       style={{ '--tint': tint, '--ink': ink } as JSX.CSSProperties}
       disabled={!enabled}
       onClick={onClick}
-      // The preflight is the cost of the tap, so it is spoken as the value of
-      // the control rather than as a second element after it.
+      // The preflight is the cost of the tap, so it is spoken as the value of the
+      // control rather than as a second element after it.
       aria-label={title}
       aria-description={detail}
     >
       <span class="stack" style={{ minWidth: 0 }}>
         <span class="primary__title">{title}</span>
-        <Caps class="primary__detail ellipsis" size="var(--fs-10)" color="inherit">
+        <Caps class="primary__detail ellipsis" size="var(--fs-9)" color="inherit" tracking="0.1em">
           {detail}
         </Caps>
       </span>
@@ -364,20 +490,65 @@ export function PrimaryAction({
   )
 }
 
-/** Bordered secondary action, 44px minimum. */
-export function SecondaryAction({
+/** A filled action with no sub-label. */
+export function FilledAction({
   title,
-  tint = 'var(--lg-text-secondary)',
-  border = 'var(--lg-hairline)',
+  tint = 'var(--ns-accent)',
+  ink = 'var(--ns-on-accent)',
+  height,
+  hint,
   onClick,
 }: {
   title: string
   tint?: string
-  border?: string
+  ink?: string
+  height?: number
+  hint?: string
   onClick: () => void
 }) {
   return (
-    <button class="secondary" style={{ borderColor: border }} onClick={onClick}>
+    <button
+      class="filled"
+      title={hint}
+      onClick={onClick}
+      style={
+        {
+          '--tint': tint,
+          '--ink': ink,
+          ...(height ? { minHeight: `${height}px` } : {}),
+        } as JSX.CSSProperties
+      }
+    >
+      {title}
+    </button>
+  )
+}
+
+/** An outlined action, labelled in caps. 44px minimum. */
+export function OutlinedAction({
+  title,
+  tint = 'var(--ns-text-secondary)',
+  edge = 'var(--ns-stroke)',
+  height,
+  onClick,
+}: {
+  title: string
+  tint?: string
+  edge?: string
+  height?: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      class="outlined"
+      style={
+        {
+          '--edge': edge,
+          ...(height ? { minHeight: `${height}px` } : {}),
+        } as JSX.CSSProperties
+      }
+      onClick={onClick}
+    >
       <Caps size="var(--fs-10)" color={tint}>
         {title}
       </Caps>
@@ -385,33 +556,39 @@ export function SecondaryAction({
   )
 }
 
-/** The segmented control used for MON 1 / MON 2 / BOTH and CHAT / CODE. */
+/** The segmented control: MON 1 / MON 2 / BOTH, CHAT / CODE, the quality ladder. */
 export function Segmented<T extends string | number>({
   options,
   selection,
   onSelect,
   label,
+  onGlass = false,
 }: {
   options: { value: T; label: string; badge?: string | null }[]
   selection: T
   onSelect: (value: T) => void
   label: string
+  onGlass?: boolean
 }) {
   return (
-    <div class="segmented" role="tablist" aria-label={label}>
+    <div
+      class={onGlass ? 'segmented segmented--onGlass' : 'segmented'}
+      role="tablist"
+      aria-label={label}
+    >
       {options.map((option) => (
         <button
           key={String(option.value)}
           role="tab"
-          // Without this the selected segment sounds exactly like the three
-          // beside it, and the control's whole job is to say which one is current.
+          // Without this the selected segment sounds exactly like the three beside
+          // it, and the control's whole job is to say which one is current.
           aria-selected={selection === option.value}
           onClick={() => onSelect(option.value)}
         >
           <Caps
-            size="var(--fs-11)"
+            size="var(--fs-9)"
             color={
-              selection === option.value ? 'var(--lg-cyan)' : 'var(--lg-text-secondary)'
+              selection === option.value ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'
             }
           >
             {option.label}
@@ -449,7 +626,7 @@ export function Toggle({
   )
 }
 
-/** A key cap. Cyan and dotted when held. */
+/** A key cap. Violet and dotted when held. */
 export function KeyCap({
   glyph,
   caption,
@@ -474,8 +651,8 @@ export function KeyCap({
         minHeight: `${height}px`,
         ...(width ? { width: `${width}px`, flex: '0 0 auto' } : {}),
       }}
-      // A modifier symbol read aloud is a coin toss — "⌘" is announced as
-      // "place of interest sign". The caption is the word for it.
+      // A modifier symbol read aloud is a coin toss — "⌘" is announced as "place
+      // of interest sign". The caption is the word for it.
       aria-label={caption ?? spokenGlyph(glyph)}
       aria-pressed={isHeld}
       title={isHeld ? 'Held. Activate to release.' : undefined}
@@ -486,12 +663,62 @@ export function KeyCap({
       </span>
       {caption ? (
         <Caps
-          size="var(--fs-9)"
-          color={isHeld ? 'var(--lg-cyan)' : 'var(--lg-text-tertiary)'}
+          size="var(--fs-8)"
+          tracking="0.08em"
+          color={isHeld ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
         >
           {caption}
         </Caps>
       ) : null}
+    </button>
+  )
+}
+
+/**
+ * A tile in the command drawer — a glyph over a caption.
+ *
+ * This is what replaced the thumb arc. The arc put seven unlabelled circles on a
+ * sweep only a right thumb could reach; a tile says what it does in a word and is
+ * the same distance from either hand.
+ */
+export function Tile({
+  glyph,
+  caption,
+  accent = false,
+  span = 1,
+  glyphSize = 'var(--fs-16)',
+  spoken,
+  onClick,
+}: {
+  glyph: string
+  caption: string
+  accent?: boolean
+  span?: number
+  glyphSize?: string
+  spoken: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      class={accent ? 'tile tile--accent' : 'tile'}
+      aria-label={spoken}
+      onClick={onClick}
+      style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
+    >
+      <span
+        class="mono"
+        aria-hidden="true"
+        style={{ fontSize: glyphSize, color: accent ? 'var(--ns-accent)' : 'var(--ns-text)' }}
+      >
+        {glyph}
+      </span>
+      <Caps
+        size="var(--fs-8)"
+        tracking="0.1em"
+        color={accent ? 'var(--ns-accent)' : 'var(--ns-text-secondary)'}
+      >
+        {caption}
+      </Caps>
     </button>
   )
 }
@@ -544,12 +771,13 @@ export function SheetDismiss({
       style={{
         minHeight: 'var(--target)',
         paddingInline: '12px',
+        marginInlineEnd: '-12px',
         display: 'flex',
         alignItems: 'center',
         flex: '0 0 auto',
       }}
     >
-      <Caps size="var(--fs-11)" color="var(--lg-text-secondary)">
+      <Caps size="var(--fs-10)" color="var(--ns-text-secondary)">
         {title}
       </Caps>
     </button>
@@ -562,43 +790,50 @@ export function SheetDismiss({
 export function ScreenHeader({ onMenu }: { onMenu?: () => void }) {
   return (
     <header class="row" style={{ minHeight: 'var(--target)', flex: '0 0 auto' }}>
-      <Caps size="var(--fs-12)" tracking="0.34em" weight={500}>
+      <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
         VibeWire
       </Caps>
       <span class="spacer" />
-      {onMenu ? (
-        <button
-          onClick={onMenu}
-          aria-label="Settings"
-          data-testid="menu"
-          // Hit testing follows the drawn shapes, not the frame around them.
-          // Without a full-size target this is three 3px dots with gaps between
-          // them — visually a button, practically unhittable, and it is the only
-          // way into Settings and unpairing.
-          style={{
-            width: 'var(--target)',
-            height: 'var(--target)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-          }}
-        >
-          {[0, 1, 2].map((index) => (
-            <span
-              key={index}
-              class="dot"
-              aria-hidden="true"
-              style={{
-                width: '3px',
-                height: '3px',
-                background: 'var(--lg-text-secondary)',
-              }}
-            />
-          ))}
-        </button>
-      ) : null}
+      {onMenu ? <OverflowButton onClick={onMenu} /> : null}
     </header>
+  )
+}
+
+/**
+ * The three dots that open Settings.
+ *
+ * Hit testing follows the drawn shapes, not the frame around them. Without a
+ * full-size target this is three 3px dots with gaps between them — visually a
+ * button, practically unhittable, and it is the only way into Settings and
+ * unpairing.
+ */
+export function OverflowButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Settings"
+      data-testid="menu"
+      style={{
+        width: '40px',
+        height: '40px',
+        flex: '0 0 auto',
+        borderRadius: 'var(--radius-inner)',
+        background: 'var(--ns-raised)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '3px',
+      }}
+    >
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          class="dot"
+          aria-hidden="true"
+          style={{ width: '3px', height: '3px', background: 'var(--ns-text-secondary)' }}
+        />
+      ))}
+    </button>
   )
 }
 
@@ -606,13 +841,13 @@ export function ScreenHeader({ onMenu }: { onMenu?: () => void }) {
  * Wraps a screen in the app's ground colour and edge insets.
  *
  * `scrolls` is set on screens that are one fixed column ending in a primary
- * action: at a large text size, or in a short window, the footer holding the
- * only way forward would otherwise leave the screen.
+ * action: at a large text size, or in a short window, the footer holding the only
+ * way forward would otherwise leave the screen.
  */
 export function ScreenBody({
   children,
   scrolls = false,
-  background = 'var(--lg-screen)',
+  background = 'var(--ns-screen)',
 }: {
   children: ComponentChildren
   scrolls?: boolean
@@ -657,6 +892,48 @@ export function CornerTicks({ color }: { color: string }) {
         </svg>
       ))}
     </div>
+  )
+}
+
+/** The grabber at the top of a drawer. Not a control — it names the edge. */
+export function Grabber() {
+  return <span class="grabber" aria-hidden="true" />
+}
+
+// MARK: - Timeline
+
+export type TimelineState = 'done' | 'running' | 'failed' | 'pending'
+
+/**
+ * The marker on the timeline rail.
+ *
+ * Four states and four shapes: a green tick, a turning arc, a red cross, a dashed
+ * ring. The colour repeats what the shape already said, which is what lets this
+ * work in a photograph of a phone held at arm's length.
+ */
+export function TimelineMark({ state }: { state: TimelineState }) {
+  const face =
+    state === 'done'
+      ? { glyph: '✓', color: 'var(--ns-green)', border: 'solid' }
+      : state === 'failed'
+        ? { glyph: '✕', color: 'var(--ns-red)', border: 'solid' }
+        : { glyph: '', color: 'var(--ns-text-disabled)', border: 'dashed' }
+
+  return (
+    // The wrapper is what sits on the rail; the shape inside it is what says
+    // which of the four states this is. Keeping the ring and the spinner in the
+    // same box is what stops the rail jumping sideways when a call finishes.
+    <span
+      class="timeline__mark"
+      aria-hidden="true"
+      style={
+        state === 'running'
+          ? { background: 'transparent' }
+          : { border: `1px ${face.border} ${face.color}`, color: face.color }
+      }
+    >
+      {state === 'running' ? <Spinner size={15} /> : face.glyph}
+    </span>
   )
 }
 

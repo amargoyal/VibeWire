@@ -65,7 +65,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.router = router
         self.transport = transport
         self.system = system
-        self.menuBar = MenuBarController(pairing: pairing, trust: trust, transport: transport)
+        let menuBar = MenuBarController(pairing: pairing, trust: trust, transport: transport)
+        // The three values above the menu items come from the router, and the
+        // menu is rebuilt each time it opens, so this is a read rather than a
+        // subscription.
+        menuBar.router = router
+        self.menuBar = menuBar
 
         observeSleepAndWake(system: system)
 

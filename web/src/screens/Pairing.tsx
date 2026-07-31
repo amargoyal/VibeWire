@@ -1,9 +1,18 @@
 /**
- * 01A · PAIRING · WAITING and 01B · PAIRING · EXCHANGING.
- * Ported from ios/VibeWire/Screens/PairingView.swift.
+ * 01 · PAIRING and 02 · EXCHANGING KEYS.
+ * Mirrored by ios/VibeWire/Screens/PairingView.swift.
  *
  * A handshake, not a login: two named machines agreeing to trust each other. No
  * account, no password field, no branding.
+ *
+ * Nightshift restructured this screen more than any other. It used to be a
+ * machine-pair graphic, six boxes, a paste button, two address fields and a
+ * discovery line — five things competing to be read first, four of which are
+ * usually already correct. It is now one hero and one target card: the six digits
+ * are the whole top of the screen, and everything about *where* they are being
+ * sent collapses into a single card that states the answer and offers EDIT. The
+ * fields still exist; they are just no longer the first thing between the user and
+ * the code they are holding in their head.
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks'
@@ -12,9 +21,13 @@ import { store } from '../app/store'
 import {
   Caps,
   Caret,
-  Hairline,
+  Display,
+  RotatesIn,
   ScreenBody,
+  SectionLabel,
   Spinner,
+  TimelineMark,
+  type TimelineState,
 } from '../design/components'
 import {
   describe,
@@ -28,15 +41,18 @@ import {
 interface ExchangeStep {
   title: string
   detail: string
-  state: 'pending' | 'running' | 'done' | 'failed'
+  state: TimelineState
 }
 
 const INITIAL_STEPS: ExchangeStep[] = [
   { title: 'HOST VERIFIED', detail: '—', state: 'pending' },
   { title: 'KEYS EXCHANGED', detail: '—', state: 'pending' },
-  { title: 'STORING TRUST IN THIS BROWSER', detail: '—', state: 'pending' },
+  { title: 'STORING TRUST', detail: 'THIS BROWSER', state: 'pending' },
   { title: 'FIRST FRAME', detail: 'QUEUED', state: 'pending' },
 ]
+
+/** The host rotates the pairing code on this cadence, and the dial reports it. */
+const CODE_ROTATION_SECONDS = 60
 
 export function Pairing() {
   const [digits, setDigits] = useState('')
@@ -48,6 +64,7 @@ export function Pairing() {
   const [errorText, setErrorText] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
   const [pasting, setPasting] = useState(false)
+  const [editingTarget, setEditingTarget] = useState(false)
   const field = useRef<HTMLInputElement | null>(null)
   // A paste can deliver six digits more than once, and the field submits the
   // moment it holds six. Pairing twice burns the code: the second attempt arrives
@@ -90,10 +107,12 @@ export function Pairing() {
     if (submitting.current) return
     if (!endpoint) {
       setErrorText('Enter the Mac’s address first.')
+      setEditingTarget(true)
       return
     }
     if (blocked) {
       setErrorText(describe(endpoint))
+      setEditingTarget(true)
       return
     }
 
@@ -102,7 +121,7 @@ export function Pairing() {
     setExchanging(true)
     setSteps(INITIAL_STEPS)
 
-    const advance = (index: number, state: ExchangeStep['state'], detail?: string) => {
+    const advance = (index: number, state: TimelineState, detail?: string) => {
       setSteps((current) =>
         current.map((step, at) =>
           at === index ? { ...step, state, detail: detail ?? step.detail } : step,
@@ -187,45 +206,35 @@ export function Pairing() {
 
   if (exchanging) return <Exchanging digits={digits} steps={steps} />
 
+  // The dial is driven off the store's one-second tick rather than a timer of its
+  // own. It reports the host's rotation cadence, not a countdown this client
+  // started — nothing here knows when the Mac last turned the code over, so the
+  // dial says "there is about this much of a window left", which is the only
+  // honest version of the fact.
+  const secondsLeft = CODE_ROTATION_SECONDS - (store.tick.value % CODE_ROTATION_SECONDS)
+
   return (
     <ScreenBody scrolls>
-      <Caps size="var(--fs-13)" tracking="0.36em" weight={500} style={{ marginTop: '12px' }}>
-        VibeWire
-      </Caps>
-
-      <MachinePair active={false} />
-
-      <h1
-        style={{
-          fontSize: 'var(--fs-27)',
-          fontWeight: 400,
-          margin: '34px 0 0',
-          lineHeight: 1.2,
-        }}
-      >
-        Type the six digits
-        <br />
-        on your Mac.
-      </h1>
-
-      <div class="stack" style={{ gap: '2px', marginTop: '12px' }}>
-        <Caps size="var(--fs-11)" tracking="0.04em">
-          MENU BAR → VIBEWIRE → PAIR
+      <header class="row" style={{ minHeight: '34px', flex: '0 0 auto' }}>
+        <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
+          VibeWire
         </Caps>
-        <span class="row" style={{ gap: '4px' }}>
-          <Caps size="var(--fs-11)" tracking="0.04em">
-            CODE ROTATES EVERY
-          </Caps>
-          <Caps size="var(--fs-11)" tracking="0.04em" color="var(--lg-amber)">
-            60S
-          </Caps>
-        </span>
-      </div>
+      </header>
+
+      <Display style={{ marginTop: '44px', flex: '0 0 auto' }}>
+        Six digits
+        <br />
+        from the menu bar.
+      </Display>
+
+      <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '14px', flex: '0 0 auto' }}>
+        MENU BAR → VIBEWIRE → PAIR
+      </Caps>
 
       {/* A single field owns the keyboard; the six boxes are only a rendering of
           its contents. That keeps paste and delete behaving the way they do
           everywhere else. */}
-      <div style={{ position: 'relative', marginTop: '30px' }}>
+      <div style={{ position: 'relative', marginTop: '34px', flex: '0 0 auto' }}>
         <input
           ref={field}
           value={digits}
@@ -246,45 +255,59 @@ export function Pairing() {
             width: '100%',
             opacity: 0.01,
             zIndex: 1,
-            // Off-screen would stop iOS scrolling it into view; transparent and
-            // in place keeps the caret where the boxes are.
+            // Off-screen would stop iOS scrolling it into view; transparent and in
+            // place keeps the caret where the boxes are.
             letterSpacing: '2em',
           }}
         />
-        <div class="row" style={{ gap: '9px', pointerEvents: 'none' }} aria-hidden="true">
+        <div class="row" style={{ gap: '8px', pointerEvents: 'none' }} aria-hidden="true">
           {[0, 1, 2, 3, 4, 5].map((index) => {
             const active = index === Math.min(digits.length, 5) && focused
+            const filled = digits[index] != null
             return (
               <div
                 key={index}
                 style={{
-                  // A maximum, not a fixed width. Six 48px boxes and five 9px gaps
-                  // need 333px; a narrow phone offers 327px inside the gutter, so
-                  // a fixed row overflowed the app's very first screen by 6px.
+                  // A maximum, not a fixed width. Six boxes and five 8px gaps have
+                  // to fit inside the gutter on the narrowest phone this app
+                  // targets, and a fixed row overflowed the app's very first screen.
                   flex: '1 1 0',
-                  maxWidth: '48px',
-                  minHeight: '64px',
-                  borderRadius: 'var(--radius-small)',
+                  minWidth: 0,
+                  height: '84px',
+                  borderRadius: 'var(--radius-control)',
                   background: active
-                    ? 'color-mix(in srgb, var(--lg-cyan) 8%, transparent)'
-                    : 'var(--lg-panel)',
-                  border: `1px solid ${active ? 'var(--lg-cyan)' : 'var(--lg-hairline)'}`,
+                    ? 'color-mix(in srgb, var(--ns-accent) 12%, transparent)'
+                    : filled
+                      ? 'var(--ns-raised-2)'
+                      : 'var(--ns-raised)',
+                  outline: active ? '1.5px solid var(--ns-accent)' : undefined,
+                  outlineOffset: '-1.5px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                {digits[index] ? (
-                  <span class="mono" style={{ fontSize: 'var(--fs-27)' }}>
+                {filled ? (
+                  <span class="mono" style={{ fontSize: 'var(--fs-30)' }}>
                     {digits[index]}
                   </span>
                 ) : active ? (
-                  <Caret />
+                  <Caret height={30} />
                 ) : null}
               </div>
             )
           })}
         </div>
+      </div>
+
+      <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
+        <RotatesIn fraction={secondsLeft / CODE_ROTATION_SECONDS} />
+        <Caps size="var(--fs-9)" tracking="0.14em">
+          ROTATES IN
+        </Caps>
+        <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-amber)">
+          {`${secondsLeft}S`}
+        </Caps>
       </div>
 
       {errorText ? (
@@ -293,34 +316,48 @@ export function Pairing() {
           role="alert"
           style={{
             fontSize: 'var(--fs-13)',
-            color: 'var(--lg-red)',
-            margin: '14px 0 0',
-            textAlign: 'center',
+            lineHeight: 1.45,
+            color: 'var(--ns-red)',
+            margin: '16px 0 0',
             userSelect: 'text',
+            flex: '0 0 auto',
           }}
         >
           {errorText}
         </p>
       ) : null}
 
-      <div style={{ marginTop: '26px' }}>
-        <Hairline />
-      </div>
+      <TargetCard
+        address={address}
+        port={port}
+        blocked={blocked}
+        note={note}
+        probeMillis={probeMillis}
+        editing={editingTarget}
+        onEdit={() => setEditingTarget((current) => !current)}
+        onAddress={setAddress}
+        onPort={setPort}
+      />
+
+      <SectionLabel style={{ marginTop: '26px', flex: '0 0 auto' }}>OTHER WAYS IN</SectionLabel>
 
       <button
         onClick={() => void applyLink()}
         disabled={pasting}
         style={{
-          marginTop: '26px',
+          marginTop: '10px',
           display: 'flex',
           alignItems: 'center',
           gap: '14px',
-          minHeight: '60px',
+          width: '100%',
+          minHeight: 'var(--primary-action)',
           paddingInline: '18px',
-          background: 'var(--lg-panel)',
-          border: '1px solid var(--lg-hairline)',
-          borderRadius: 'var(--radius-medium)',
+          paddingBlock: '12px',
+          background: 'var(--ns-raised)',
+          borderRadius: 'var(--radius-card)',
           textAlign: 'left',
+          flex: '0 0 auto',
+          opacity: pasting ? 0.6 : 1,
         }}
         aria-label="Paste a pairing link"
       >
@@ -328,28 +365,140 @@ export function Pairing() {
           aria-hidden="true"
           class="mono"
           style={{
-            width: '30px',
-            height: '30px',
+            width: '34px',
+            height: '34px',
             flex: '0 0 auto',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: 'var(--radius-hairline)',
-            background: 'color-mix(in srgb, var(--lg-text-secondary) 35%, transparent)',
-            color: 'var(--lg-text-secondary)',
-            fontSize: 'var(--fs-13)',
+            borderRadius: 'var(--radius-inner)',
+            background: 'var(--ns-raised-2)',
+            color: 'var(--ns-text-secondary)',
+            fontSize: 'var(--fs-12)',
           }}
         >
           ⌘V
         </span>
-        <span class="stack" style={{ gap: '3px' }}>
-          <span style={{ fontSize: 'var(--fs-15)' }}>Paste the pairing link instead</span>
-          <Caps size="var(--fs-10)">READS THE QR PAYLOAD · SAME HANDSHAKE</Caps>
+        <span class="stack" style={{ gap: '4px', minWidth: 0 }}>
+          <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+            {pasting ? 'Reading the clipboard…' : 'Paste the pairing link'}
+          </span>
+          <Caps size="var(--fs-9)" tracking="0.1em">
+            READS THE QR PAYLOAD · SAME HANDSHAKE
+          </Caps>
         </span>
       </button>
 
-      <div class="stack" style={{ gap: '8px', marginTop: '20px' }}>
-        <Caps size="var(--fs-10)">MAC ADDRESS</Caps>
+      <span class="spacer" style={{ minHeight: '16px' }} />
+
+      <Caps
+        size="var(--fs-9)"
+        tracking="0.14em"
+        color="var(--ns-text-faint)"
+        style={{ lineHeight: 1.8, paddingBottom: 'calc(20px + var(--safe-bottom))', flex: '0 0 auto' }}
+      >
+        {'NO ACCOUNT. NO PASSWORD.\nTHE MAC KEEPS A PUBLIC KEY AND NOTHING REPLAYABLE.'}
+      </Caps>
+    </ScreenBody>
+  )
+}
+
+/**
+ * Where the six digits are about to go.
+ *
+ * One card doing what a status line and two labelled fields used to do between
+ * them. Discovery is reported in its own header — if the Mac were not there, this
+ * says so rather than accepting six digits into a void — and the address is a
+ * value to read, not a field to fill, until EDIT says otherwise. The fields are
+ * one tap away and open by themselves when a submit fails for want of an address.
+ */
+function TargetCard({
+  address,
+  port,
+  blocked,
+  note,
+  probeMillis,
+  editing,
+  onEdit,
+  onAddress,
+  onPort,
+}: {
+  address: string
+  port: string
+  blocked: boolean
+  note: string | null
+  probeMillis: number | null
+  editing: boolean
+  onEdit: () => void
+  onAddress: (value: string) => void
+  onPort: (value: string) => void
+}) {
+  const hostServed = isHostServed()
+
+  const discovery = (() => {
+    if (blocked) {
+      return {
+        color: 'var(--ns-amber)',
+        text: 'BROWSER WILL NOT OPEN THAT SCHEME',
+        square: false,
+      }
+    }
+    if (probeMillis != null) {
+      return {
+        color: 'var(--ns-green)',
+        text: `HOST FOUND · ${Math.round(probeMillis)} MS`,
+        square: false,
+      }
+    }
+    if (address.trim()) {
+      return { color: 'var(--ns-red)', text: 'NOTHING ANSWERING', square: true }
+    }
+    return { color: 'var(--ns-text-tertiary)', text: 'NO ADDRESS YET', square: false }
+  })()
+
+  return (
+    <div
+      class="card"
+      style={{
+        marginTop: '30px',
+        padding: '16px 18px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '11px',
+        flex: '0 0 auto',
+      }}
+    >
+      <div class="row" style={{ gap: '9px' }}>
+        <span
+          class={discovery.square ? 'dot dot--square' : 'dot'}
+          aria-hidden="true"
+          style={{ width: '7px', height: '7px', background: discovery.color }}
+        />
+        <Caps size="var(--fs-9)" tracking="0.16em" color={discovery.color} weight={500}>
+          {discovery.text}
+        </Caps>
+        <span class="spacer" style={{ minWidth: '8px' }} />
+        <button
+          onClick={onEdit}
+          aria-expanded={editing}
+          aria-label="Edit the Mac’s address"
+          style={{
+            minHeight: 'var(--target)',
+            paddingInline: '10px',
+            marginBlock: '-12px',
+            marginInlineEnd: '-10px',
+            display: 'flex',
+            alignItems: 'center',
+            flex: '0 0 auto',
+          }}
+        >
+          <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-accent)">
+            {editing ? 'DONE' : 'EDIT'}
+          </Caps>
+        </button>
+      </div>
+
+      {editing ? (
         <div class="row" style={{ gap: '8px' }}>
           <input
             value={address}
@@ -359,7 +508,7 @@ export function Pairing() {
             autocorrect="off"
             inputMode="url"
             aria-label="The Mac’s address"
-            onInput={(event) => setAddress(event.currentTarget.value)}
+            onInput={(event) => onAddress(event.currentTarget.value)}
             class="mono"
             style={fieldStyle}
           />
@@ -368,39 +517,40 @@ export function Pairing() {
             placeholder="8787"
             inputMode="numeric"
             aria-label="Port"
-            onInput={(event) => setPort(event.currentTarget.value)}
+            onInput={(event) => onPort(event.currentTarget.value)}
             class="mono"
-            style={{ ...fieldStyle, width: '68px', flex: '0 0 auto', textAlign: 'center' }}
+            style={{ ...fieldStyle, width: '72px', flex: '0 0 auto', textAlign: 'center' }}
           />
         </div>
-      </div>
+      ) : (
+        <span
+          class="mono ellipsis"
+          style={{ fontSize: 'var(--fs-14)', letterSpacing: '-0.01em' }}
+        >
+          {address.trim() ? `${address}:${port}` : 'No address'}
+        </span>
+      )}
 
       {note ? (
         <p
           class="wrap"
           style={{
-            marginTop: '16px',
-            padding: '13px 14px',
+            margin: 0,
             fontSize: 'var(--fs-13)',
             lineHeight: 1.45,
-            color: 'var(--lg-on-amber-wash)',
-            background: 'color-mix(in srgb, var(--lg-amber) 7%, transparent)',
-            borderLeft: '2px solid var(--lg-amber)',
+            color: 'var(--ns-on-amber-wash)',
           }}
         >
           {note}
         </p>
-      ) : null}
-
-      <span class="spacer" style={{ minHeight: '12px' }} />
-
-      <DiscoveryLine
-        address={address}
-        blocked={blocked}
-        probeMillis={probeMillis}
-        hostServed={isHostServed()}
-      />
-    </ScreenBody>
+      ) : (
+        <Caps size="var(--fs-9)" tracking="0.1em" style={{ lineHeight: 1.5 }}>
+          {hostServed
+            ? 'THIS PAGE IS SERVED BY THE HOST · SAME ORIGIN'
+            : 'THE CODE AND THE KEYS GO TO THIS ADDRESS ONLY'}
+        </Caps>
+      )}
+    </div>
   )
 }
 
@@ -410,134 +560,109 @@ const fieldStyle = {
   fontSize: 'var(--fs-13)',
   paddingInline: '12px',
   minHeight: 'var(--target)',
-  background: 'var(--lg-panel)',
-  border: '1px solid var(--lg-hairline)',
-  borderRadius: 'var(--radius-small)',
-  color: 'var(--lg-text)',
+  background: 'var(--ns-raised-2)',
+  borderRadius: 'var(--radius-inner)',
+  color: 'var(--ns-text)',
 }
+
+// MARK: 02 — exchanging
 
 /**
- * Discovery is reported before the user types. If the Mac were not there, this
- * line says so instead of accepting six digits into a void.
+ * Four named steps with real values rather than one indeterminate spinner. If step
+ * three fails, the failure has an address.
+ *
+ * The digits stay on screen and go dim: the code has been accepted and is no
+ * longer something to act on, but removing it mid-handshake makes the screen look
+ * like it started over.
  */
-function DiscoveryLine({
-  address,
-  blocked,
-  probeMillis,
-  hostServed,
-}: {
-  address: string
-  blocked: boolean
-  probeMillis: number | null
-  hostServed: boolean
-}) {
-  let color = 'var(--lg-text-disabled)'
-  let text = 'ENTER THE MAC’S ADDRESS TO BEGIN'
-  let inkColor = 'var(--lg-text-tertiary)'
-
-  if (blocked) {
-    color = 'var(--lg-amber)'
-    inkColor = 'var(--lg-amber)'
-    text = 'THE BROWSER WILL NOT OPEN THAT SCHEME FROM THIS PAGE'
-  } else if (probeMillis != null) {
-    color = 'var(--lg-green)'
-    text = hostServed
-      ? `THIS PAGE IS SERVED BY THE HOST · ${Math.round(probeMillis)} MS`
-      : `HOST FOUND · ${Math.round(probeMillis)} MS`
-  } else if (address.trim()) {
-    color = 'var(--lg-red)'
-    inkColor = 'var(--lg-red)'
-    text = 'NOTHING ANSWERING AT THAT ADDRESS'
-  }
-
-  return (
-    <div class="row" style={{ gap: '10px', paddingBottom: 'calc(20px + var(--safe-bottom))' }}>
-      <span class="dot" aria-hidden="true" style={{ width: '6px', height: '6px', background: color }} />
-      <Caps size="var(--fs-10)" tracking="0.12em" color={inkColor}>
-        {text}
-      </Caps>
-    </div>
-  )
-}
-
-// MARK: 01B — exchanging
-
 function Exchanging({ digits, steps }: { digits: string; steps: ExchangeStep[] }) {
   return (
     <ScreenBody scrolls>
-      <Caps size="var(--fs-13)" tracking="0.36em" weight={500} style={{ marginTop: '12px' }}>
-        VibeWire
-      </Caps>
+      <header class="row" style={{ minHeight: '34px', flex: '0 0 auto' }}>
+        <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
+          VibeWire
+        </Caps>
+      </header>
 
-      <MachinePair active />
+      <Display style={{ marginTop: '44px', flex: '0 0 auto' }}>Trading keys.</Display>
 
-      <h1 style={{ fontSize: 'var(--fs-27)', fontWeight: 400, margin: '34px 0 0' }}>
-        Trading keys.
-      </h1>
-
-      <Caps size="var(--fs-11)" tracking="0.04em" style={{ marginTop: '12px' }}>
+      <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '14px', flex: '0 0 auto' }}>
         CODE ACCEPTED · KEEP BOTH MACHINES AWAKE
       </Caps>
 
-      <div class="row" style={{ gap: '9px', marginTop: '30px' }} aria-hidden="true">
+      <div class="row" style={{ gap: '8px', marginTop: '34px', flex: '0 0 auto' }} aria-hidden="true">
         {[0, 1, 2, 3, 4, 5].map((index) => (
           <div
             key={index}
             style={{
               flex: '1 1 0',
-              maxWidth: '48px',
-              minHeight: '64px',
-              borderRadius: 'var(--radius-small)',
-              background: 'var(--lg-chrome)',
-              border: '1px solid var(--lg-stroke)',
+              minWidth: 0,
+              height: '84px',
+              borderRadius: 'var(--radius-control)',
+              background: 'var(--ns-raised)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <span class="mono" style={{ fontSize: 'var(--fs-27)' }}>
+            <span
+              class="mono"
+              style={{ fontSize: 'var(--fs-30)', color: 'var(--ns-text-tertiary)' }}
+            >
               {digits[index] ?? ''}
             </span>
           </div>
         ))}
       </div>
 
-      {/* Four named steps with real values rather than one indeterminate spinner.
-          If step three fails, the failure has an address. */}
-      <ol class="stack" style={{ marginTop: '34px', padding: 0, listStyle: 'none' }}>
-        {steps.map((step, index) => (
-          <li
-            key={step.title}
-            class="row"
-            style={{
-              gap: '14px',
-              minHeight: '52px',
-              borderBottom: index === steps.length - 1 ? 'none' : '1px solid var(--lg-hairline-dim)',
-            }}
-          >
-            <StepMarker state={step.state} />
-            <Caps
-              size="var(--fs-12)"
-              color={
-                step.state === 'pending' ? 'var(--lg-text-tertiary)' : 'var(--lg-text-secondary)'
-              }
+      <ol
+        class="group"
+        style={{ margin: '34px 0 0', padding: 0, listStyle: 'none', flex: '0 0 auto' }}
+        aria-label="Handshake progress"
+      >
+          {steps.map((step) => (
+            <li
+              key={step.title}
+              class="row"
+              style={{
+                gap: '14px',
+                minHeight: '64px',
+                paddingInline: '18px',
+                background:
+                  step.state === 'running'
+                    ? 'color-mix(in srgb, var(--ns-accent) 10%, transparent)'
+                    : 'var(--ns-raised)',
+              }}
             >
-              {step.title}
-            </Caps>
-            <span class="spacer" />
-            <Caps size="var(--fs-11)" tracking="0" color={detailColor(step.state)}>
-              {step.detail}
-            </Caps>
-          </li>
-        ))}
+              <StepMarker state={step.state} />
+              <Caps
+                size="var(--fs-11)"
+                tracking="0.12em"
+                color={
+                  step.state === 'pending'
+                    ? 'var(--ns-text-tertiary)'
+                    : step.state === 'running'
+                      ? 'var(--ns-text)'
+                      : 'var(--ns-text-secondary)'
+                }
+              >
+                {step.title}
+              </Caps>
+              <span class="spacer" style={{ minWidth: '8px' }} />
+              <Caps size="var(--fs-10)" tracking="0" color={detailColor(step.state)}>
+                {step.detail}
+              </Caps>
+            </li>
+          ))}
       </ol>
 
-      <span class="spacer" />
+      <span class="spacer" style={{ minHeight: '16px' }} />
 
       <Caps
-        size="var(--fs-10)"
-        tracking="0.12em"
-        style={{ paddingBottom: 'calc(20px + var(--safe-bottom))', lineHeight: 1.7 }}
+        size="var(--fs-9)"
+        tracking="0.14em"
+        color="var(--ns-text-faint)"
+        style={{ paddingBottom: 'calc(20px + var(--safe-bottom))', lineHeight: 1.8, flex: '0 0 auto' }}
       >
         {'PAIRING TRAFFIC STAYS ON THE PATH YOU CHOSE.\nYOU WILL NOT SEE THIS SCREEN AGAIN.'}
       </Caps>
@@ -545,162 +670,28 @@ function Exchanging({ digits, steps }: { digits: string; steps: ExchangeStep[] }
   )
 }
 
-function detailColor(state: ExchangeStep['state']): string {
+function detailColor(state: TimelineState): string {
   switch (state) {
     case 'running':
-      return 'var(--lg-cyan)'
+      return 'var(--ns-accent)'
     case 'failed':
-      return 'var(--lg-red)'
-    default:
-      return 'var(--lg-text-tertiary)'
-  }
-}
-
-function StepMarker({ state }: { state: ExchangeStep['state'] }) {
-  const shell = {
-    width: '18px',
-    height: '18px',
-    flex: '0 0 auto',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 'var(--fs-11)',
-  }
-  switch (state) {
+      return 'var(--ns-red)'
     case 'done':
-      return (
-        <span
-          aria-hidden="true"
-          style={{ ...shell, border: '1px solid var(--lg-green)', color: 'var(--lg-green)' }}
-        >
-          ✓
-        </span>
-      )
-    case 'running':
-      return <Spinner size={18} />
-    case 'failed':
-      return (
-        <span
-          aria-hidden="true"
-          style={{ ...shell, border: '1px solid var(--lg-red)', color: 'var(--lg-red)' }}
-        >
-          ✕
-        </span>
-      )
+      return 'var(--ns-text-secondary)'
     default:
-      return (
-        <span
-          aria-hidden="true"
-          style={{ ...shell, border: '1px dashed var(--lg-stroke)' }}
-        />
-      )
+      return 'var(--ns-text-faint)'
   }
 }
 
-/**
- * The two named machines and the wire between them.
- *
- * The travelling dot is the only motion on the waiting screen, and it is the one
- * piece that crosses the whole width — so it is the one Reduce Motion most clearly
- * means. Travel is replaced by a dot resting at the midpoint: the wire is still
- * drawn, the machines are still joined, and the discovery line underneath was
- * always the part that said in words whether anything answered.
- */
-function MachinePair({ active }: { active: boolean }) {
-  const ink = active ? 'var(--lg-cyan)' : 'var(--lg-text-secondary)'
+/** The step ring, sized for a 64px row rather than for a timeline rail. */
+function StepMarker({ state }: { state: TimelineState }) {
+  if (state === 'running') return <Spinner size={20} />
   return (
-    <div class="row" style={{ gap: '10px', marginTop: '46px' }} aria-hidden="true">
-      <MachineTile caption="THIS" active={active} width={16} height={26} radius={3} ink={ink} />
-      <div style={{ flex: '1 1 auto', position: 'relative', height: '6px' }}>
-        <div
-          style={{
-            position: 'absolute',
-            top: '2px',
-            left: 0,
-            right: 0,
-            height: '1px',
-            background: active
-              ? 'var(--lg-cyan)'
-              : 'repeating-linear-gradient(to right, var(--lg-stroke) 0 5px, transparent 5px 10px)',
-          }}
-        />
-        {active ? null : (
-          <span
-            class="dot travelling"
-            style={{ width: '5px', height: '5px', background: 'var(--lg-green)' }}
-          />
-        )}
-      </div>
-      <MachineTile caption="MAC" active={active} width={30} height={20} radius={2} ink={ink} />
-      <style>{`
-        .travelling {
-          position: absolute;
-          top: 0;
-          animation: lg-travel 2.2s linear infinite;
-        }
-        @keyframes lg-travel {
-          0% { left: 0; opacity: 0; }
-          6% { opacity: 1; }
-          94% { opacity: 1; }
-          100% { left: 100%; opacity: 0; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .travelling { left: 50%; opacity: 1; animation: none; }
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function MachineTile({
-  caption,
-  active,
-  width,
-  height,
-  radius,
-  ink,
-}: {
-  caption: string
-  active: boolean
-  width: number
-  height: number
-  radius: number
-  ink: string
-}) {
-  return (
-    <div
-      class="stack"
-      style={{
-        width: '64px',
-        height: '64px',
-        flex: '0 0 auto',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '5px',
-        borderRadius: 'var(--radius-large)',
-        background: active
-          ? 'color-mix(in srgb, var(--lg-cyan) 10%, transparent)'
-          : 'var(--lg-chrome)',
-        border: `1px solid ${active ? 'var(--lg-cyan)' : 'var(--lg-stroke)'}`,
-      }}
-    >
-      <span
-        style={{
-          width: `${width}px`,
-          height: `${height}px`,
-          borderRadius: `${radius}px`,
-          border: `1px solid ${ink}`,
-        }}
-      />
-      <Caps
-        size="var(--fs-9)"
-        tracking="0.08em"
-        color={active ? 'var(--lg-cyan)' : 'var(--lg-text-tertiary)'}
-      >
-        {caption}
-      </Caps>
-    </div>
+    <span style={{ position: 'relative', width: '20px', height: '20px', flex: '0 0 auto' }}>
+      <span style={{ position: 'absolute', inset: 0 }}>
+        <TimelineMark state={state} />
+      </span>
+    </span>
   )
 }
 

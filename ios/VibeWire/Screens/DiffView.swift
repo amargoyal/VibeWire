@@ -48,11 +48,11 @@ struct DiffView: View {
                         }
                     }
                     .background(
-                        RoundedRectangle(cornerRadius: 8).fill(LG.Color.codeGround)
+                        RoundedRectangle(cornerRadius: 8).fill(NS.Color.deepGround)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(LG.Color.hairlineDim, lineWidth: 1)
+                            .stroke(NS.Color.hairlineDim, lineWidth: 1)
                     )
                     .padding(.top, 14)
                 }
@@ -92,20 +92,20 @@ struct DiffView: View {
             // Wide enough for the longest line, so the added and removed tints
             // run the full width of the column instead of stopping raggedly at
             // each line's own last character.
-            self.width = CGFloat(longest) * LG.Font.monoAdvance(DiffView.codeSize) + 20
+            self.width = CGFloat(longest) * NS.Font.monoAdvance(DiffView.codeSize) + 20
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                MonoCaps("LIVE DIFF", size: 10, color: LG.Color.cyan, tracking: 2)
+                MonoCaps("LIVE DIFF", size: 10, color: NS.Color.accent, tracking: 2)
                 Spacer()
                 SheetDismiss("CLOSE") { dismiss() }
             }
             Text(model.diffPath ?? "")
-                .font(LG.Font.mono(12))
-                .foregroundStyle(LG.Color.text)
+                .font(NS.Font.mono(12))
+                .foregroundStyle(NS.Color.text)
                 .lineLimit(2)
                 .truncationMode(.head)
         }
@@ -115,7 +115,7 @@ struct DiffView: View {
     private var empty: some View {
         VStack(spacing: 10) {
             Spacer()
-            Spinner(color: LG.Color.cyan).frame(width: 20, height: 20)
+            Spinner(size: 20, color: NS.Color.accent)
             MonoCaps("READING THE WORKING TREE", size: 10, tracking: 1.4)
             Spacer()
         }
@@ -124,8 +124,8 @@ struct DiffView: View {
 
     private func footer(_ patch: Patch) -> some View {
         HStack(spacing: 14) {
-            MonoCaps("+\(patch.added)", size: 10, color: LG.Color.green, tracking: 1.2)
-            MonoCaps("−\(patch.removed)", size: 10, color: LG.Color.red, tracking: 1.2)
+            MonoCaps("+\(patch.added)", size: 10, color: NS.Color.green, tracking: 1.2)
+            MonoCaps("−\(patch.removed)", size: 10, color: NS.Color.red, tracking: 1.2)
             Spacer()
             MonoCaps("UPDATES AS CLAUDE EDITS", size: 9, tracking: 1.4)
         }
@@ -135,7 +135,7 @@ struct DiffView: View {
     private func row(_ line: String) -> some View {
         let kind = DiffLineKind(line)
         return Text(line.isEmpty ? " " : line)
-            .font(LG.Font.mono(Self.codeSize))
+            .font(NS.Font.mono(Self.codeSize))
             .foregroundStyle(kind.foreground)
             .padding(.horizontal, 10)
             .padding(.vertical, 1)
@@ -170,18 +170,18 @@ private enum DiffLineKind {
 
     var foreground: Color {
         switch self {
-        case .added: return LG.Color.green
-        case .removed: return LG.Color.red
-        case .hunk: return LG.Color.cyan
-        case .meta: return LG.Color.textTertiary
+        case .added: return NS.Color.green
+        case .removed: return NS.Color.red
+        case .hunk: return NS.Color.accent
+        case .meta: return NS.Color.textTertiary
         case .context: return Color(hex: 0xA8AEB8)
         }
     }
 
     var background: Color {
         switch self {
-        case .added: return LG.Color.green.opacity(0.08)
-        case .removed: return LG.Color.red.opacity(0.08)
+        case .added: return NS.Color.green.opacity(0.08)
+        case .removed: return NS.Color.red.opacity(0.08)
         default: return .clear
         }
     }

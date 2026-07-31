@@ -14,10 +14,10 @@ import SwiftUI
 /// truncated code is a lie.
 struct MarkdownText: View {
     let text: String
-    var textColor: Color = LG.Color.text
+    var textColor: Color = NS.Color.text
     var size: CGFloat = 15
 
-    init(_ text: String, color: Color = LG.Color.text, size: CGFloat = 15) {
+    init(_ text: String, color: Color = NS.Color.text, size: CGFloat = 15) {
         self.text = text
         self.textColor = color
         self.size = size
@@ -52,8 +52,8 @@ struct MarkdownText: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .top, spacing: 8) {
                         Text("•")
-                            .font(LG.Font.mono(size - 2))
-                            .foregroundStyle(LG.Color.cyan.opacity(0.8))
+                            .font(NS.Font.mono(size - 2))
+                            .foregroundStyle(NS.Color.accent.opacity(0.8))
                         inline(item)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -65,8 +65,8 @@ struct MarkdownText: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .top, spacing: 8) {
                         Text("\(index + 1).")
-                            .font(LG.Font.mono(size - 3))
-                            .foregroundStyle(LG.Color.cyan.opacity(0.8))
+                            .font(NS.Font.mono(size - 3))
+                            .foregroundStyle(NS.Color.accent.opacity(0.8))
                         inline(item)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -76,15 +76,15 @@ struct MarkdownText: View {
         case .quote(let content):
             HStack(alignment: .top, spacing: 10) {
                 Rectangle()
-                    .fill(LG.Color.cyan.opacity(0.35))
+                    .fill(NS.Color.accent.opacity(0.35))
                     .frame(width: 2)
-                inline(content, color: LG.Color.textSecondary)
+                inline(content, color: NS.Color.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
         case .rule:
             Rectangle()
-                .fill(LG.Color.hairlineDim)
+                .fill(NS.Color.hairlineDim)
                 .frame(height: 1)
                 .padding(.vertical, 2)
         }
@@ -97,7 +97,7 @@ struct MarkdownText: View {
         color: Color? = nil
     ) -> Text {
         Text(Self.attributed(content))
-            .font(LG.Font.sans(overrideSize ?? size, weight: weight))
+            .font(NS.Font.sans(overrideSize ?? size, weight: weight))
             .foregroundStyle(color ?? textColor)
     }
 
@@ -114,12 +114,12 @@ struct MarkdownText: View {
         // Inline code needs to look like code; the system parser marks the run
         // but leaves it styled as prose.
         for run in attributed.runs where run.inlinePresentationIntent == .code {
-            attributed[run.range].font = LG.Font.mono(13)
-            attributed[run.range].foregroundColor = LG.Color.cyan
+            attributed[run.range].font = NS.Font.mono(13)
+            attributed[run.range].foregroundColor = NS.Color.accent
         }
         for run in attributed.runs where run.link != nil {
             attributed[run.range].underlineStyle = .single
-            attributed[run.range].foregroundColor = LG.Color.cyan
+            attributed[run.range].foregroundColor = NS.Color.accent
         }
         return attributed
     }
@@ -147,7 +147,7 @@ private struct CodeBlock: View {
                 MonoCaps(
                     (language?.isEmpty == false ? language! : "CODE").uppercased(),
                     size: 9,
-                    color: LG.Color.textTertiary,
+                    color: NS.Color.textTertiary,
                     tracking: 1.4
                 )
                 Spacer()
@@ -159,13 +159,13 @@ private struct CodeBlock: View {
                     MonoCaps(
                         copied ? "COPIED" : "COPY",
                         size: 9,
-                        color: copied ? LG.Color.green : LG.Color.textSecondary,
+                        color: copied ? NS.Color.green : NS.Color.textSecondary,
                         tracking: 1.4
                     )
                     // 28pt was below the floor for a target, and the ink is
                     // four small letters. The chip looks the same; the area
                     // that answers a thumb is a full one.
-                    .frame(minHeight: LG.Metric.minimumTarget)
+                    .frame(minHeight: NS.Metric.minimumTarget)
                     .padding(.horizontal, 12)
                     .contentShape(Rectangle())
                 }
@@ -177,7 +177,7 @@ private struct CodeBlock: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
-                    .font(LG.Font.mono(12))
+                    .font(NS.Font.mono(12))
                     .foregroundStyle(Color(hex: 0xD5DBE3))
                     .lineSpacing(2)
                     .textSelection(.enabled)
@@ -186,9 +186,9 @@ private struct CodeBlock: View {
                     .padding(.top, 2)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 8).fill(LG.Color.codeGround))
+        .background(RoundedRectangle(cornerRadius: 8).fill(NS.Color.deepGround))
         .overlay(
-            RoundedRectangle(cornerRadius: 8).stroke(LG.Color.hairlineDim, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8).stroke(NS.Color.hairlineDim, lineWidth: 1)
         )
     }
 }

@@ -1,10 +1,25 @@
 /**
- * 06A · CLAUDE · CHAT, 06B · CLAUDE CODE · RUNNING, 06C · DIFF + PERMISSION.
- * Ported from ios/VibeWire/Screens/ClaudePanelView.swift.
+ * 09 · CLAUDE — RUNNING, 10 · ASKING PERMISSION, 11 · RESUME A SESSION.
+ * Mirrored by ios/VibeWire/Screens/ClaudePanelView.swift.
  *
- * A sheet over the picture, because it acts on the Mac being looked at. No bubbles:
- * prose is prose, machine output is monospace in a gutter, and everything the agent
+ * A sheet over the picture, because it acts on the Mac being looked at. No
+ * bubbles: prose is prose, machine output is monospace, and everything the agent
  * touched is a row that can be opened.
+ *
+ * Nightshift changed two things here, and both are about not hiding the thing
+ * being explained.
+ *
+ *  - **Tool calls are a timeline.** They used to be a boxed list of equal rows,
+ *    which said nothing about order and made twenty calls look like a table. A
+ *    rail down the left says these happened in sequence, and lets the running one
+ *    be a different shape — a card with its output in it — without breaking the
+ *    run.
+ *  - **The permission prompt is inline.** It used to be a sheet pinned to the
+ *    bottom of the screen, which covered the last thing Claude said — usually the
+ *    sentence explaining why it wants to run the command being approved. It is now
+ *    a card at the end of the transcript, in sequence, where the reasoning above it
+ *    stays readable. The composer dims and says why, and the transcript above dims
+ *    with it, so there is exactly one thing to answer.
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks'
@@ -19,12 +34,17 @@ import {
 import {
   Caps,
   Caret,
+  Display,
+  FilledAction,
+  Group,
+  OutlinedAction,
   PrimaryAction,
   ScreenBody,
-  SecondaryAction,
   Segmented,
   SheetDismiss,
-  Spinner,
+  SectionLabel,
+  TimelineMark,
+  type TimelineState,
 } from '../design/components'
 import { MarkdownText } from '../design/markdown'
 import { DiffView } from './Diff'
@@ -48,11 +68,11 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
   useEffect(() => {
     const node = transcript.current
     if (node) node.scrollTop = node.scrollHeight
-  }, [turns.length, toolCalls.length])
+  }, [turns.length, toolCalls.length, permission?.id])
 
-  // The sheet is a bottom overlay, so with the keyboard up it arrives underneath
-  // it: a tool sits waiting on an answer the user cannot see or reach. Typing gives
-  // way to the question.
+  // The composer gives way to the question. With the keyboard up, a prompt at the
+  // end of the transcript would arrive underneath it: a tool waiting on an answer
+  // the user cannot see or reach.
   useEffect(() => {
     if (permission) composer.current?.blur()
   }, [permission?.id])
@@ -71,28 +91,38 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
   // silent until the first prompt, so the header asks for one, and gating on the id
   // alone would block the very thing it asks for.
   const hasSomewhereToSend = store.claudeSessionId.value != null || store.claudeOpening.value
-  const canSend = hasSomewhereToSend && draft.trim().length > 0
-  const composerPrompt = !hasSomewhereToSend
-    ? 'Pick a session first…'
-    : mode === 'chat'
-      ? 'Ask about this Mac…'
-      : 'Steer the session…'
+  const canSend = hasSomewhereToSend && draft.trim().length > 0 && !permission
+  const composerPrompt = permission
+    ? 'Answer the question first…'
+    : !hasSomewhereToSend
+      ? 'Pick a session first…'
+      : mode === 'chat'
+        ? 'Ask about this Mac…'
+        : 'Steer the session…'
 
   const emptyTranscript = !turns.length && !toolCalls.length && !store.claudeStreaming.value
 
   const suggestions =
-    mode === 'chat' && !store.claudeStreaming.value && turns[turns.length - 1]?.role === 'assistant'
+    mode === 'chat' &&
+    !store.claudeStreaming.value &&
+    !permission &&
+    turns[turns.length - 1]?.role === 'assistant'
       ? ['What’s eating my battery', 'Show me the top processes']
       : []
 
   return (
     <div class={half ? 'sheet sheet--half' : 'sheet'} role="dialog" aria-label="Claude">
       <ScreenBody>
-        {/* The one thing the system does not know: which Mac this is talking to, and
-            how far away it is. */}
-        <div class="row" style={{ paddingTop: '6px', flex: '0 0 auto' }}>
-          <Caps class="ellipsis" size="var(--fs-9)" color="var(--lg-green)">
-            {`● ${store.selectedDisplay.value?.name.toUpperCase() ?? 'MAC'} · ${
+        {/* The one thing the system does not know: which Mac this is talking to,
+            and how far away it is. */}
+        <div class="row" style={{ minHeight: '40px', paddingTop: '6px', flex: '0 0 auto' }}>
+          <span
+            class="dot"
+            aria-hidden="true"
+            style={{ width: '6px', height: '6px', background: 'var(--ns-green)' }}
+          />
+          <Caps class="ellipsis" size="var(--fs-9)" tracking="0.14em">
+            {`${store.selectedDisplay.value?.name.toUpperCase() ?? 'MAC'} · ${
               store.link.value.rttMillis == null
                 ? '—'
                 : `${Math.round(store.link.value.rttMillis)}MS`
@@ -102,35 +132,61 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
           <SheetDismiss onClick={onClose} id="closePanel" />
         </div>
 
-        <div style={{ marginTop: '4px', flex: '0 0 auto' }}>
-          <Segmented<ClaudeMode>
-            label="Claude mode"
-            options={[
-              { value: 'chat', label: 'CHAT', badge: null },
-              {
-                value: 'code',
-                label: 'CODE',
-                badge: store.claudeSessionId.value ? 'var(--lg-green)' : null,
-              },
-            ]}
-            selection={mode}
-            onSelect={(next) => {
-              // Re-opening tears down the running CLI and starts another, which is
-              // what put two `claude` processes 400ms apart in the host log and left
-              // the session unusable.
-              if (next === mode) return
-              // The terminal owns the mode of a live session, and re-opening here
-              // would quietly detach from it and start a private conversation
-              // instead — messages would stop reaching the terminal with nothing to
-              // say they had.
-              if (store.claudeIsLive.value) return
-              store.openClaude(next)
-            }}
-          />
+        <div class="row" style={{ gap: '12px', paddingTop: '6px', flex: '0 0 auto' }}>
+          <Display level={26}>Claude</Display>
+          <span class="spacer" />
+          {permission ? (
+            // While something is waiting, the header states that instead of
+            // offering a mode switch nobody should be making mid-question.
+            <span
+              class="pill"
+              style={{
+                minHeight: '32px',
+                background: 'color-mix(in srgb, var(--ns-amber) 14%, transparent)',
+                flex: '0 0 auto',
+              }}
+            >
+              <span
+                class="dot dot--square"
+                aria-hidden="true"
+                style={{ width: '6px', height: '6px', background: 'var(--ns-amber)' }}
+              />
+              <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-amber)">
+                1 WAITING
+              </Caps>
+            </span>
+          ) : (
+            <span style={{ flex: '0 0 auto' }}>
+              <Segmented<ClaudeMode>
+                label="Claude mode"
+                options={[
+                  { value: 'chat', label: 'CHAT', badge: null },
+                  {
+                    value: 'code',
+                    label: 'CODE',
+                    badge: store.claudeSessionId.value ? 'var(--ns-green)' : null,
+                  },
+                ]}
+                selection={mode}
+                onSelect={(next) => {
+                  // Re-opening tears down the running CLI and starts another, which
+                  // is what put two `claude` processes 400ms apart in the host log
+                  // and left the session unusable.
+                  if (next === mode) return
+                  // The terminal owns the mode of a live session, and re-opening
+                  // here would quietly detach from it and start a private
+                  // conversation instead — messages would stop reaching the terminal
+                  // with nothing to say they had.
+                  if (store.claudeIsLive.value) return
+                  store.openClaude(next)
+                }}
+              />
+            </span>
+          )}
         </div>
 
         {mode === 'code' ? (
-          <div style={{ marginTop: '12px', flex: '0 0 auto' }}>
+          <div style={{ marginTop: '14px', flex: '0 0 auto' }}>
             <SessionHeader onPick={() => (store.showSessionPicker.value = true)} />
           </div>
         ) : null}
@@ -140,55 +196,57 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
           style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingTop: '22px' }}
         >
           <div class="stack" style={{ gap: '20px' }}>
-            {emptyTranscript && !hasSomewhereToSend ? <EmptyState mode={mode} /> : null}
+            {/* Everything that is not the question dims while one is pending. */}
+            <div
+              class="stack"
+              style={{
+                gap: '20px',
+                opacity: permission ? 0.5 : 1,
+                transition: 'opacity var(--state-change) ease-out',
+              }}
+              aria-hidden={permission ? 'true' : undefined}
+            >
+              {emptyTranscript && !hasSomewhereToSend ? <EmptyState mode={mode} /> : null}
 
-            {turns.map((turn) => (
-              <TurnView key={turn.id} turn={turn} />
-            ))}
+              {turns.map((turn) => (
+                <TurnView key={turn.id} turn={turn} />
+              ))}
 
-            {/* Tool calls collapse to one 44px line each — verb, target, duration —
-                so twenty stay skimmable at arm's length. */}
-            {toolCalls.length ? (
-              <div
-                class="stack"
-                style={{
-                  gap: '1px',
-                  background: 'var(--lg-chrome)',
-                  border: '1px solid var(--lg-chrome)',
-                  borderRadius: 'var(--radius-row)',
-                  overflow: 'hidden',
-                }}
-              >
-                {toolCalls.map((call) => (
-                  <ToolRow key={call.id} call={call} />
-                ))}
-              </div>
-            ) : null}
+              {toolCalls.length ? (
+                <div class="timeline">
+                  {toolCalls.map((call) => (
+                    <ToolRow key={call.id} call={call} />
+                  ))}
+                </div>
+              ) : null}
 
-            {changedFiles.length ? (
-              <FileList
-                files={changedFiles}
-                expanded={filesExpanded}
-                onToggle={() => setFilesExpanded((current) => !current)}
-              />
-            ) : null}
+              {changedFiles.length ? (
+                <FileList
+                  files={changedFiles}
+                  expanded={filesExpanded}
+                  onToggle={() => setFilesExpanded((current) => !current)}
+                />
+              ) : null}
 
-            {store.claudeStreaming.value ? (
-              <div class="row" style={{ gap: '8px' }}>
-                <Caret height={16} />
-                <Caps size="var(--fs-9)" tracking="0.16em">
-                  {store.claudeTokensPerSecond.value > 0
-                    ? `STREAMING · ${store.claudeTokensPerSecond.value} TOK/S`
-                    : 'WORKING'}
+              {store.claudeStreaming.value ? (
+                <div class="row" style={{ gap: '9px' }}>
+                  <Caret height={14} />
+                  <Caps size="var(--fs-9)" tracking="0.16em">
+                    {store.claudeTokensPerSecond.value > 0
+                      ? `STREAMING · ${store.claudeTokensPerSecond.value} TOK/S`
+                      : 'WORKING'}
+                  </Caps>
+                </div>
+              ) : null}
+
+              {store.claudeRateLimitNote.value ? (
+                <Caps size="var(--fs-9)" tracking="0.16em" color="var(--ns-amber)">
+                  {store.claudeRateLimitNote.value}
                 </Caps>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
 
-            {store.claudeRateLimitNote.value ? (
-              <Caps size="var(--fs-9)" tracking="0.16em" color="var(--lg-amber)">
-                {store.claudeRateLimitNote.value}
-              </Caps>
-            ) : null}
+            {permission ? <PermissionCard /> : null}
           </div>
         </div>
 
@@ -198,15 +256,11 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion}
+                class="pill"
                 onClick={() => store.sendToClaude(suggestion)}
-                style={{
-                  minHeight: 'var(--target)',
-                  paddingInline: '14px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--lg-hairline)',
-                }}
+                style={{ minHeight: 'var(--target)' }}
               >
-                <Caps size="var(--fs-10)" tracking="0.1em" color="var(--lg-text-secondary)">
+                <Caps size="var(--fs-9)" tracking="0.1em" color="var(--ns-text-secondary)">
                   {suggestion}
                 </Caps>
               </button>
@@ -221,7 +275,9 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             marginTop: '12px',
             alignItems: 'flex-end',
             flex: '0 0 auto',
-            paddingBottom: 'calc(8px + var(--safe-bottom))',
+            paddingBottom: 'calc(10px + var(--safe-bottom))',
+            opacity: permission ? 0.4 : 1,
+            transition: 'opacity var(--state-change) ease-out',
           }}
         >
           <textarea
@@ -229,6 +285,7 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             value={draft}
             placeholder={composerPrompt}
             aria-label={composerPrompt}
+            disabled={permission != null}
             rows={1}
             onInput={(event) => {
               setDraft(event.currentTarget.value)
@@ -252,14 +309,14 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
             style={{
               flex: '1 1 auto',
               minWidth: 0,
+              minHeight: '52px',
               resize: 'none',
               fontSize: 'var(--fs-15)',
               lineHeight: 1.4,
-              padding: '16px',
-              borderRadius: 'var(--radius-large)',
-              background: 'var(--lg-panel)',
-              border: '1px solid var(--lg-hairline)',
-              fontFamily: 'var(--lg-sans)',
+              padding: '16px 18px',
+              borderRadius: 'var(--radius-card)',
+              background: 'var(--ns-raised)',
+              fontFamily: 'var(--ns-sans)',
             }}
           />
 
@@ -272,19 +329,21 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
               title="Interrupts the run in progress."
               class="stack"
               style={{
-                width: '56px',
-                height: '56px',
+                width: '52px',
+                height: '52px',
                 flex: '0 0 auto',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
+                gap: '3px',
+                borderRadius: 'var(--radius-control)',
+                background: 'var(--ns-red)',
               }}
             >
               <span
                 aria-hidden="true"
-                style={{ width: '12px', height: '12px', background: 'var(--lg-red)' }}
+                style={{ width: '11px', height: '11px', background: 'var(--ns-on-red)' }}
               />
-              <Caps size="var(--fs-9)" tracking="0.1em" color="var(--lg-red)">
+              <Caps size="var(--fs-8)" tracking="0.08em" color="var(--ns-on-red)">
                 STOP
               </Caps>
             </button>
@@ -298,12 +357,12 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
               disabled={!canSend}
               aria-label="Send"
               style={{
-                width: '56px',
-                height: '56px',
+                width: '52px',
+                height: '52px',
                 flex: '0 0 auto',
-                borderRadius: 'var(--radius-large)',
-                background: 'var(--lg-cyan)',
-                color: 'var(--lg-on-cyan)',
+                borderRadius: 'var(--radius-control)',
+                background: 'var(--ns-accent)',
+                color: 'var(--ns-on-accent)',
                 opacity: canSend ? 1 : 0.4,
               }}
             >
@@ -315,7 +374,6 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
         </div>
       </ScreenBody>
 
-      {permission ? <PermissionSheet /> : null}
       {store.showSessionPicker.value ? (
         <SessionPicker onClose={() => (store.showSessionPicker.value = false)} />
       ) : null}
@@ -342,7 +400,12 @@ function SessionHeader({ onPick }: { onPick: () => void }) {
 
   const right = (() => {
     const running = store.toolCalls.value.filter((call) => call.state === 'running').length
-    if (running > 0) return `${store.changedFiles.value.length} FILES · ${running} TOOLS RUNNING`
+    if (running > 0) return `${store.changedFiles.value.length} FILES · ${running} RUNNING`
+    if (store.changedFiles.value.length > 0) {
+      return `${store.changedFiles.value.length} FILE${
+        store.changedFiles.value.length === 1 ? '' : 'S'
+      }`
+    }
     const opened = store.claudeOpenedAt.value
     if (opened == null) return ''
     // Follows the store's one-second tick rather than a timer of its own.
@@ -358,29 +421,32 @@ function SessionHeader({ onPick }: { onPick: () => void }) {
         width: '100%',
         display: 'block',
         textAlign: 'left',
-        padding: '11px 13px',
-        borderRadius: 'var(--radius-row)',
-        background: 'var(--lg-raised)',
-        border: '1px solid var(--lg-hairline-dim)',
+        padding: '12px 14px',
+        borderRadius: 'var(--radius-control)',
+        background: 'var(--ns-raised)',
       }}
     >
-      <span class="row" style={{ gap: '8px' }}>
-        <span class="mono ellipsis ellipsis--head" style={{ fontSize: 'var(--fs-10)' }}>
+      <span class="row" style={{ gap: '10px' }}>
+        <span class="mono ellipsis ellipsis--head" style={{ fontSize: 'var(--fs-11)' }}>
           <span>{shortPath(store.claudeCwd.value)}</span>
         </span>
         <span class="spacer" style={{ minWidth: '8px' }} />
         {store.claudeBranch.value ? (
-          <Caps size="var(--fs-10)" tracking="0.08em" color="var(--lg-green)">
+          <Caps size="var(--fs-10)" tracking="0.08em" color="var(--ns-green)">
             {store.claudeBranch.value}
           </Caps>
         ) : null}
       </span>
-      <span class="row" style={{ gap: '8px', marginTop: '7px' }}>
-        <Caps size="var(--fs-9)" tracking="0.12em">
+      <span class="row" style={{ gap: '10px', marginTop: '8px' }}>
+        <Caps
+          size="var(--fs-9)"
+          tracking="0.12em"
+          color={store.claudeIsLive.value ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
+        >
           {left}
         </Caps>
         <span class="spacer" style={{ minWidth: '8px' }} />
-        <Caps size="var(--fs-9)" tracking="0.12em">
+        <Caps size="var(--fs-9)" tracking="0.1em">
           {right}
         </Caps>
       </span>
@@ -406,9 +472,9 @@ function EmptyState({ mode }: { mode: ClaudeMode }) {
   return (
     <div
       class="stack"
-      style={{ gap: '14px', alignItems: 'center', padding: '60px 32px 0', textAlign: 'center' }}
+      style={{ gap: '16px', alignItems: 'center', padding: '48px 24px 0', textAlign: 'center' }}
     >
-      <Caps size="var(--fs-10)" tracking="0.18em" color="var(--lg-cyan)">
+      <Caps size="var(--fs-9)" tracking="0.18em" color="var(--ns-accent)">
         {mode === 'chat' ? 'CHAT' : 'CODE'}
       </Caps>
       <p
@@ -416,7 +482,9 @@ function EmptyState({ mode }: { mode: ClaudeMode }) {
         style={{
           margin: 0,
           fontSize: 'var(--fs-19)',
-          color: 'var(--lg-text-secondary)',
+          fontWeight: 500,
+          letterSpacing: '-0.02em',
+          color: 'var(--ns-text-secondary)',
           lineHeight: 1.4,
         }}
       >
@@ -426,15 +494,18 @@ function EmptyState({ mode }: { mode: ClaudeMode }) {
       </p>
       {store.claudeSessionId.value == null ? (
         <button
+          class="outlined"
           onClick={() => (store.showSessionPicker.value = true)}
-          style={{
-            minHeight: '46px',
-            paddingInline: '20px',
-            borderRadius: '10px',
-            border: '1px solid color-mix(in srgb, var(--lg-cyan) 45%, transparent)',
-          }}
+          style={
+            {
+              width: 'auto',
+              minHeight: '46px',
+              paddingInline: '20px',
+              '--edge': 'color-mix(in srgb, var(--ns-accent) 45%, transparent)',
+            } as Record<string, string>
+          }
         >
-          <Caps size="var(--fs-11)" color="var(--lg-cyan)">
+          <Caps size="var(--fs-10)" color="var(--ns-accent)">
             PICK A SESSION
           </Caps>
         </button>
@@ -443,7 +514,11 @@ function EmptyState({ mode }: { mode: ClaudeMode }) {
   )
 }
 
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })
+const CLOCK = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
 
 function TurnView({ turn }: { turn: ClaudeTurn }) {
   if (turn.role === 'user') {
@@ -452,14 +527,14 @@ function TurnView({ turn }: { turn: ClaudeTurn }) {
         <Caps size="var(--fs-9)" tracking="0.2em">
           {`YOU · ${CLOCK.format(new Date(turn.at))}`}
         </Caps>
-        <MarkdownText text={turn.text} color="var(--lg-you)" />
+        <MarkdownText text={turn.text} color="var(--ns-you)" />
       </div>
     )
   }
   return (
     <div class="stack" style={{ gap: '9px' }}>
-      <div class="row" style={{ gap: '8px' }}>
-        <Caps size="var(--fs-9)" tracking="0.2em" color="var(--lg-cyan)">
+      <div class="row" style={{ gap: '9px' }}>
+        <Caps size="var(--fs-9)" tracking="0.2em" color="var(--ns-accent)">
           CLAUDE
         </Caps>
         <span
@@ -467,7 +542,7 @@ function TurnView({ turn }: { turn: ClaudeTurn }) {
           aria-hidden="true"
           style={{
             height: '1px',
-            background: 'color-mix(in srgb, var(--lg-cyan) 20%, transparent)',
+            background: 'color-mix(in srgb, var(--ns-accent) 22%, transparent)',
           }}
         />
       </div>
@@ -477,19 +552,22 @@ function TurnView({ turn }: { turn: ClaudeTurn }) {
   )
 }
 
+function toolState(call: ToolCall): TimelineState {
+  if (call.state === 'ok') return 'done'
+  if (call.state === 'error') return 'failed'
+  return 'running'
+}
+
+/**
+ * One tool call on the timeline: verb, target, how long it took.
+ *
+ * A finished call is one 40px line, so twenty stay skimmable at arm's length. The
+ * running one becomes a card and shows its output, because that is the only one
+ * whose output is still news.
+ */
 function ToolRow({ call }: { call: ToolCall }) {
-  const marker =
-    call.state === 'ok' ? (
-      <span class="mono" style={{ fontSize: 'var(--fs-11)', color: 'var(--lg-green)' }}>
-        ✓
-      </span>
-    ) : call.state === 'error' ? (
-      <span class="mono" style={{ fontSize: 'var(--fs-11)', color: 'var(--lg-red)' }}>
-        ✕
-      </span>
-    ) : (
-      <Spinner size={12} />
-    )
+  const state = toolState(call)
+  const running = state === 'running'
 
   const duration =
     call.milliseconds == null
@@ -499,49 +577,50 @@ function ToolRow({ call }: { call: ToolCall }) {
         : `${(call.milliseconds / 1000).toFixed(1)}S`
 
   return (
-    <div
-      class="stack"
-      style={{ background: call.state === 'running' ? 'var(--lg-screen)' : 'var(--lg-raised)' }}
-    >
-      <div class="row" style={{ gap: '10px', minHeight: 'var(--target)', paddingInline: '12px' }}>
-        {marker}
-        <span class="mono" style={{ fontSize: 'var(--fs-11)', flex: '0 0 auto' }}>
-          {call.name}
-        </span>
-        <span
-          class="mono ellipsis"
-          style={{
-            fontSize: 'var(--fs-11)',
-            color: call.state === 'running' ? 'var(--lg-text-secondary)' : 'var(--lg-text)',
-          }}
-        >
-          {call.target}
-        </span>
-        <span class="spacer" style={{ minWidth: '8px' }} />
-        <Caps
-          size="var(--fs-9)"
-          tracking="0"
-          color={call.state === 'running' ? 'var(--lg-cyan)' : 'var(--lg-text-tertiary)'}
-        >
-          {duration}
-        </Caps>
+    <div class={running ? 'timeline__row timeline__row--running' : 'timeline__row'}>
+      <TimelineMark state={state} />
+      <div class="timeline__body">
+        <div class="row" style={{ gap: '10px', minHeight: running ? '22px' : undefined }}>
+          <span class="mono" style={{ fontSize: 'var(--fs-11)', flex: '0 0 auto' }}>
+            {call.name}
+          </span>
+          <span
+            class="mono ellipsis"
+            style={{
+              fontSize: 'var(--fs-11)',
+              color: running ? 'var(--ns-text-secondary)' : 'var(--ns-text-secondary)',
+            }}
+          >
+            {call.target}
+          </span>
+          <span class="spacer" style={{ minWidth: '8px' }} />
+          <Caps
+            size="var(--fs-9)"
+            tracking="0"
+            color={
+              state === 'failed'
+                ? 'var(--ns-red)'
+                : running
+                  ? 'var(--ns-accent)'
+                  : 'var(--ns-text-tertiary)'
+            }
+          >
+            {duration}
+          </Caps>
+        </div>
+        {running && call.preview ? (
+          <span
+            class="mono ellipsis"
+            style={{
+              fontSize: 'var(--fs-10)',
+              lineHeight: 1.6,
+              color: 'var(--ns-text-tertiary)',
+            }}
+          >
+            {call.preview}
+          </span>
+        ) : null}
       </div>
-      {/* Only the running one shows output. */}
-      {call.state === 'running' && call.preview ? (
-        <pre
-          class="mono wrap"
-          style={{
-            margin: 0,
-            padding: '0 12px 11px',
-            fontSize: 'var(--fs-10)',
-            color: 'var(--lg-text-tertiary)',
-            lineHeight: 1.6,
-            whiteSpace: 'pre-wrap',
-          }}
-        >
-          {call.preview}
-        </pre>
-      ) : null}
     </div>
   )
 }
@@ -564,55 +643,36 @@ function FileList({
   onToggle: () => void
 }) {
   return (
-    <div class="stack" style={{ gap: '6px' }}>
+    <div class="stack" style={{ gap: '8px' }}>
       <button
         onClick={onToggle}
         aria-expanded={expanded}
         aria-label={`${files.length} changed files`}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          minHeight: 'var(--target)',
-        }}
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: 'var(--target)' }}
       >
         <Caps size="var(--fs-9)" tracking="0.16em">
           {`${files.length} CHANGED FILE${files.length === 1 ? '' : 'S'}`}
         </Caps>
-        <Caps size="var(--fs-9)" tracking="0.16em" color="var(--lg-cyan)">
+        <Caps size="var(--fs-9)" tracking="0.16em" color="var(--ns-accent)">
           {expanded ? 'HIDE' : 'SHOW · TAP FOR THE DIFF'}
         </Caps>
       </button>
 
       {expanded ? (
-        <div
-          class="stack"
-          style={{
-            gap: '1px',
-            background: 'var(--lg-chrome)',
-            borderRadius: 'var(--radius-row)',
-            overflow: 'hidden',
-          }}
-        >
+        <Group>
           {files.map((file) => (
             <button
               key={file.path}
+              class="group-row"
               onClick={() => store.openDiff(file.path)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '12px',
-                background: 'var(--lg-raised)',
-                textAlign: 'left',
-              }}
+              style={{ minHeight: '48px', gap: '10px', paddingInline: '12px' }}
             >
               <span
                 class="mono"
                 style={{
                   fontSize: 'var(--fs-10)',
                   flex: '0 0 auto',
-                  color: file.status === 'A' ? 'var(--lg-green)' : 'var(--lg-amber)',
+                  color: file.status === 'A' ? 'var(--ns-green)' : 'var(--ns-amber)',
                 }}
               >
                 {file.status}
@@ -624,7 +684,7 @@ function FileList({
               {file.added > 0 ? (
                 <span
                   class="mono"
-                  style={{ fontSize: 'var(--fs-10)', color: 'var(--lg-green)', flex: '0 0 auto' }}
+                  style={{ fontSize: 'var(--fs-10)', color: 'var(--ns-green)', flex: '0 0 auto' }}
                 >
                   {`+${file.added}`}
                 </span>
@@ -632,7 +692,7 @@ function FileList({
               {file.removed > 0 ? (
                 <span
                   class="mono"
-                  style={{ fontSize: 'var(--fs-10)', color: 'var(--lg-red)', flex: '0 0 auto' }}
+                  style={{ fontSize: 'var(--fs-10)', color: 'var(--ns-red)', flex: '0 0 auto' }}
                 >
                   {`−${file.removed}`}
                 </span>
@@ -640,14 +700,14 @@ function FileList({
               <RatioBars added={file.added} removed={file.removed} />
             </button>
           ))}
-        </div>
+        </Group>
       ) : null}
     </div>
   )
 }
 
 /** File changes get counts and a four-bar ratio. */
-function RatioBars({ added, removed }: { added: number; removed: number }) {
+export function RatioBars({ added, removed }: { added: number; removed: number }) {
   const total = Math.max(1, added + removed)
   const green = Math.round((added / total) * 4)
   return (
@@ -658,7 +718,7 @@ function RatioBars({ added, removed }: { added: number; removed: number }) {
           style={{
             width: '3px',
             height: '12px',
-            background: index < green ? 'var(--lg-green)' : 'var(--lg-red)',
+            background: index < green ? 'var(--ns-green)' : 'var(--ns-red)',
           }}
         />
       ))}
@@ -666,13 +726,17 @@ function RatioBars({ added, removed }: { added: number; removed: number }) {
   )
 }
 
-// MARK: - 06C permission
+// MARK: - 10 · permission
 
 /**
- * The one thing only the user can do. States the command verbatim, what it will
- * destroy in plain units, and how long it has been waiting.
+ * The one thing only the user can do.
+ *
+ * States the command verbatim, what it will destroy in plain units, and how long
+ * it has been waiting. It sits at the end of the transcript rather than over it,
+ * so the sentence in which Claude explained why it wants to run this is still on
+ * screen while the question is being answered.
  */
-function PermissionSheet() {
+function PermissionCard() {
   const request = store.permission.value
   if (!request) return null
   // Follows the store's tick. A permission request is the only thing that shows
@@ -684,46 +748,35 @@ function PermissionSheet() {
 
   return (
     <div
-      class="sheet--bottom"
+      class="card card--tinted"
       role="dialog"
       aria-modal="true"
       aria-label={`Claude is asking to run ${request.command}`}
-      style={{
-        left: '18px',
-        right: '18px',
-        bottom: 'calc(20px + var(--safe-bottom))',
-        maxWidth: 'var(--measure)',
-        marginInline: 'auto',
-        background: 'var(--lg-raised)',
-        border: '1px solid color-mix(in srgb, var(--lg-amber) 40%, transparent)',
-        borderRadius: 'var(--radius-large)',
-      }}
+      style={
+        {
+          '--tint': 'var(--ns-amber)',
+          borderRadius: 'var(--radius-card-large)',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '13px',
+        } as Record<string, string>
+      }
     >
-      <div class="row" style={{ gap: '9px', padding: '14px 16px 0' }}>
+      <div class="row" style={{ gap: '9px' }}>
         <span
+          class="dot dot--square"
           aria-hidden="true"
-          style={{ width: '7px', height: '7px', background: 'var(--lg-amber)', flex: '0 0 auto' }}
+          style={{ width: '7px', height: '7px', background: 'var(--ns-amber)' }}
         />
-        <Caps size="var(--fs-10)" tracking="0.16em" color="var(--lg-amber)">
+        <Caps size="var(--fs-10)" tracking="0.16em" color="var(--ns-amber)" weight={500}>
           {`WANTS TO RUN · PAUSED ${waited}S`}
         </Caps>
       </div>
 
       <pre
-        class="mono wrap"
-        style={{
-          margin: '12px 16px 0',
-          padding: '13px',
-          fontSize: 'var(--fs-12)',
-          lineHeight: 1.5,
-          whiteSpace: 'pre-wrap',
-          userSelect: 'text',
-          background: 'var(--lg-deep)',
-          border: '1px solid var(--lg-hairline-dim)',
-          borderRadius: '6px',
-          maxHeight: '30dvh',
-          overflowY: 'auto',
-        }}
+        class="code"
+        style={{ userSelect: 'text', maxHeight: '30dvh', overflowY: 'auto' }}
       >
         {request.command}
       </pre>
@@ -732,51 +785,44 @@ function PermissionSheet() {
         <p
           class="wrap"
           style={{
-            margin: '12px 16px 0',
+            margin: 0,
             fontSize: 'var(--fs-13)',
             lineHeight: 1.45,
-            color: 'var(--lg-text-secondary)',
+            color: 'var(--ns-text-secondary)',
           }}
         >
           {request.explanation}
         </p>
       ) : null}
 
-      <div class="stack" style={{ gap: '8px', padding: '16px' }}>
-        <button
+      <div class="stack" style={{ gap: '8px' }}>
+        <FilledAction
+          title="Allow once"
+          hint="Runs this command once. You will be asked again next time."
           onClick={() => store.answerPermission(true, 'once')}
-          title="Runs this command once. You will be asked again next time."
-          style={{
-            minHeight: '56px',
-            borderRadius: '10px',
-            background: 'var(--lg-cyan)',
-            color: 'var(--lg-on-cyan)',
-            fontSize: 'var(--fs-16)',
-            fontWeight: 500,
-          }}
-        >
-          Allow once
-        </button>
+        />
 
         {/* Deny gets its own full-width row, and the standing grant is moved away
             from it. These two used to sit side by side, the same size, differing
             only in colour — so the tap that stops a tool was one thumb's width from
             the tap that permanently allows it, and only one of those can be taken
             back. */}
-        <SecondaryAction
+        <OutlinedAction
           title="DENY"
-          tint="var(--lg-red)"
-          border="color-mix(in srgb, var(--lg-red) 50%, transparent)"
+          tint="var(--ns-red)"
+          edge="color-mix(in srgb, var(--ns-red) 50%, transparent)"
+          height={48}
           onClick={() => store.answerPermission(false, 'once', 'Denied from the browser.')}
         />
 
         <button
+          class="quiet"
           onClick={() => store.answerPermission(true, 'always')}
           // Visually demoted on purpose, and this is the one that cannot be taken
           // back — so the title has to carry what the size does not.
           aria-label="Always allow this here"
           title="Grants this command in this folder permanently. Cannot be undone from here."
-          style={{ minHeight: 'var(--target)', marginTop: '2px' }}
+          style={{ minHeight: '40px' }}
         >
           <Caps size="var(--fs-9)" tracking="0.12em">
             ALWAYS ALLOW THIS HERE
@@ -787,7 +833,7 @@ function PermissionSheet() {
   )
 }
 
-// MARK: - Session picker
+// MARK: - 11 · session picker
 
 /** Real sessions from ~/.claude/projects, resumable by id. */
 function SessionPicker({ onClose }: { onClose: () => void }) {
@@ -796,117 +842,113 @@ function SessionPicker({ onClose }: { onClose: () => void }) {
   }, [])
 
   const sessions = store.claudeSessions.value
+  const current = store.claudeSessionId.value
 
   return (
     <div class="sheet" role="dialog" aria-label="Resume a session">
       <ScreenBody>
-        <div class="row" style={{ marginTop: '24px', flex: '0 0 auto' }}>
-          <Caps size="var(--fs-10)" tracking="0.2em">
-            RESUME A SESSION
-          </Caps>
+        <div class="row" style={{ minHeight: '40px', marginTop: '16px', flex: '0 0 auto' }}>
+          <SectionLabel>SESSIONS ON THE MAC</SectionLabel>
           <span class="spacer" />
           <SheetDismiss title="CLOSE" onClick={onClose} />
         </div>
 
-        {/* The picker could only resume, so a Mac with no sessions on it was a dead
-            end: the empty state said so and offered nothing. The host already
-            accepts an open without a session id. */}
-        <button
-          onClick={() => {
-            store.openClaude(store.claudeMode.value)
-            onClose()
-          }}
+        <Display level={30} style={{ marginTop: '14px', flex: '0 0 auto' }}>
+          Pick up where
+          <br />
+          you left off.
+        </Display>
+
+        <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            minHeight: '52px',
-            paddingInline: '16px',
-            marginTop: '18px',
-            flex: '0 0 auto',
-            borderRadius: 'var(--radius-row)',
-            border: '1px solid color-mix(in srgb, var(--lg-cyan) 40%, transparent)',
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            marginTop: '22px',
           }}
         >
-          <span class="mono" style={{ fontSize: 'var(--fs-15)', color: 'var(--lg-cyan)' }}>
-            +
-          </span>
-          <Caps size="var(--fs-11)" color="var(--lg-cyan)">
-            START A NEW SESSION
-          </Caps>
-        </button>
-
-        {sessions.length === 0 ? (
-          <Caps size="var(--fs-11)" tracking="0.12em" style={{ marginTop: '24px' }}>
-            NO SESSIONS FOUND ON THE MAC
-          </Caps>
-        ) : null}
-
-        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingTop: '16px' }}>
-          <div class="stack" style={{ gap: '8px' }}>
-            {sessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => {
-                  store.openClaude('code', session.id, session.cwd)
-                  onClose()
-                }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '14px',
-                  borderRadius: 'var(--radius-row)',
-                  background: 'var(--lg-raised)',
-                  border: '1px solid var(--lg-hairline-dim)',
-                }}
-              >
-                <span
-                  class="wrap"
-                  style={{
-                    display: 'block',
-                    fontSize: 'var(--fs-14)',
-                    lineHeight: 1.35,
-                    // Two lines, then clipped: a summary is a label, not the
-                    // conversation.
-                    maxHeight: '2.7em',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {session.summary}
-                </span>
-                <span class="row" style={{ gap: '8px', marginTop: '6px' }}>
-                  <Caps
-                    class="ellipsis ellipsis--head"
-                    size="var(--fs-9)"
-                    tracking="0.08em"
+          {sessions.length === 0 ? (
+            <Caps size="var(--fs-10)" tracking="0.12em">
+              NO SESSIONS FOUND ON THE MAC
+            </Caps>
+          ) : (
+            <div class="stack" style={{ gap: '8px' }}>
+              {sessions.map((session) => {
+                const selected = session.id === current
+                return (
+                  <button
+                    key={session.id}
+                    onClick={() => {
+                      store.openClaude('code', session.id, session.cwd)
+                      onClose()
+                    }}
+                    aria-current={selected ? 'true' : undefined}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '15px 16px',
+                      borderRadius: 'var(--radius-control)',
+                      background: 'var(--ns-raised)',
+                      outline: selected
+                        ? '1px solid color-mix(in srgb, var(--ns-accent) 35%, transparent)'
+                        : undefined,
+                      outlineOffset: '-1px',
+                    }}
                   >
-                    <span>{shortPath(session.cwd)}</span>
-                  </Caps>
-                  <span class="spacer" style={{ minWidth: '4px' }} />
-                  {session.gitBranch ? (
-                    <Caps size="var(--fs-9)" tracking="0.08em" color="var(--lg-green)">
-                      {session.gitBranch}
-                    </Caps>
-                  ) : null}
-                  <Caps size="var(--fs-9)" tracking="0.08em">
-                    {`${session.messageCount} MSG`}
-                  </Caps>
-                </span>
-              </button>
-            ))}
-          </div>
+                    <span
+                      class="wrap"
+                      style={{
+                        display: 'block',
+                        fontSize: 'var(--fs-14)',
+                        lineHeight: 1.4,
+                        // Two lines, then clipped: a summary is a label, not the
+                        // conversation.
+                        maxHeight: '2.8em',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {session.summary}
+                    </span>
+                    <span class="row" style={{ gap: '9px', marginTop: '9px' }}>
+                      <Caps class="ellipsis ellipsis--head" size="var(--fs-9)" tracking="0.08em">
+                        <span>{shortPath(session.cwd)}</span>
+                      </Caps>
+                      <span class="spacer" style={{ minWidth: '4px' }} />
+                      {session.gitBranch ? (
+                        <Caps size="var(--fs-9)" tracking="0.08em" color="var(--ns-green)">
+                          {session.gitBranch}
+                        </Caps>
+                      ) : null}
+                      <Caps size="var(--fs-9)" tracking="0.08em">
+                        {`${session.messageCount} MSG`}
+                      </Caps>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        <div style={{ paddingBottom: 'calc(24px + var(--safe-bottom))', flex: '0 0 auto' }}>
+        <div
+          style={{ paddingBlock: '12px calc(24px + var(--safe-bottom))', flex: '0 0 auto' }}
+        >
+          {/* The picker could only resume, so a Mac with no sessions on it was a
+              dead end: the empty state said so and offered nothing. The host already
+              accepts an open without a session id. */}
           <PrimaryAction
             title="New session"
-            detail="STARTS IN THE LAST PROJECT"
+            detail={
+              store.claudeCwd.value
+                ? `STARTS IN ${shortPath(store.claudeCwd.value).toUpperCase()}`
+                : 'STARTS IN THE LAST PROJECT'
+            }
             glyph="＋"
-            tint="var(--lg-cyan)"
-            ink="var(--lg-on-cyan)"
+            tint="var(--ns-accent)"
+            ink="var(--ns-on-accent)"
             onClick={() => {
-              store.openClaude('code')
+              store.openClaude(store.claudeMode.value)
               onClose()
             }}
           />

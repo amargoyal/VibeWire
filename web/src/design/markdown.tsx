@@ -1,5 +1,5 @@
 /**
- * Claude answers in Markdown, so the panel renders Markdown. Ported from
+ * Claude answers in Markdown, so the panel renders Markdown. Mirrored by
  * ios/VibeWire/Design/Markdown.swift.
  *
  * Not a full CommonMark implementation and not trying to be. Blocks are split
@@ -203,7 +203,7 @@ export function inlineNodes(text: string): ComponentChildren[] {
         <code
           key={key++}
           class="mono"
-          style={{ fontSize: 'var(--fs-13)', color: 'var(--lg-cyan)' }}
+          style={{ fontSize: 'var(--fs-13)', color: 'var(--ns-accent)' }}
         >
           {code[1]}
         </code>,
@@ -223,7 +223,7 @@ export function inlineNodes(text: string): ComponentChildren[] {
             href={href}
             target="_blank"
             rel="noreferrer noopener"
-            style={{ color: 'var(--lg-cyan)' }}
+            style={{ color: 'var(--ns-accent)' }}
           >
             {link[1] || href}
           </a>
@@ -279,7 +279,7 @@ function safeHref(raw: string): string | null {
 
 export function MarkdownText({
   text,
-  color = 'var(--lg-text)',
+  color = 'var(--ns-text)',
   size = 'var(--fs-15)',
 }: {
   text: string
@@ -334,7 +334,7 @@ function BlockView({ block, size }: { block: Block; size: string }) {
               <span
                 class="mono"
                 aria-hidden="true"
-                style={{ color: 'var(--lg-cyan)', opacity: 0.8, lineHeight: 1.45 }}
+                style={{ color: 'var(--ns-accent)', opacity: 0.8, lineHeight: 1.45 }}
               >
                 •
               </span>
@@ -355,7 +355,7 @@ function BlockView({ block, size }: { block: Block; size: string }) {
                 class="mono"
                 aria-hidden="true"
                 style={{
-                  color: 'var(--lg-cyan)',
+                  color: 'var(--ns-accent)',
                   opacity: 0.8,
                   fontSize: `calc(${size} - 3px)`,
                   lineHeight: 1.6,
@@ -379,10 +379,10 @@ function BlockView({ block, size }: { block: Block; size: string }) {
             style={{
               width: '2px',
               alignSelf: 'stretch',
-              background: 'color-mix(in srgb, var(--lg-cyan) 35%, transparent)',
+              background: 'color-mix(in srgb, var(--ns-accent) 35%, transparent)',
             }}
           />
-          <span class="wrap" style={{ color: 'var(--lg-text-secondary)', lineHeight: 1.45 }}>
+          <span class="wrap" style={{ color: 'var(--ns-text-secondary)', lineHeight: 1.45 }}>
             {inlineNodes(block.text)}
           </span>
         </blockquote>
@@ -413,10 +413,12 @@ function CodeBlock({ language, code }: { language: string | null; code: string }
 
   return (
     <div
+      // Nightshift draws a code block as its own ground rather than as a
+      // bordered box: the two greys are the separation, and a border around a
+      // block that already has a fill is one line doing nothing.
       style={{
-        background: 'var(--lg-code)',
-        border: '1px solid var(--lg-hairline-dim)',
-        borderRadius: 'var(--radius-row)',
+        background: 'var(--ns-deep)',
+        borderRadius: 'var(--radius-inner)',
       }}
     >
       <div class="row" style={{ padding: '4px 10px 0' }}>
@@ -442,7 +444,7 @@ function CodeBlock({ language, code }: { language: string | null; code: string }
         >
           <Caps
             size="var(--fs-9)"
-            color={copied ? 'var(--lg-green)' : 'var(--lg-text-secondary)'}
+            color={copied ? 'var(--ns-green)' : 'var(--ns-text-secondary)'}
           >
             {copied ? 'COPIED' : 'COPY'}
           </Caps>
@@ -455,7 +457,7 @@ function CodeBlock({ language, code }: { language: string | null; code: string }
           padding: '2px 10px 10px',
           overflowX: 'auto',
           fontSize: 'var(--fs-12)',
-          color: 'var(--lg-code-ink)',
+          color: 'var(--ns-code-ink)',
           lineHeight: 1.5,
         }}
       >

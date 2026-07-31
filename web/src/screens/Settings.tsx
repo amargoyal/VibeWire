@@ -1,8 +1,8 @@
 /**
- * 07A · SETTINGS and 07B · REVOKE · CONFIRM.
- * Ported from ios/VibeWire/Screens/SettingsView.swift.
+ * 13 · SETTINGS and 14 · REVOKE — CONFIRM.
+ * Mirrored by ios/VibeWire/Screens/SettingsView.swift.
  *
- * Four groups, no search field, no icons in coloured squares. Every value that
+ * Five groups, no search field, no icons in coloured squares. Every value that
  * affects the picture shows its cost in bytes or milliseconds, because that is the
  * only reason to come here.
  *
@@ -18,10 +18,14 @@ import { bitrateMbps, store, type PairedDeviceEntry, type RevokeTarget } from '.
 import { decoderSupport } from '../video/renderer'
 import {
   Caps,
-  Hairline,
-  Panel,
+  Card,
+  Display,
+  FilledAction,
+  Grabber,
+  Group,
+  OutlinedAction,
   ScreenBody,
-  SecondaryAction,
+  SectionLabel,
   SheetDismiss,
   Toggle,
 } from '../design/components'
@@ -35,36 +39,38 @@ export function Settings({ onClose }: { onClose: () => void }) {
       <ScreenBody scrolls>
         <div
           style={{
-            opacity: target ? 0.22 : 1,
+            opacity: target ? 0.18 : 1,
             pointerEvents: target ? 'none' : 'auto',
             display: 'flex',
             flexDirection: 'column',
             flex: '1 1 auto',
+            transition: 'opacity var(--state-change) ease-out',
           }}
         >
-          <div class="row" style={{ marginTop: '8px' }}>
-            <h1 style={{ fontSize: 'var(--fs-22)', fontWeight: 500, margin: 0 }}>Settings</h1>
+          <div class="row" style={{ minHeight: '40px', marginTop: '12px', flex: '0 0 auto' }}>
+            <Display level={26}>Settings</Display>
             <span class="spacer" />
             <SheetDismiss onClick={onClose} id="dismissSettings" />
           </div>
 
-          <Group title="PAIRED">
+          <SettingsGroup title="PAIRED">
             <PairedDevices />
-          </Group>
-          <Group title="VIDEO">
+          </SettingsGroup>
+          <SettingsGroup title="VIDEO">
             <VideoSection />
-          </Group>
-          <Group title="TRACKPAD">
+          </SettingsGroup>
+          <SettingsGroup title="TRACKPAD">
             <TrackpadSection />
-          </Group>
-          <Group title="ACCESS">
+          </SettingsGroup>
+          <SettingsGroup title="ACCESS">
             <AccessSection />
-          </Group>
-          <Group title="THIS BROWSER">
+          </SettingsGroup>
+          <SettingsGroup title="THIS BROWSER">
             <BrowserSection />
-          </Group>
+          </SettingsGroup>
 
           <button
+            class="outlined"
             onClick={() =>
               // Goes through the same sheet as a single revoke. Revoking one device
               // asked for confirmation; revoking all of them, including this
@@ -74,23 +80,25 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 count: store.devices.value.length,
               })
             }
-            style={{
-              marginTop: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              minHeight: '54px',
-              paddingInline: '18px',
-              borderRadius: 'var(--radius-medium)',
-              border: '1px solid color-mix(in srgb, var(--lg-red) 40%, transparent)',
-            }}
+            style={
+              {
+                marginTop: '20px',
+                minHeight: '54px',
+                justifyContent: 'flex-start',
+                paddingInline: '18px',
+                gap: '10px',
+                flex: '0 0 auto',
+                '--edge': 'color-mix(in srgb, var(--ns-red) 40%, transparent)',
+              } as Record<string, string>
+            }
           >
-            <span style={{ fontSize: 'var(--fs-15)', color: 'var(--lg-red)' }}>
+            <span style={{ fontSize: 'var(--fs-15)', color: 'var(--ns-red)' }}>
               Revoke every device
             </span>
             <span class="spacer" />
             {/* Solid, not 70%: the count is the scale of what the tap destroys, and
                 the faded version read at 3.4:1. */}
-            <Caps size="var(--fs-9)" tracking="0.12em" color="var(--lg-red)">
+            <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-red)">
               {`${store.devices.value.length} KEYS`}
             </Caps>
           </button>
@@ -98,10 +106,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
           <Caps
             size="var(--fs-9)"
             tracking="0.12em"
+            color="var(--ns-text-faint)"
             style={{
-              marginTop: '10px',
+              marginTop: '12px',
               paddingBottom: 'calc(40px + var(--safe-bottom))',
               lineHeight: 1.7,
+              flex: '0 0 auto',
             }}
           >
             {`VIBEWIRE WEB ${store.appVersion} · HOST ${settings.hostVersion} · NO ACCOUNT, NO CLOUD`}
@@ -119,12 +129,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
   )
 }
 
-function Group({ title, children }: { title: string; children: ComponentChildren }) {
+function SettingsGroup({ title, children }: { title: string; children: ComponentChildren }) {
   return (
-    <section class="stack" style={{ gap: '10px', marginTop: '20px' }}>
-      <Caps size="var(--fs-10)" tracking="0.2em">
-        {title}
-      </Caps>
+    <section
+      class="stack"
+      style={{ gap: '9px', marginTop: '22px', flex: '0 0 auto' }}
+    >
+      <SectionLabel>{title}</SectionLabel>
       {children}
     </section>
   )
@@ -137,34 +148,35 @@ function PairedDevices() {
 
   if (!devices.length) {
     return (
-      <Caps size="var(--fs-10)" tracking="0.12em" style={{ minHeight: '50px', display: 'flex', alignItems: 'center' }}>
+      <Caps
+        size="var(--fs-10)"
+        tracking="0.12em"
+        style={{ minHeight: '50px', display: 'flex', alignItems: 'center' }}
+      >
         NO DEVICES REPORTED BY THE HOST
       </Caps>
     )
   }
 
   return (
-    <div class="stack">
+    <Group>
       {devices.map((device) => (
         <div
           key={device.id}
-          class="row"
-          style={{
-            gap: '12px',
-            minHeight: '50px',
-            paddingBlock: '6px',
-            borderBottom: '1px solid var(--lg-chrome)',
-          }}
+          class={device.isThisDevice ? 'group-row group-row--selected' : 'group-row'}
         >
           <DeviceGlyph kind={device.kind} isThisDevice={device.isThisDevice} />
-          <span class="stack" style={{ gap: '2px', minWidth: 0 }}>
-            <span class="ellipsis" style={{ fontSize: 'var(--fs-15)' }}>
+          <span class="stack" style={{ gap: '3px', minWidth: 0 }}>
+            <span
+              class="ellipsis"
+              style={{ fontSize: 'var(--fs-15)', fontWeight: 500, letterSpacing: '-0.01em' }}
+            >
               {device.name}
             </span>
             <Caps
               size="var(--fs-9)"
-              tracking="0.12em"
-              color={device.isThisDevice ? 'var(--lg-cyan)' : 'var(--lg-text-tertiary)'}
+              tracking="0.1em"
+              color={device.isThisDevice ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
             >
               {device.isThisDevice
                 ? `THIS BROWSER · PAIRED ${shortDate(device.pairedAt)}`
@@ -174,23 +186,27 @@ function PairedDevices() {
           <span class="spacer" style={{ minWidth: '8px' }} />
           {device.isThisDevice ? null : (
             <button
+              class="outlined"
               onClick={() => (store.revokeTarget.value = { kind: 'device', device })}
-              style={{
-                minHeight: 'var(--target)',
-                paddingInline: '14px',
-                flex: '0 0 auto',
-                borderRadius: 'var(--radius-row)',
-                border: '1px solid color-mix(in srgb, var(--lg-red) 40%, transparent)',
-              }}
+              style={
+                {
+                  width: 'auto',
+                  minHeight: '38px',
+                  paddingInline: '13px',
+                  flex: '0 0 auto',
+                  borderRadius: 'var(--radius-inner)',
+                  '--edge': 'color-mix(in srgb, var(--ns-red) 40%, transparent)',
+                } as Record<string, string>
+              }
             >
-              <Caps size="var(--fs-10)" tracking="0.1em" color="var(--lg-red)">
+              <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-red)">
                 REVOKE
               </Caps>
             </button>
           )}
         </div>
       ))}
-    </div>
+    </Group>
   )
 }
 
@@ -199,10 +215,10 @@ function DeviceGlyph({ kind, isThisDevice }: { kind: string; isThisDevice: boole
   // outlines next to each other in the one list whose job is telling them apart.
   const shape =
     kind === 'tablet'
-      ? { width: 28, height: 22, radius: 2 }
+      ? { width: 27, height: 21, radius: 2 }
       : kind === 'browser'
-        ? { width: 30, height: 24, radius: 3 }
-        : { width: 20, height: 30, radius: 3 }
+        ? { width: 28, height: 22, radius: 3 }
+        : { width: 19, height: 28, radius: 4 }
   return (
     <span
       aria-hidden="true"
@@ -211,7 +227,7 @@ function DeviceGlyph({ kind, isThisDevice }: { kind: string; isThisDevice: boole
         height: `${shape.height}px`,
         flex: '0 0 auto',
         borderRadius: `${shape.radius}px`,
-        border: `1px solid ${isThisDevice ? 'var(--lg-cyan)' : 'var(--lg-text-tertiary)'}`,
+        border: `1px solid ${isThisDevice ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}`,
         // The browser shape gets a title bar, so it reads as a window.
         borderTopWidth: kind === 'browser' ? '5px' : '1px',
       }}
@@ -263,12 +279,13 @@ function VideoSection() {
             key={ladder}
             role="radio"
             aria-checked={settings.quality === ladder}
-            aria-selected={settings.quality === ladder}
             onClick={() => store.setQuality(ladder)}
+            style={{ minHeight: '40px' }}
           >
             <Caps
-              size="var(--fs-11)"
-              color={settings.quality === ladder ? 'var(--lg-cyan)' : 'var(--lg-text-secondary)'}
+              size="var(--fs-10)"
+              tracking="0.12em"
+              color={settings.quality === ladder ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
             >
               {ladder}
             </Caps>
@@ -280,8 +297,8 @@ function VideoSection() {
         <Caps size="var(--fs-9)" tracking="0.12em">
           {nowLabel}
         </Caps>
-        <span class="spacer" />
-        <Caps size="var(--fs-9)" tracking="0.12em" color="var(--lg-text-secondary)">
+        <span class="spacer" style={{ minWidth: '8px' }} />
+        <Caps size="var(--fs-9)" tracking="0.12em" color="var(--ns-text-secondary)">
           DROPS ON ITS OWN
         </Caps>
       </div>
@@ -291,7 +308,9 @@ function VideoSection() {
         subtitle={
           store.linkMonitor.measured
             ? `CEILING ${Math.round(settings.cellularCeilingMbps)} MB/S`
-            : `CEILING ${Math.round(settings.cellularCeilingMbps)} MB/S · THIS BROWSER WILL NOT NAME THE RADIO`
+            : `CEILING ${Math.round(
+                settings.cellularCeilingMbps,
+              )} MB/S · THIS BROWSER WILL NOT NAME THE RADIO`
         }
         isOn={settings.capOnCellular}
         onChange={(value) => store.setSetting('capOnCellular', value)}
@@ -308,9 +327,11 @@ function TrackpadSection() {
   return (
     <div class="stack" style={{ gap: '12px' }}>
       <div class="row">
-        <span style={{ fontSize: 'var(--fs-15)' }}>Sensitivity</span>
+        <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+          Sensitivity
+        </span>
         <span class="spacer" />
-        <Caps size="var(--fs-11)" tracking="0" color="var(--lg-cyan)">
+        <Caps size="var(--fs-11)" tracking="0" color="var(--ns-accent)">
           {`${settings.sensitivity} / 8`}
         </Caps>
       </div>
@@ -337,7 +358,7 @@ function TrackpadSection() {
             if (settings.sensitivity > 1) store.setSetting('sensitivity', settings.sensitivity - 1)
           }
         }}
-        style={{ gap: '6px' }}
+        style={{ gap: '5px', alignItems: 'flex-end' }}
       >
         {[1, 2, 3, 4, 5, 6, 7, 8].map((tick) => (
           <button
@@ -350,21 +371,23 @@ function TrackpadSection() {
               height: 'var(--target)',
               flex: '0 0 auto',
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               justifyContent: 'center',
             }}
           >
             <span
               style={{
                 width: '4px',
+                borderRadius: '2px',
                 height: `${10 + (tick - 1) * 4}px`,
-                background: tick <= settings.sensitivity ? 'var(--lg-cyan)' : 'var(--lg-stroke)',
+                background:
+                  tick <= settings.sensitivity ? 'var(--ns-accent)' : 'var(--ns-raised-2)',
               }}
             />
           </button>
         ))}
         <span class="spacer" />
-        <Caps size="var(--fs-9)" tracking="0.1em">
+        <Caps size="var(--fs-9)" tracking="0.1em" style={{ paddingBottom: '4px' }}>
           {`${settings.sensitivity * 216}PX / SWIPE`}
         </Caps>
       </div>
@@ -403,11 +426,10 @@ function AccessSection() {
         isOn={settings.requireBiometricEachSession}
         onChange={(value) => store.setSetting('requireBiometricEachSession', value)}
       />
-      <Hairline color="var(--lg-chrome)" />
       <SettingRow
         title="Relay over internet"
         subtitle={relaySubtitle}
-        subtitleColor={settings.relayOverInternet ? 'var(--lg-amber)' : 'var(--lg-text-tertiary)'}
+        subtitleColor={settings.relayOverInternet ? 'var(--ns-amber)' : 'var(--ns-text-tertiary)'}
         isOn={settings.relayOverInternet}
         onChange={(value) => store.setSetting('relayOverInternet', value)}
       />
@@ -426,10 +448,11 @@ function BrowserSection() {
   const storage = store.keyStorage.value
   const decoder = decoderSupport()
   const paired = store.pairedHost.value
+  const wrong = storage === 'raw-seed' || decoder !== 'ok'
 
   return (
-    <Panel tint={storage === 'raw-seed' || decoder !== 'ok' ? 'var(--lg-amber)' : undefined}>
-      <div class="stack" style={{ gap: '12px', padding: '16px' }}>
+    <Card tint={wrong ? 'var(--ns-amber)' : undefined} style={{ padding: '16px' }}>
+      <div class="stack" style={{ gap: '12px' }}>
         <FactRow
           label="SIGNING KEY"
           value={
@@ -439,7 +462,7 @@ function BrowserSection() {
                 ? 'NON-EXTRACTABLE'
                 : 'RAW SEED IN THIS ORIGIN'
           }
-          tone={storage === 'raw-seed' ? 'var(--lg-amber)' : 'var(--lg-green)'}
+          tone={storage === 'raw-seed' ? 'var(--ns-amber)' : 'var(--ns-green)'}
         />
         <p
           class="wrap"
@@ -447,7 +470,7 @@ function BrowserSection() {
             margin: 0,
             fontSize: 'var(--fs-13)',
             lineHeight: 1.45,
-            color: 'var(--lg-text-secondary)',
+            color: storage === 'raw-seed' ? 'var(--ns-on-amber-wash)' : 'var(--ns-text-secondary)',
           }}
         >
           {storage === 'raw-seed'
@@ -455,12 +478,10 @@ function BrowserSection() {
             : 'The key was generated non-extractable: this page can ask it to sign and cannot read it back. It never leaves this browser and never syncs.'}
         </p>
 
-        <Hairline color="var(--lg-chrome)" />
-
         <FactRow
           label="VIDEO DECODER"
           value={decoder === 'ok' ? 'WEBCODECS H.264' : 'MISSING'}
-          tone={decoder === 'ok' ? 'var(--lg-green)' : 'var(--lg-amber)'}
+          tone={decoder === 'ok' ? 'var(--ns-green)' : 'var(--ns-amber)'}
         />
         {decoder === 'ok' ? null : (
           <p
@@ -469,33 +490,30 @@ function BrowserSection() {
               margin: 0,
               fontSize: 'var(--fs-13)',
               lineHeight: 1.45,
-              color: 'var(--lg-on-amber-wash)',
+              color: 'var(--ns-on-amber-wash)',
             }}
           >
-            This browser has no WebCodecs video decoder, so the picture will not
-            arrive. Everything else — pointer, keyboard, clipboard, Claude — still
-            works.
+            This browser has no WebCodecs video decoder, so the picture will not arrive. Everything
+            else — pointer, keyboard, clipboard, Claude — still works.
           </p>
         )}
 
-        <Hairline color="var(--lg-chrome)" />
-
-        <FactRow label="PAIRED FROM" value={location.origin} tone="var(--lg-text)" />
+        <FactRow label="PAIRED FROM" value={location.origin} tone="var(--ns-text)" />
         <p
           class="wrap"
           style={{
             margin: 0,
             fontSize: 'var(--fs-13)',
             lineHeight: 1.45,
-            color: 'var(--lg-text-secondary)',
+            color: 'var(--ns-text-secondary)',
           }}
         >
-          Browser storage is per-origin, so each address you open this client from
-          pairs once and appears as its own device on the Mac.
+          Browser storage is per-origin, so each address you open this client from pairs once and
+          appears as its own device on the Mac.
           {paired ? ` This one talks to ${paired.origin}.` : ''}
         </p>
       </div>
-    </Panel>
+    </Card>
   )
 }
 
@@ -518,7 +536,7 @@ function FactRow({ label, value, tone }: { label: string; value: string; tone: s
 function SettingRow({
   title,
   subtitle,
-  subtitleColor = 'var(--lg-text-tertiary)',
+  subtitleColor = 'var(--ns-text-tertiary)',
   isOn,
   onChange,
 }: {
@@ -529,11 +547,13 @@ function SettingRow({
   onChange: (value: boolean) => void
 }) {
   return (
-    <div class="row" style={{ minHeight: '50px', paddingBlock: '6px' }}>
-      <span class="stack" style={{ gap: '2px', minWidth: 0 }}>
-        <span style={{ fontSize: 'var(--fs-15)' }}>{title}</span>
+    <div class="row" style={{ gap: '14px', minHeight: '56px', paddingBlock: '6px' }}>
+      <span class="stack" style={{ gap: '3px', minWidth: 0 }}>
+        <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+          {title}
+        </span>
         {subtitle ? (
-          <Caps size="var(--fs-9)" tracking="0.12em" color={subtitleColor}>
+          <Caps size="var(--fs-9)" tracking="0.1em" color={subtitleColor}>
             {subtitle}
           </Caps>
         ) : null}
@@ -545,9 +565,11 @@ function SettingRow({
 }
 
 /**
- * 07B. Three consequences in plain sentences, including the one that is *not*
- * affected — that last line is what makes a destructive tap safe to make
- * one-handed. The confirming verb is the same word as the button that opened it.
+ * 14 · REVOKE — CONFIRM.
+ *
+ * Three consequences in plain sentences, including the one that is *not* affected —
+ * that last line is what makes a destructive tap safe to make one-handed. The
+ * confirming verb is the same word as the button that opened it.
  */
 function RevokeConfirm({ target }: { target: RevokeTarget }) {
   const isEverything = target.kind === 'everything'
@@ -563,119 +585,115 @@ function RevokeConfirm({ target }: { target: RevokeTarget }) {
   /** The third line is the one that makes the tap safe to judge: for a single
    *  device it says what keeps working, and for all of them it says plainly that
    *  this browser is included, which is the part a one-tap button hid. */
-  const consequences: [string, string][] = isEverything
+  const consequences: [string, boolean][] = isEverything
     ? [
-        ['Every live session ends inside 1s.', 'var(--lg-red)'],
-        ['This browser is included. You will be signed out.', 'var(--lg-red)'],
-        ['Pairing again needs physical access to the Mac.', 'var(--lg-red)'],
+        ['Every live session ends inside 1s.', true],
+        ['This browser is included. You will be signed out.', true],
+        ['Pairing again needs physical access to the Mac.', true],
       ]
     : [
-        ['Any live session from that device ends inside 1s.', 'var(--lg-red)'],
-        ['Pairing again needs physical access to the Mac.', 'var(--lg-red)'],
-        ['This browser keeps working. Nothing else changes.', 'var(--lg-text-tertiary)'],
+        ['Any live session from that device ends inside 1s.', true],
+        ['Pairing again needs physical access to the Mac.', true],
+        ['This browser keeps working. Nothing else changes.', false],
       ]
 
-  const auditSubject = isEverything
-    ? `ALL ${target.count} DEVICES`
-    : target.device.name.toUpperCase()
+  const auditSubject = isEverything ? `ALL ${target.count} DEVICES` : target.device.name.toUpperCase()
   const auditNoun = isEverything ? (target.count === 1 ? 'KEY' : 'KEYS') : 'KEY'
 
   return (
     <div
-      class="sheet--bottom"
+      class="drawer"
       role="dialog"
       aria-modal="true"
       aria-label={title}
       style={{
-        padding: '26px 22px calc(44px + var(--safe-bottom))',
-        background: 'var(--lg-raised)',
-        borderRadius: '18px 18px 0 0',
-        borderTop: '1px solid color-mix(in srgb, var(--lg-red) 34%, transparent)',
+        borderTop: '1px solid color-mix(in srgb, var(--ns-red) 34%, transparent)',
+        padding: '16px 22px calc(34px + var(--safe-bottom))',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px',
       }}
     >
-      <div class="stack" style={{ gap: '18px', maxWidth: 'var(--measure)', marginInline: 'auto' }}>
-        <span
-          aria-hidden="true"
-          style={{
-            width: '46px',
-            height: '4px',
-            borderRadius: 'var(--radius-pill)',
-            background: 'var(--lg-stroke)',
-            marginInline: 'auto',
-          }}
-        />
+      <div
+        class="stack"
+        style={{ gap: '18px', width: '100%', maxWidth: 'var(--measure)', marginInline: 'auto' }}
+      >
+        <Grabber />
 
         <div class="stack" style={{ gap: '10px' }}>
-          <Caps size="var(--fs-10)" tracking="0.18em" color="var(--lg-red)">
+          <Caps size="var(--fs-10)" tracking="0.18em" color="var(--ns-red)">
             {title}
           </Caps>
-          <p class="wrap" style={{ margin: 0, fontSize: 'var(--fs-24)', lineHeight: 1.25 }}>
+          <p
+            class="wrap"
+            style={{
+              margin: 0,
+              fontSize: 'var(--fs-24)',
+              fontWeight: 600,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.2,
+            }}
+          >
             {headline}
           </p>
         </div>
 
-        <ul
-          class="stack"
-          style={{
-            gap: '1px',
-            margin: 0,
-            padding: 0,
-            listStyle: 'none',
-            background: 'var(--lg-chrome)',
-            borderRadius: 'var(--radius-row)',
-            overflow: 'hidden',
-          }}
-        >
-          {consequences.map(([text, color]) => (
-            <li
-              key={text}
-              class="row row--baseline"
-              style={{ gap: '11px', padding: '13px 14px', background: 'var(--lg-screen)' }}
-            >
-              <span class="mono" aria-hidden="true" style={{ fontSize: 'var(--fs-10)', color }}>
-                ▸
-              </span>
-              <span
-                class="wrap"
-                style={{
-                  fontSize: 'var(--fs-14)',
-                  lineHeight: 1.45,
-                  color:
-                    color === 'var(--lg-text-tertiary)'
-                      ? 'var(--lg-text-secondary)'
-                      : 'var(--lg-text)',
-                }}
+        <ul class="group" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            {consequences.map(([text, severe]) => (
+              <li
+                key={text}
+                class="row row--top"
+                style={{ gap: '11px', padding: '13px 14px', background: 'var(--ns-screen)' }}
               >
-                {text}
-              </span>
-            </li>
-          ))}
+                <span
+                  class="mono"
+                  aria-hidden="true"
+                  style={{
+                    fontSize: 'var(--fs-10)',
+                    lineHeight: 1.5,
+                    color: severe ? 'var(--ns-red)' : 'var(--ns-text-tertiary)',
+                  }}
+                >
+                  ▸
+                </span>
+                <span
+                  class="wrap"
+                  style={{
+                    fontSize: 'var(--fs-14)',
+                    lineHeight: 1.45,
+                    color: severe ? 'var(--ns-text)' : 'var(--ns-text-secondary)',
+                  }}
+                >
+                  {text}
+                </span>
+              </li>
+            ))}
         </ul>
 
         <div class="stack" style={{ gap: '9px' }}>
-          <button
+          <FilledAction
+            title={isEverything ? 'Revoke everything' : 'Revoke it'}
+            tint="var(--ns-red)"
+            ink="var(--ns-on-red)"
+            height={60}
             onClick={() => {
               if (target.kind === 'device') store.revoke(target.device)
               else store.revokeAll()
             }}
-            style={{
-              minHeight: '60px',
-              borderRadius: '10px',
-              background: 'var(--lg-red)',
-              color: 'var(--lg-on-red)',
-              fontSize: 'var(--fs-17)',
-              fontWeight: 500,
-            }}
-          >
-            {isEverything ? 'Revoke everything' : 'Revoke it'}
-          </button>
-          <SecondaryAction
+          />
+          <OutlinedAction
             title={isEverything ? 'KEEP THEM PAIRED' : 'KEEP IT PAIRED'}
+            height={52}
             onClick={() => (store.revokeTarget.value = null)}
           />
         </div>
 
-        <Caps size="var(--fs-9)" tracking="0.12em" style={{ textAlign: 'center' }}>
+        <Caps
+          size="var(--fs-9)"
+          tracking="0.12em"
+          color="var(--ns-text-faint)"
+          style={{ textAlign: 'center' }}
+        >
           {`HOST WILL LOG: REVOKED · ${auditSubject} · ${auditNoun} DELETED`}
         </Caps>
       </div>
