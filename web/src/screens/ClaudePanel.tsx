@@ -35,6 +35,7 @@ import {
   Announce,
   Caps,
   Caret,
+  ConditionDot,
   Display,
   FilledAction,
   Group,
@@ -121,11 +122,10 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
         {/* The one thing the system does not know: which Mac this is talking to,
             and how far away it is. */}
         <div class="row" style={{ minHeight: '40px', paddingTop: '6px', flex: '0 0 auto' }}>
-          <span
-            class="dot"
-            aria-hidden="true"
-            style={{ width: '6px', height: '6px', background: 'var(--ns-green)' }}
-          />
+          {/* Green whatever the link was doing, which made this the one caption in
+              the app that could report a healthy Mac while the socket was gone.
+              The reading beside it — the round trip — was already honest. */}
+          <ConditionDot condition={store.condition.value} size={6} />
           <Caps class="ellipsis" size="var(--fs-9)" tracking="0.14em">
             {`${store.selectedDisplay.value?.name.toUpperCase() ?? 'MAC'} · ${
               store.link.value.rttMillis == null

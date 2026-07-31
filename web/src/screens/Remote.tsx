@@ -46,7 +46,9 @@ import {
   Announce,
   Caps,
   Card,
+  ConditionDot,
   conditionColor,
+  type Condition,
   CornerTicks,
   KeyCap,
   MODIFIERS,
@@ -707,7 +709,18 @@ function StatusStrip() {
     return `H.264 · ${bitrateMbps(config).toFixed(1)} MB/S · ${config.fps}FPS`
   })()
 
-  const tone = reconnecting ? 'var(--ns-amber)' : conditionColor[condition]
+  // The picture's condition, which is not the link's: the socket can be answering
+  // while nothing is arriving to draw. The label and the dot are derived from the
+  // same value so they cannot disagree.
+  const streamCondition: Condition =
+    state.kind === 'live'
+      ? condition
+      : state.kind === 'failed'
+        ? 'lost'
+        : state.kind === 'stalled' || state.kind === 'reconnecting'
+          ? 'degraded'
+          : 'idle'
+  const tone = reconnecting ? 'var(--ns-amber)' : conditionColor[streamCondition]
 
   // The kind of state, never the numbers in it: the RTT and the stall counter
   // change every second, and a live region would read them out every second.
@@ -724,18 +737,16 @@ function StatusStrip() {
     <>
       <Announce>{spoken}</Announce>
       <span class="row" style={{ gap: '7px' }}>
-        <span
-          class={
-            reconnecting
-              ? 'dot dot--pulse dot--pulse-fast'
-              : state.kind === 'live'
-                ? 'dot'
-                : 'dot dot--pulse'
-          }
-          aria-hidden="true"
-          // Nothing decorative moves next to a live video feed; a stall is not
-          // decoration.
-          style={{ width: '6px', height: '6px', background: tone }}
+        {/* The shared dot, not a hand-rolled one. This span was drawing its own
+            circle in whatever colour the tone came out, which meant a lost
+            connection here was a red circle — and the redundant-channel rule says
+            lost is a square, so colour is never the only thing carrying it. It is
+            also what suppresses the pulse while video is live: nothing decorative
+            moves beside a live feed, and a stall is not decoration. */}
+        <ConditionDot
+          condition={reconnecting ? 'degraded' : streamCondition}
+          size={6}
+          animated={state.kind !== 'live'}
         />
         <Caps size="var(--fs-10)" tracking="0.14em" color={tone}>
           {liveLabel}
