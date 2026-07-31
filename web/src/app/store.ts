@@ -298,7 +298,6 @@ export class Store {
   streamSessionCount = signal(0)
 
   // Clipboard
-  clipboardFromMac = signal('')
   /** Text the Mac sent that this browser refused to put on the clipboard. Held so
    *  it can be offered with a button, which is a gesture the browser accepts. */
   clipboardOffer = signal<string | null>(null)
@@ -712,7 +711,6 @@ export class Store {
         if (str(payload['direction']) !== 'fromMac') return
         const text = str(payload['text'])
         if (!text) return
-        this.clipboardFromMac.value = text
         // A clipboard write with no user gesture behind it is refused by most
         // browsers, and this one has none: the text arrived over a socket seconds
         // after the tap that asked for it. So the outcome is reported rather than
@@ -1254,7 +1252,10 @@ export class Store {
       }
     }
     this.send({ t: 'hubAction', action })
-    if (action !== 'keys' && action !== 'mods') this.showHub.value = false
+    // Every action that reaches here closes the drawer. `keys` and `mods` never
+    // do: the drawer handles both itself, synchronously, because iOS only opens
+    // the system keyboard from inside the tap that asks for it.
+    this.showHub.value = false
   }
 
   requestLastFrame(): void {
@@ -1334,6 +1335,11 @@ export class Store {
       // exactly like the tap having done nothing.
       if (sessionId) this.claudeSessionId.value = sessionId
       if (cwd) this.claudeCwd.value = cwd
+      // The branch comes with the session list and nowhere else, so nothing ever
+      // set this and the panel's branch chip could not render at all — while the
+      // picker two taps away had been showing the branch for every session in it.
+      this.claudeBranch.value =
+        this.claudeSessions.value.find((entry) => entry.id === sessionId)?.gitBranch ?? null
       this.claudeUsingSubscription.value = null
       this.claudeOpenedAt.value = Date.now()
       this.claudeOpening.value = true
