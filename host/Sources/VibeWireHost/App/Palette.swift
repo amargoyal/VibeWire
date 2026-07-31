@@ -47,6 +47,15 @@ enum Palette {
 
     static let hairline = NSColor(srgbRed: 0x26 / 255, green: 0x29 / 255, blue: 0x2F / 255, alpha: 1)
     static let stroke = NSColor(srgbRed: 0x2F / 255, green: 0x33 / 255, blue: 0x39 / 255, alpha: 1)
+    /// A line *between* two things and the edge of a control are different jobs
+    /// and take different inks. `stroke` is the hairline — a divider, a dashed
+    /// rule. `edge` is the boundary of a control that has no fill, where the
+    /// edge *is* the control and there is nothing else to find, which is the
+    /// case the 3:1 non-text threshold exists for. `stroke` measures 1.5:1
+    /// against the screen ground and fails that by more than half; this measures
+    /// 3.16:1 on `raised` and 3.04:1 on the sodium-tinted card the pairing
+    /// window's grant buttons sit in.
+    static let edge = NSColor(srgbRed: 0x65 / 255, green: 0x69 / 255, blue: 0x70 / 255, alpha: 1)
 
     /// Ink on a filled action. Each is its own tint taken down to a near-black
     /// of the same hue, so a filled button reads as one object rather than as
@@ -72,11 +81,34 @@ extension NSView {
     /// A filled surface with a corner. Nightshift draws a card as a lighter
     /// ground rather than as a box around nothing, so this is the only
     /// background helper the host needs.
+    ///
+    /// `edge` is the one exception the system allows: a tinted card carries the
+    /// hue as a 7 % wash *and* an outline, because the wash alone is 1.13:1
+    /// against the ground it sits on and an edge nobody can find is not an edge.
+    /// Nothing that already reads as a filled surface passes one.
     @discardableResult
-    func fill(_ color: NSColor, radius: CGFloat) -> Self {
+    func fill(_ color: NSColor, radius: CGFloat, edge: NSColor? = nil) -> Self {
         wantsLayer = true
         layer?.cornerRadius = radius
         layer?.backgroundColor = color.cgColor
+        // CALayer draws its border inside the bounds, which is what a one-point
+        // edge has to do for a row of outlined controls to line up with a filled
+        // sibling of the same declared height.
+        layer?.borderWidth = edge == nil ? 0 : 1
+        layer?.borderColor = edge?.cgColor
+        return self
+    }
+
+    /// A control with no fill at all — an outlined action, where the boundary is
+    /// the whole of it. Separate from `fill` rather than `fill(.clear, …)`,
+    /// because "transparent" is the absence of a ground and not a colour this
+    /// palette has any business naming.
+    @discardableResult
+    func outline(_ color: NSColor, radius: CGFloat) -> Self {
+        wantsLayer = true
+        layer?.cornerRadius = radius
+        layer?.borderWidth = 1
+        layer?.borderColor = color.cgColor
         return self
     }
 }

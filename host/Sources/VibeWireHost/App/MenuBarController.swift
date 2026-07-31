@@ -52,6 +52,21 @@ final class MenuBarController: NSObject {
     private var servingDot: NSView?
     private var rotationTimer: Timer?
     private var lastLoggedBrowserURL: String?
+    /// The permission notice, when there is one to draw. Held so the one-second
+    /// tick can take it away the moment a grant lands without touching anything
+    /// else in the window.
+    private var permissionNotice: NSView?
+    /// The last measured permission pair this window was drawn for. `nil` until
+    /// the first probe: not-yet-asked and granted are different facts, and this
+    /// window is not allowed to draw the second while it means the first.
+    private var lastPermissions: Permissions?
+
+    /// The two grants the phone depends on, as measured — never as assumed.
+    private struct Permissions: Equatable {
+        let screen: Bool
+        let accessibility: Bool
+        var allGranted: Bool { screen && accessibility }
+    }
 
     init(pairing: PairingService, trust: TrustStore, transport: TransportManager) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -312,7 +327,8 @@ final class MenuBarController: NSObject {
     }
 
     private func showPairingWindow(code: PairingService.ActiveCode) {
-        if pairingWindow == nil {
+        let isNew = pairingWindow == nil
+        if isNew {
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 640, height: 474),
                 styleMask: [.titled, .closable, .fullSizeContentView],
@@ -324,21 +340,29 @@ final class MenuBarController: NSObject {
             window.isReleasedWhenClosed = false
             window.appearance = NSAppearance(named: .darkAqua)
             window.backgroundColor = Palette.screen
-            window.center()
 
             let content = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 474))
             content.fill(Palette.screen, radius: 0)
 
+            // 474 is the height with both permissions granted. A missing one
+            // grows the window downward, so everything above the band between
+            // the digits and the QR cards is pinned to the top edge — `.minYMargin`
+            // — and everything below it keeps its distance from the bottom, which
+            // is what an unset mask already does. Without the pinning the new
+            // height would open as a gap under the title bar and leave the six
+            // digits sitting in the middle of the window.
             let title = NSTextField(labelWithString: "Pair a device")
             title.frame = NSRect(x: 28, y: 414, width: 300, height: 30)
             title.font = .systemFont(ofSize: 24, weight: .semibold)
             title.textColor = Palette.text
+            title.autoresizingMask = .minYMargin
             content.addSubview(title)
 
             // The dial says at a glance whether there is time to finish typing;
             // the number beside it is the same fact for anyone who wants it
             // exactly.
             let dial = RotationDial(frame: NSRect(x: 470, y: 421, width: 13, height: 13))
+            dial.autoresizingMask = .minYMargin
             content.addSubview(dial)
             self.rotationDial = dial
 
@@ -347,6 +371,7 @@ final class MenuBarController: NSObject {
             countdown.alignment = .right
             countdown.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             countdown.textColor = Palette.amber
+            countdown.autoresizingMask = .minYMargin
             content.addSubview(countdown)
             self.countdownField = countdown
 
@@ -364,6 +389,7 @@ final class MenuBarController: NSObject {
                 // the whole point of the two screens being compared side by
                 // side.
                 box.fill(Palette.raised, radius: Palette.Radius.control)
+                box.autoresizingMask = .minYMargin
                 content.addSubview(box)
 
                 let digit = NSTextField(labelWithString: "")
@@ -460,11 +486,19 @@ final class MenuBarController: NSObject {
         }
 
         update(for: code)
+        // Centred after the first update rather than at construction, because
+        // the height is not known until the two permissions have been measured:
+        // a missing grant grows the window, and a window centred at 474 and then
+        // grown downward is not centred any more.
+        if isNew { pairingWindow?.center() }
         pairingWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
     private func update(for code: PairingService.ActiveCode) {
+        // Ahead of the digits, because it decides how tall the window is.
+        refreshPermissionNotice()
+
         let digits = Array(code.value)
         for (index, field) in digitFields.enumerated() {
             field.stringValue = index < digits.count ? String(digits[index]) : ""
@@ -712,6 +746,227 @@ final class MenuBarController: NSObject {
         let context = CIContext()
         guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
         return NSImage(cgImage: cgImage, size: NSSize(width: 200, height: 200))
+    }
+
+    // MARK: The permission notice
+
+    /// The two permissions, on the one screen where fixing them still costs
+    /// nothing.
+    ///
+    /// A user can pair here, walk away, pick up the phone and find a black
+    /// picture or dead input: ScreenCaptureKit needs Screen Recording, CGEvent
+    /// posting needs Accessibility, and neither one says a word at the moment it
+    /// fails. PRODUCT.md makes both hard constraints and forbids presenting a
+    /// missing Accessibility grant as a working connection. This window is the
+    /// last moment before that happens, and it used to say nothing at all.
+    ///
+    /// Measured, never assumed, and through the same two calls the menu items
+    /// above are built from — `CGPreflightScreenCaptureAccess()` and
+    /// `AXIsProcessTrusted()`. There is no second way of asking in this host.
+    ///
+    /// Nothing is drawn when both are granted. A standing panel of green ticks
+    /// is the decoration this system does not do, and the window's job is the
+    /// code and the QR.
+    private func refreshPermissionNotice() {
+        guard let content = pairingWindow?.contentView else { return }
+        let now = Permissions(
+            screen: DisplayCatalog.hasScreenRecordingPermission(),
+            accessibility: InputInjector.hasAccessibilityPermission()
+        )
+        // Rebuilt when the answer changes, not on every tick. This runs once a
+        // second for the life of the window, and granting a permission is
+        // something a person does about twice a year.
+        guard now != lastPermissions else { return }
+        lastPermissions = now
+
+        permissionNotice?.removeFromSuperview()
+        permissionNotice = nil
+
+        guard !now.allGranted else {
+            resizePairingWindow(noticeHeight: 0)
+            return
+        }
+        let notice = permissionNoticeView(now)
+        resizePairingWindow(noticeHeight: notice.frame.height)
+        content.addSubview(notice)
+        permissionNotice = notice
+    }
+
+    /// The card itself.
+    ///
+    /// Sodium, because this is a measured degradation and not a failure: the
+    /// handshake genuinely completes without either grant, the code on screen is
+    /// good, and the phone will pair. What does not survive is the picture, or
+    /// the input — two different losses, either of which can be missing on its
+    /// own — so the heading names exactly which ones apply and each row names
+    /// its own mechanism. One word for "permissions" would be the collapse
+    /// PRODUCT.md's second principle says this product has already paid for.
+    ///
+    /// Ink measured against the ground it actually lands on. The card is `amber`
+    /// at 7 % over `screen`, compositing to #1F1D19 — 1.13:1 against the ground
+    /// it sits on, which is why DESIGN.md's tinted card also carries a 34 %
+    /// outline: #5E4D2E, 2.31:1 on `screen`. That outline is a container's
+    /// boundary rather than a control's, so it owes the hairline's job and not
+    /// the 3:1 threshold, and it still sits well above the 1.5:1 `stroke` is
+    /// already drawn at elsewhere in this system. On the #1F1D19 card face:
+    /// `amber` is 10.18:1, `textSecondary` 7.12:1, and `edge` 3.04:1 — which is
+    /// the 3:1 the grant button's boundary owes, being the only thing that marks
+    /// it. `textTertiary` is 3.99:1 there, under the threshold, so the quiet row
+    /// for a permission that *is* granted takes `textSecondary` instead.
+    private func permissionNoticeView(_ state: Permissions) -> NSView {
+        let rows: [(name: String, granted: Bool, loss: String, grant: Selector)] = [
+            (
+                "SCREEN RECORDING",
+                state.screen,
+                "ScreenCaptureKit has no frames to send, so the phone shows an empty picture.",
+                #selector(requestScreenPermission)
+            ),
+            (
+                "ACCESSIBILITY",
+                state.accessibility,
+                "Taps and keystrokes are posted and silently dropped. The pointer never moves.",
+                #selector(requestAccessibilityPermission)
+            ),
+        ]
+        // A row with something to do is as tall as the outlined action inside it
+        // — 44, the system's own floor for one. A row that is only reporting a
+        // permission already granted is one 9pt line and no more.
+        let heights: [CGFloat] = rows.map { $0.granted ? 16 : 44 }
+        // 18 card padding · 14 heading · 12 · row · 12 · row · 18. Every gap is
+        // on the ladder: `card` padding, `md` between blocks.
+        let height = 18 + 14 + 12 + heights[0] + 12 + heights[1] + 18
+
+        // x 28 and width 592 put the card's edges on the digit run's, 28 to 620
+        // — the strongest vertical line this window has. It sits at 226, a 20pt
+        // `gutter` above the QR cards, and the window's height is what absorbs
+        // the rest.
+        let card = NSView(frame: NSRect(x: 28, y: 226, width: 592, height: height))
+        card.fill(
+            Palette.amber.withAlphaComponent(0.07),
+            radius: Palette.Radius.card,
+            edge: Palette.amber.withAlphaComponent(0.34)
+        )
+
+        // Which of the two losses actually apply, derived from the measured pair
+        // rather than written once and made to cover both. Stated up front
+        // because an amber card under six digits reads as "the code is bad"
+        // until something says otherwise, and the code is fine.
+        let lost: String
+        switch (state.screen, state.accessibility) {
+        case (false, false): lost = "THE PICTURE AND THE INPUT WILL NOT"
+        case (false, true): lost = "THE PICTURE WILL NOT"
+        // Exhaustive over the pair rather than `default`, because the fourth
+        // combination is both-granted and a `default` would print "THE INPUT
+        // WILL NOT" about a Mac that has everything it needs. It cannot arrive
+        // — nothing is drawn at all in that case — and it is not going to
+        // arrive silently either.
+        case (true, _): lost = "THE INPUT WILL NOT"
+        }
+        let heading = NSTextField(labelWithString: "PAIRING WILL WORK · \(lost)")
+        // 300.43pt at its longest, of the 556 the card's padding leaves.
+        heading.frame = NSRect(x: 18, y: height - 32, width: 556, height: 14)
+        heading.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
+        heading.textColor = Palette.amber
+        card.addSubview(heading)
+
+        // "GRANT…" measures 33.38pt at 9pt mono; 16pt of padding each side puts
+        // the button at 66 and leaves 478 for the text beside it. The longest
+        // label is 166.90 and the longer sentence 450.93, so both hold one line
+        // — which they have to, since a 44pt row has room for exactly two.
+        let buttonFont = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
+        let buttonWidth = ("GRANT…" as NSString)
+            .size(withAttributes: [.font: buttonFont]).width.rounded(.up) + 32
+        let textWidth = 556 - buttonWidth - 12
+
+        var y = height - 32 - 12
+        for (index, row) in rows.enumerated() {
+            y -= heights[index]
+            if row.granted {
+                // Named, and quiet. It is here so the reader can tell which of
+                // the two to go and fix — the absence of a row would leave that
+                // ambiguous with nobody having checked — and in neutral ink
+                // rather than jade, because nothing is being congratulated.
+                let label = NSTextField(labelWithString: "\(row.name) · GRANTED")
+                label.frame = NSRect(x: 18, y: y, width: 556, height: 16)
+                label.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
+                label.textColor = Palette.textSecondary
+                card.addSubview(label)
+                y -= 12
+                continue
+            }
+
+            let label = NSTextField(labelWithString: "\(row.name) · NOT GRANTED")
+            label.frame = NSRect(x: 18, y: y + 25, width: textWidth, height: 14)
+            label.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
+            label.textColor = Palette.amber
+            card.addSubview(label)
+
+            let loss = NSTextField(labelWithString: row.loss)
+            loss.frame = NSRect(x: 18, y: y + 5, width: textWidth, height: 18)
+            loss.font = .systemFont(ofSize: 12)
+            loss.textColor = Palette.textSecondary
+            card.addSubview(loss)
+
+            // The same two actions the menu's own entries call. Nothing about
+            // asking for a grant is duplicated here — only where it is asked
+            // from, which is now the window that caused the need.
+            let button = NSButton(title: "", target: self, action: row.grant)
+            button.isBordered = false
+            button.frame = NSRect(x: 574 - buttonWidth, y: y, width: buttonWidth, height: 44)
+            button.attributedTitle = NSAttributedString(
+                string: "GRANT…",
+                attributes: [.font: buttonFont, .foregroundColor: Palette.textSecondary]
+            )
+            // The whole 44pt box is the target, not the six characters of ink in
+            // it — the Hit Shape Rule, which this codebase has paid for four
+            // times. An outlined control's corner is `control`, and at 44 tall
+            // the 16 survives being drawn rather than clamping to a capsule.
+            button.outline(Palette.edge, radius: Palette.Radius.control)
+            // "GRANT…" alone is ambiguous read out of its row.
+            button.toolTip = "Grant \(row.name.capitalized)"
+            card.addSubview(button)
+
+            y -= 12
+        }
+
+        return card
+    }
+
+    /// Grow the window rather than crush the notice into the room it has.
+    ///
+    /// The band the layout already leaves between the digits and the QR cards is
+    /// 112pt tall, and the 20pt `gutter` above and below a block makes that 72pt
+    /// of usable room. The notice measures 134 with one permission missing and
+    /// 162 with both, so it does not fit — and the answer to that is not a
+    /// smaller type size or a dropped sentence, both of which would be this
+    /// window lying about how much it has to say. Three heights: 474 granted,
+    /// 536 with one missing, 564 with both. It shrinks back the moment a grant
+    /// lands, which is the clearest thing this window can do to confirm one.
+    ///
+    /// The top edge is held still and the growth goes downward, because the six
+    /// digits are what the reader is looking at and a title bar that jumps under
+    /// their eyes is the worse trade.
+    private func resizePairingWindow(noticeHeight: CGFloat) {
+        guard let window = pairingWindow else { return }
+        // 402 is everything that is not the notice: 226 below it (the QR cards
+        // at 92…206, plus the gutter), and 176 above (the gutter, the digits at
+        // 318…396, the title and the margin over it).
+        let wanted = noticeHeight == 0 ? 474 : max(474, noticeHeight + 402)
+        // With `.fullSizeContentView` these are the same number and this is
+        // zero, but deriving it means the window keeps working if that style
+        // mask ever changes.
+        let chrome = window.frame.height - window.contentRect(forFrameRect: window.frame).height
+        let frame = window.frame
+        guard abs(frame.height - (wanted + chrome)) > 0.5 else { return }
+        window.setFrame(
+            NSRect(
+                x: frame.minX,
+                y: frame.maxY - wanted - chrome,
+                width: frame.width,
+                height: wanted + chrome
+            ),
+            display: true
+        )
     }
 
     // MARK: Permissions
