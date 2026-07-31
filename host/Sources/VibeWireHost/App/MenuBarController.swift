@@ -87,14 +87,79 @@ final class MenuBarController: NSObject {
         /// run, 16 to the right of the QR cards and 28 to the right of the two
         /// right-aligned readouts: four different answers to one question.
         static let margin: CGFloat = 20
-        static let width: CGFloat = 632
-        /// 592 — everything between the margins.
-        static let band: CGFloat = width - 2 * margin
+        /// A digit box, and `sm` between them. These two are the seed of every
+        /// horizontal number below, which is what the paragraph above claims —
+        /// so they are declared here and the width is derived, rather than 632
+        /// being written down and the claim left to be believed.
+        static let digitWidth: CGFloat = 92
+        static let digitGap: CGFloat = 8
+        /// 592 — the digit run, and so everything between the margins.
+        static let band: CGFloat = 6 * digitWidth + 5 * digitGap
+        /// 632.
+        static let width: CGFloat = band + 2 * margin
         /// 612 — the right-hand line every trailing edge sits on.
         static let right: CGFloat = width - margin
         /// `lg` between the two QR cards, which makes each of them 288.
         static let cardGap: CGFloat = 16
         static let cardWidth: CGFloat = (band - cardGap) / 2
+    }
+
+    /// The pairing window's vertical stack, bottom to top.
+    ///
+    /// These are not five free values, and that is the thing worth knowing
+    /// before moving one. `resizePairingWindow` grows the window by the height
+    /// of the permission notice, and the two totals it works from — what sits
+    /// below the notice band and what sits above it — are sums of everything
+    /// here. Change any single value and all three window heights change with
+    /// it, which is why they are derived below rather than written down three
+    /// times and kept in agreement by hand.
+    ///
+    /// Only two of them are on the spacing ladder, and the rest are not
+    /// mistakes waiting to be corrected:
+    ///
+    ///  - `titleBarClearance` is fixed by something outside the design system.
+    ///  - `gutter` and `titleToDigits` are `gutter` and `card`, on the ladder.
+    ///  - `cardsToListening` and `bottomMargin` are simply the values they are.
+    ///  - `bandUsable` is a residue, not a choice, and load-bearing.
+    private enum Stack {
+        /// Clearance for the system title bar, not a design margin.
+        ///
+        /// `.fullSizeContentView` runs the content view underneath the title
+        /// bar, which is 28pt, so this is that 28 plus 2. A `gutter` here would
+        /// put the headline inside the title bar and under the traffic lights.
+        /// It is off the ladder because it is not answering to the ladder.
+        static let titleBarClearance: CGFloat = 30
+        static let titleHeight: CGFloat = 30
+        /// `card`, and on the ladder — leave it there.
+        static let titleToDigits: CGFloat = 18
+        static let digitsHeight: CGFloat = 78
+        /// `gutter`, on the ladder, held above and below the notice band.
+        static let gutter: CGFloat = 20
+        /// What the band between the digits and the QR cards has left once both
+        /// gutters are taken out of its 112. Not a chosen value — it is what the
+        /// rest of the stack leaves over — and the notice needs 134 or 162, so
+        /// it never fits and the window grows instead. That is the whole reason
+        /// `resizePairingWindow` exists.
+        static let bandUsable: CGFloat = 72
+        static let cardsHeight: CGFloat = 114
+        /// Off the ladder, and not derived from anything: simply the values they
+        /// are. Load-bearing all the same, being two of the five terms in
+        /// `below`, so moving one moves all three window heights.
+        static let cardsToListening: CGFloat = 26
+        static let listeningHeight: CGFloat = 16
+        static let bottomMargin: CGFloat = 50
+
+        /// 226 — everything under the notice band, and so the notice's own y.
+        static let below = bottomMargin + listeningHeight + cardsToListening + cardsHeight + gutter
+        /// 176 — everything over it.
+        static let above = gutter + digitsHeight + titleToDigits + titleHeight + titleBarClearance
+        /// 402 — the window, minus whatever the notice turns out to be.
+        static let fixed = below + above
+        /// 474 — the height with both permissions granted: the fixed content
+        /// plus a band with nothing in it. Also the floor `resizePairingWindow`
+        /// clamps to, which is the same statement as "never smaller than the
+        /// layout with an empty band".
+        static let granted = fixed + bandUsable
     }
 
     /// The two grants the phone depends on, as measured — never as assumed.
@@ -403,7 +468,7 @@ final class MenuBarController: NSObject {
         let isNew = pairingWindow == nil
         if isNew {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: Pane.width, height: 474),
+                contentRect: NSRect(x: 0, y: 0, width: Pane.width, height: Stack.granted),
                 styleMask: [.titled, .closable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
@@ -414,8 +479,15 @@ final class MenuBarController: NSObject {
             window.appearance = NSAppearance(named: .darkAqua)
             window.backgroundColor = Palette.screen
 
-            let content = NSView(frame: NSRect(x: 0, y: 0, width: Pane.width, height: 474))
+            let content = NSView(frame: NSRect(x: 0, y: 0, width: Pane.width, height: Stack.granted))
             content.fill(Palette.screen, radius: 0)
+
+            // The stack, read off `Stack` rather than written as absolute y
+            // values, so the three of them cannot drift apart from the totals
+            // `resizePairingWindow` works from.
+            let titleY = Stack.granted - Stack.titleBarClearance - Stack.titleHeight   // 414
+            let digitsY = titleY - Stack.titleToDigits - Stack.digitsHeight            // 318
+            let cardsY = Stack.bottomMargin + Stack.listeningHeight + Stack.cardsToListening
 
             // 474 is the height with both permissions granted. A missing one
             // grows the window downward, so everything above the band between
@@ -425,7 +497,7 @@ final class MenuBarController: NSObject {
             // height would open as a gap under the title bar and leave the six
             // digits sitting in the middle of the window.
             let title = NSTextField(labelWithString: "Pair a device")
-            title.frame = NSRect(x: Pane.margin, y: 414, width: 300, height: 30)
+            title.frame = NSRect(x: Pane.margin, y: titleY, width: 300, height: Stack.titleHeight)
             title.font = .systemFont(ofSize: 24, weight: .semibold)
             title.textColor = Palette.text
             title.autoresizingMask = .minYMargin
@@ -441,13 +513,15 @@ final class MenuBarController: NSObject {
             let countdownWidth: CGFloat = 122
             let countdownX = Pane.right - countdownWidth
             // `xs` from the dial to the field it belongs to.
-            let dial = RotationDial(frame: NSRect(x: countdownX - 6 - 13, y: 421, width: 13, height: 13))
+            // Both ride the title's row, offset into it rather than placed
+            // absolutely, so the pair stays put if the row ever moves.
+            let dial = RotationDial(frame: NSRect(x: countdownX - 6 - 13, y: titleY + 7, width: 13, height: 13))
             dial.autoresizingMask = .minYMargin
             content.addSubview(dial)
             self.rotationDial = dial
 
             let countdown = NSTextField(labelWithString: "")
-            countdown.frame = NSRect(x: countdownX, y: 419, width: countdownWidth, height: 16)
+            countdown.frame = NSRect(x: countdownX, y: titleY + 5, width: countdownWidth, height: 16)
             countdown.alignment = .right
             countdown.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             countdown.textColor = Palette.amber
@@ -459,11 +533,11 @@ final class MenuBarController: NSObject {
             // a time and typed one at a time, and a run of six characters on a
             // Mac is a serial number until it is boxed.
             var boxes: [NSTextField] = []
-            let boxWidth: CGFloat = 92
-            let boxGap: CGFloat = 8
+            let boxWidth = Pane.digitWidth
+            let boxGap = Pane.digitGap
             for index in 0..<6 {
                 let x = Pane.margin + CGFloat(index) * (boxWidth + boxGap)
-                let box = NSView(frame: NSRect(x: x, y: 318, width: boxWidth, height: 78))
+                let box = NSView(frame: NSRect(x: x, y: digitsY, width: boxWidth, height: Stack.digitsHeight))
                 // A digit box is a control, so it takes the control corner —
                 // the same 16 the phone draws its own six boxes with, which is
                 // the whole point of the two screens being compared side by
@@ -497,7 +571,7 @@ final class MenuBarController: NSObject {
                 ("ANY BROWSER", "Scan with the phone's own camera. Pairs on load.", Palette.green),
             ].enumerated() {
                 let x = Pane.margin + CGFloat(index) * (Pane.cardWidth + Pane.cardGap)
-                let card = NSView(frame: NSRect(x: x, y: 92, width: Pane.cardWidth, height: 114))
+                let card = NSView(frame: NSRect(x: x, y: cardsY, width: Pane.cardWidth, height: Stack.cardsHeight))
                 // These are cards — they contain the plate and its caption —
                 // so they take 20, not the 16 of a control. The plate inside
                 // stays a step tighter, which is what makes it read as nested.
@@ -510,13 +584,28 @@ final class MenuBarController: NSObject {
                 // can hold: "ANY BROWSER · PUBLISHED SITE" at 155.78. Those 2.22
                 // are the tightest number in this window, and they are exact
                 // rather than estimated — SF Mono advances 5.5635pt at 9pt and
-                // the string is 28 characters of it. A longer caption than that
-                // needs a wider column, not a smaller size.
+                // the string is 28 characters of it.
+                //
+                // Spend them and nothing says so. `NSTextField(labelWithString:)`
+                // comes with `lineBreakMode` `.byClipping`, not
+                // `.byTruncatingTail`, so a caption one character too long is cut
+                // mid-glyph with no ellipsis to mark it — the failure looks like
+                // a caption that happens to end there. A longer caption needs a
+                // wider column, not a smaller size, and whoever writes one has to
+                // re-measure it here rather than trust that it looked fine.
                 let padding: CGFloat = 16
-                let textX = padding + 86 + 12
+                let plateSize: CGFloat = 86
+                let textX = padding + plateSize + 12
                 let textWidth = Pane.cardWidth - textX - padding
 
-                let plate = NSView(frame: NSRect(x: padding, y: 14, width: 86, height: 86))
+                let plate = NSView(
+                    frame: NSRect(
+                        x: padding,
+                        y: (Stack.cardsHeight - plateSize) / 2,
+                        width: plateSize,
+                        height: plateSize
+                    )
+                )
                 // The one raw colour on any host surface, and it is not an ink:
                 // a QR needs a white quiet zone to decode, so this is a value a
                 // scanner requires rather than one the palette chose. Naming it
@@ -553,7 +642,7 @@ final class MenuBarController: NSObject {
 
             // What the host is actually doing, in the same words the phone uses
             // for the same facts.
-            let servingDot = NSView(frame: NSRect(x: Pane.margin, y: 54, width: 7, height: 7))
+            let servingDot = NSView(frame: NSRect(x: Pane.margin, y: Stack.bottomMargin + 4, width: 7, height: 7))
             servingDot.fill(Palette.green, radius: 3.5)
             content.addSubview(servingDot)
             self.servingDot = servingDot
@@ -575,9 +664,9 @@ final class MenuBarController: NSObject {
             let listening = NSTextField(labelWithString: "")
             listening.frame = NSRect(
                 x: listeningX,
-                y: 50,
+                y: Stack.bottomMargin,
                 width: versionX - 12 - listeningX,
-                height: 16
+                height: Stack.listeningHeight
             )
             listening.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             listening.textColor = Palette.textTertiary
@@ -585,7 +674,12 @@ final class MenuBarController: NSObject {
             self.listeningField = listening
 
             let version = NSTextField(labelWithString: "HOST \(Config.hostVersion)")
-            version.frame = NSRect(x: versionX, y: 50, width: versionWidth, height: 16)
+            version.frame = NSRect(
+                x: versionX,
+                y: Stack.bottomMargin,
+                width: versionWidth,
+                height: Stack.listeningHeight
+            )
             version.alignment = .right
             version.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             version.textColor = Palette.textSecondary
@@ -946,7 +1040,13 @@ final class MenuBarController: NSObject {
         let heights: [CGFloat] = rows.map { $0.granted ? 16 : 44 }
         // 18 card padding · 14 heading · 12 · row · 12 · row · 18. Every gap is
         // on the ladder: `card` padding, `md` between blocks.
-        let height = 18 + 14 + 12 + heights[0] + 12 + heights[1] + 18
+        let padding: CGFloat = 18
+        // 556. Derived from the band rather than written down, because this card
+        // spans it: the two of them agreed by hand until now, and a margin pass
+        // that moved one would have left the other measuring against a width the
+        // card no longer had.
+        let inner = Pane.band - 2 * padding
+        let height = padding + 14 + 12 + heights[0] + 12 + heights[1] + padding
 
         // The card fills the band, so its edges are the digit run's and the QR
         // row's — 20 to 612, the strongest vertical line this window has. It
@@ -956,7 +1056,7 @@ final class MenuBarController: NSObject {
         // The band is 592 either side of the margin change, so every string
         // measured inside this card still has exactly the room it was measured
         // against; only the card's origin moved.
-        let card = NSView(frame: NSRect(x: Pane.margin, y: 226, width: Pane.band, height: height))
+        let card = NSView(frame: NSRect(x: Pane.margin, y: Stack.below, width: Pane.band, height: height))
         card.fill(
             Palette.amber.withAlphaComponent(0.07),
             radius: Palette.Radius.card,
@@ -980,7 +1080,7 @@ final class MenuBarController: NSObject {
         }
         let heading = NSTextField(labelWithString: "PAIRING WILL WORK · \(lost)")
         // 300.43pt at its longest, of the 556 the card's padding leaves.
-        heading.frame = NSRect(x: 18, y: height - 32, width: 556, height: 14)
+        heading.frame = NSRect(x: padding, y: height - 32, width: inner, height: 14)
         heading.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
         heading.textColor = Palette.amber
         card.addSubview(heading)
@@ -992,7 +1092,7 @@ final class MenuBarController: NSObject {
         let buttonFont = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
         let buttonWidth = ("GRANT…" as NSString)
             .size(withAttributes: [.font: buttonFont]).width.rounded(.up) + 32
-        let textWidth = 556 - buttonWidth - 12
+        let textWidth = inner - buttonWidth - 12
 
         var y = height - 32 - 12
         for (index, row) in rows.enumerated() {
@@ -1003,7 +1103,7 @@ final class MenuBarController: NSObject {
                 // ambiguous with nobody having checked — and in neutral ink
                 // rather than jade, because nothing is being congratulated.
                 let label = NSTextField(labelWithString: "\(row.name) · GRANTED")
-                label.frame = NSRect(x: 18, y: y, width: 556, height: 16)
+                label.frame = NSRect(x: padding, y: y, width: inner, height: 16)
                 label.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
                 label.textColor = Palette.textSecondary
                 card.addSubview(label)
@@ -1012,13 +1112,13 @@ final class MenuBarController: NSObject {
             }
 
             let label = NSTextField(labelWithString: "\(row.name) · NOT GRANTED")
-            label.frame = NSRect(x: 18, y: y + 25, width: textWidth, height: 14)
+            label.frame = NSRect(x: padding, y: y + 25, width: textWidth, height: 14)
             label.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
             label.textColor = Palette.amber
             card.addSubview(label)
 
             let loss = NSTextField(labelWithString: row.loss)
-            loss.frame = NSRect(x: 18, y: y + 5, width: textWidth, height: 18)
+            loss.frame = NSRect(x: padding, y: y + 5, width: textWidth, height: 18)
             loss.font = .systemFont(ofSize: 12)
             loss.textColor = Palette.textSecondary
             card.addSubview(loss)
@@ -1028,7 +1128,7 @@ final class MenuBarController: NSObject {
             // from, which is now the window that caused the need.
             let button = NSButton(title: "", target: self, action: row.grant)
             button.isBordered = false
-            button.frame = NSRect(x: 574 - buttonWidth, y: y, width: buttonWidth, height: 44)
+            button.frame = NSRect(x: padding + inner - buttonWidth, y: y, width: buttonWidth, height: 44)
             button.attributedTitle = NSAttributedString(
                 string: "GRANT…",
                 attributes: [.font: buttonFont, .foregroundColor: Palette.textSecondary]
@@ -1064,10 +1164,14 @@ final class MenuBarController: NSObject {
     /// their eyes is the worse trade.
     private func resizePairingWindow(noticeHeight: CGFloat) {
         guard let window = pairingWindow else { return }
-        // 402 is everything that is not the notice: 226 below it (the QR cards
-        // at 92…206, plus the gutter), and 176 above (the gutter, the digits at
-        // 318…396, the title and the margin over it).
-        let wanted = noticeHeight == 0 ? 474 : max(474, noticeHeight + 402)
+        // Both numbers come off `Stack`, which is where the arithmetic that
+        // produces them is written down: `fixed` is everything that is not the
+        // notice, and `granted` is that plus an empty band. The floor is not a
+        // guard against a small notice — it is the statement that this window
+        // never gets shorter than the layout it has when both grants are in.
+        let wanted = noticeHeight == 0
+            ? Stack.granted
+            : max(Stack.granted, noticeHeight + Stack.fixed)
         // With `.fullSizeContentView` these are the same number and this is
         // zero, but deriving it means the window keeps working if that style
         // mask ever changes.
