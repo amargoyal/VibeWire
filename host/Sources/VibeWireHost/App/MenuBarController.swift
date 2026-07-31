@@ -72,6 +72,31 @@ final class MenuBarController: NSObject {
     /// window is not allowed to draw the second while it means the first.
     private var lastPermissions: Permissions?
 
+    /// The pairing window's horizontal geometry, in one place because four
+    /// separate blocks of this file have to agree on it.
+    ///
+    /// The digit run sets the width rather than the other way round. Six 92pt
+    /// boxes with `sm` between them measure exactly 592, so a `gutter` either
+    /// side of that wants a 632pt window — and 592 then divides into two QR
+    /// cards of 288 with `lg` between them. Both whole numbers, and the digit
+    /// run, the QR row and the permission card all land on the same two vertical
+    /// lines, which is the strongest thing this window can do with an edge.
+    private enum Pane {
+        /// `gutter`, and symmetric — which this window's margins were not. It
+        /// was 28 on the left throughout, against 20 to the right of the digit
+        /// run, 16 to the right of the QR cards and 28 to the right of the two
+        /// right-aligned readouts: four different answers to one question.
+        static let margin: CGFloat = 20
+        static let width: CGFloat = 632
+        /// 592 — everything between the margins.
+        static let band: CGFloat = width - 2 * margin
+        /// 612 — the right-hand line every trailing edge sits on.
+        static let right: CGFloat = width - margin
+        /// `lg` between the two QR cards, which makes each of them 288.
+        static let cardGap: CGFloat = 16
+        static let cardWidth: CGFloat = (band - cardGap) / 2
+    }
+
     /// The two grants the phone depends on, as measured — never as assumed.
     private struct Permissions: Equatable {
         let screen: Bool
@@ -378,7 +403,7 @@ final class MenuBarController: NSObject {
         let isNew = pairingWindow == nil
         if isNew {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 640, height: 474),
+                contentRect: NSRect(x: 0, y: 0, width: Pane.width, height: 474),
                 styleMask: [.titled, .closable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
@@ -389,7 +414,7 @@ final class MenuBarController: NSObject {
             window.appearance = NSAppearance(named: .darkAqua)
             window.backgroundColor = Palette.screen
 
-            let content = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 474))
+            let content = NSView(frame: NSRect(x: 0, y: 0, width: Pane.width, height: 474))
             content.fill(Palette.screen, radius: 0)
 
             // 474 is the height with both permissions granted. A missing one
@@ -400,7 +425,7 @@ final class MenuBarController: NSObject {
             // height would open as a gap under the title bar and leave the six
             // digits sitting in the middle of the window.
             let title = NSTextField(labelWithString: "Pair a device")
-            title.frame = NSRect(x: 28, y: 414, width: 300, height: 30)
+            title.frame = NSRect(x: Pane.margin, y: 414, width: 300, height: 30)
             title.font = .systemFont(ofSize: 24, weight: .semibold)
             title.textColor = Palette.text
             title.autoresizingMask = .minYMargin
@@ -409,13 +434,20 @@ final class MenuBarController: NSObject {
             // The dial says at a glance whether there is time to finish typing;
             // the number beside it is the same fact for anyone who wants it
             // exactly.
-            let dial = RotationDial(frame: NSRect(x: 470, y: 421, width: 13, height: 13))
+            //
+            // 122 holds the longest thing this field says — "LOCKED 60S · 5
+            // WRONG" at 111.27 — and its trailing edge is the window's, so the
+            // countdown and the digit run below it end on the same line.
+            let countdownWidth: CGFloat = 122
+            let countdownX = Pane.right - countdownWidth
+            // `xs` from the dial to the field it belongs to.
+            let dial = RotationDial(frame: NSRect(x: countdownX - 6 - 13, y: 421, width: 13, height: 13))
             dial.autoresizingMask = .minYMargin
             content.addSubview(dial)
             self.rotationDial = dial
 
             let countdown = NSTextField(labelWithString: "")
-            countdown.frame = NSRect(x: 490, y: 419, width: 122, height: 16)
+            countdown.frame = NSRect(x: countdownX, y: 419, width: countdownWidth, height: 16)
             countdown.alignment = .right
             countdown.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             countdown.textColor = Palette.amber
@@ -430,7 +462,7 @@ final class MenuBarController: NSObject {
             let boxWidth: CGFloat = 92
             let boxGap: CGFloat = 8
             for index in 0..<6 {
-                let x = 28 + CGFloat(index) * (boxWidth + boxGap)
+                let x = Pane.margin + CGFloat(index) * (boxWidth + boxGap)
                 let box = NSView(frame: NSRect(x: x, y: 318, width: boxWidth, height: 78))
                 // A digit box is a control, so it takes the control corner —
                 // the same 16 the phone draws its own six boxes with, which is
@@ -460,20 +492,31 @@ final class MenuBarController: NSObject {
             // One card each, with the sentence that says which is which,
             // because a caption under a QR is the thing nobody reads before
             // scanning the wrong one.
-            let cardWidth: CGFloat = 291
             for (index, spec) in [
                 ("iPHONE APP", "Scan in VibeWire. Custom scheme — a browser cannot open it.", Palette.accent),
                 ("ANY BROWSER", "Scan with the phone's own camera. Pairs on load.", Palette.green),
             ].enumerated() {
-                let x = 28 + CGFloat(index) * (cardWidth + 14)
-                let card = NSView(frame: NSRect(x: x, y: 92, width: cardWidth, height: 114))
+                let x = Pane.margin + CGFloat(index) * (Pane.cardWidth + Pane.cardGap)
+                let card = NSView(frame: NSRect(x: x, y: 92, width: Pane.cardWidth, height: 114))
                 // These are cards — they contain the plate and its caption —
                 // so they take 20, not the 16 of a control. The plate inside
                 // stays a step tighter, which is what makes it read as nested.
                 card.fill(Palette.raised, radius: Palette.Radius.card)
                 content.addSubview(card)
 
-                let plate = NSView(frame: NSRect(x: 14, y: 14, width: 86, height: 86))
+                // 16 padding (`lg`, inside the 16–18 DESIGN.md allows a card),
+                // `md` from the plate across to the text, and the 158pt column
+                // that leaves is measured against the longest caption this card
+                // can hold: "ANY BROWSER · PUBLISHED SITE" at 155.78. Those 2.22
+                // are the tightest number in this window, and they are exact
+                // rather than estimated — SF Mono advances 5.5635pt at 9pt and
+                // the string is 28 characters of it. A longer caption than that
+                // needs a wider column, not a smaller size.
+                let padding: CGFloat = 16
+                let textX = padding + 86 + 12
+                let textWidth = Pane.cardWidth - textX - padding
+
+                let plate = NSView(frame: NSRect(x: padding, y: 14, width: 86, height: 86))
                 // The one raw colour on any host surface, and it is not an ink:
                 // a QR needs a white quiet zone to decode, so this is a value a
                 // scanner requires rather than one the palette chose. Naming it
@@ -487,13 +530,13 @@ final class MenuBarController: NSObject {
                 plate.addSubview(image)
 
                 let caption = NSTextField(labelWithString: spec.0)
-                caption.frame = NSRect(x: 112, y: 76, width: 166, height: 14)
+                caption.frame = NSRect(x: textX, y: 76, width: textWidth, height: 14)
                 caption.font = .monospacedSystemFont(ofSize: 9, weight: .medium)
                 caption.textColor = spec.2
                 card.addSubview(caption)
 
                 let blurb = NSTextField(wrappingLabelWithString: spec.1)
-                blurb.frame = NSRect(x: 112, y: 18, width: 166, height: 52)
+                blurb.frame = NSRect(x: textX, y: 18, width: textWidth, height: 52)
                 blurb.font = .systemFont(ofSize: 12)
                 blurb.textColor = Palette.textSecondary
                 blurb.isSelectable = false
@@ -510,20 +553,39 @@ final class MenuBarController: NSObject {
 
             // What the host is actually doing, in the same words the phone uses
             // for the same facts.
-            let servingDot = NSView(frame: NSRect(x: 28, y: 54, width: 7, height: 7))
+            let servingDot = NSView(frame: NSRect(x: Pane.margin, y: 54, width: 7, height: 7))
             servingDot.fill(Palette.green, radius: 3.5)
             content.addSubview(servingDot)
             self.servingDot = servingDot
 
+            // 80 for a string that measures 55.63 today. Sized to the value
+            // rather than to a round number, but with room for a version longer
+            // than this one: "HOST 10.10.10" is 72.30, which still fits.
+            //
+            // It used to be 160, which is what had the listening line beside it
+            // down to 420 for a reading that measures 411.70 at its longest —
+            // and their frames overlapped by 12 into the bargain. Right-aligned
+            // text hid it, but the two fields were fighting over the same 12pt.
+            let versionWidth: CGFloat = 80
+            let versionX = Pane.right - versionWidth
+
+            // `sm` from the dot to the line it belongs to, `md` from that line
+            // to the version. 485 for a reading that needs 411.70 at worst.
+            let listeningX = Pane.margin + 7 + 8
             let listening = NSTextField(labelWithString: "")
-            listening.frame = NSRect(x: 44, y: 50, width: 420, height: 16)
+            listening.frame = NSRect(
+                x: listeningX,
+                y: 50,
+                width: versionX - 12 - listeningX,
+                height: 16
+            )
             listening.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             listening.textColor = Palette.textTertiary
             content.addSubview(listening)
             self.listeningField = listening
 
             let version = NSTextField(labelWithString: "HOST \(Config.hostVersion)")
-            version.frame = NSRect(x: 452, y: 50, width: 160, height: 16)
+            version.frame = NSRect(x: versionX, y: 50, width: versionWidth, height: 16)
             version.alignment = .right
             version.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
             version.textColor = Palette.textSecondary
@@ -657,8 +719,10 @@ final class MenuBarController: NSObject {
         //
         // The precise version of the reach sentence, in mono, where a measured
         // value belongs — the sans blurb beside it says the short form. All four
-        // segments together measure 412pt of the field's 420, so this line is
-        // full: another segment needs a wider field, not a shorter word.
+        // segments together measure 411.70, which used to be 8pt off filling the
+        // field; the margin pass gave this line 485 by taking the 160 the version
+        // string next to it was never using, so there is room for a fifth
+        // segment now if the host ever measures one.
         listeningField?.stringValue = [
             "LISTENING ON :\(port)",
             isReachable ? nil : "NO ADDRESS BUT LOOPBACK",
@@ -884,11 +948,15 @@ final class MenuBarController: NSObject {
         // on the ladder: `card` padding, `md` between blocks.
         let height = 18 + 14 + 12 + heights[0] + 12 + heights[1] + 18
 
-        // x 28 and width 592 put the card's edges on the digit run's, 28 to 620
-        // — the strongest vertical line this window has. It sits at 226, a 20pt
-        // `gutter` above the QR cards, and the window's height is what absorbs
-        // the rest.
-        let card = NSView(frame: NSRect(x: 28, y: 226, width: 592, height: height))
+        // The card fills the band, so its edges are the digit run's and the QR
+        // row's — 20 to 612, the strongest vertical line this window has. It
+        // sits at 226, a 20pt `gutter` above the QR cards, and the window's
+        // height is what absorbs the rest.
+        //
+        // The band is 592 either side of the margin change, so every string
+        // measured inside this card still has exactly the room it was measured
+        // against; only the card's origin moved.
+        let card = NSView(frame: NSRect(x: Pane.margin, y: 226, width: Pane.band, height: height))
         card.fill(
             Palette.amber.withAlphaComponent(0.07),
             radius: Palette.Radius.card,
