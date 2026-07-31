@@ -21,7 +21,6 @@ struct RemoteView: View {
     @State private var showTeachingOverlay = true
     @State private var pinchStart: CGFloat = 1
     @State private var showZoomBadge = false
-    @State private var stallSeconds = 0
 
     // Zoom that goes somewhere: the pinch keeps its focal point, and two
     // fingers move the view around once there is more picture than glass.
@@ -102,7 +101,7 @@ struct RemoteView: View {
         // accessibility1 is already two steps beyond the largest standard size,
         // and every other screen in the app takes the full range.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-        .task { await stallTicker() }
+        .task { await queueTicker() }
         .onAppear {
             // The teaching overlay retires after three sessions; the corner
             // ticks and cursor halo stay forever.
@@ -184,16 +183,63 @@ struct RemoteView: View {
         HStack {
             HStack(spacing: 7) {
                 ConditionDot(
-                    condition: model.link.condition,
+                    condition: streamCondition,
                     size: 6,
                     // Nothing decorative moves next to a live video feed.
                     animated: model.streamState != .live
                 )
-                MonoCaps(liveLabel, size: 10, color: model.link.condition.color, tracking: 1.4)
+                MonoCaps(liveLabel, size: 10, color: streamCondition.color, tracking: 1.4)
             }
             Spacer()
             MonoCaps(codecLabel, size: 10, tracking: 1.4)
         }
+    }
+
+    /// What the *picture* is doing, which is not what the socket is doing.
+    ///
+    /// `link.condition` answers "is the Mac answering"; this answers "are frames
+    /// arriving", and the two disagree exactly where it matters — a socket that
+    /// still replies while the stream has stopped. The dot and the label beside
+    /// it both take this, so the colour and the word can never say two different
+    /// things about the same picture.
+    private var streamCondition: Condition {
+        switch model.streamState {
+        // A live picture is only as good as the link carrying it, so here the
+        // measured round trip and loss are what decide between the two.
+        case .live: return model.link.condition
+        // Frames have stopped arriving. That is a measured degradation whatever
+        // the socket claims, and it pulses at the faster rate this system gives
+        // a thin link.
+        case .stalled, .reconnecting: return .degraded
+        case .failed: return .lost
+        // Nothing has been measured about a stream that has not started or has
+        // been stopped, so the dot is a hollow ring rather than a colour.
+        case .starting, .stopped: return .idle
+        }
+    }
+
+    /// Stalled or reconnecting: two states, one fact — frames are not arriving,
+    /// so nothing on this screen may go on reading as though they were.
+    private var picturePaused: Bool {
+        switch model.streamState {
+        case .stalled, .reconnecting: return true
+        default: return false
+        }
+    }
+
+    /// How old the picture is, and only where that has actually been measured.
+    ///
+    /// A stall is measured: the host is still on the socket and reported the age
+    /// of the last frame it sent. A reconnect is not measured by anyone — the
+    /// socket is gone — so it has no age to print, and says what it does know
+    /// instead.
+    private var stalledMillis: Int? {
+        if case .stalled(let millis) = model.streamState { return millis }
+        return nil
+    }
+
+    private func seconds(_ millis: Int) -> String {
+        String(format: "%.1f", Double(millis) / 1000)
     }
 
     private var liveLabel: String {
@@ -201,7 +247,10 @@ struct RemoteView: View {
         case .live:
             return "LIVE \(model.link.rttMillis.map { String(Int($0)) } ?? "—")MS"
         case .starting: return "OPENING"
-        case .stalled: return "STALLED \(stallSeconds).0S"
+        // The host's own figure, to the tenth it was reported in. This used to
+        // round to whole seconds and print a `.0` after them, which is a digit
+        // nobody measured sitting where a measured one goes.
+        case .stalled(let millis): return "STALLED \(seconds(millis))S"
         case .reconnecting(let attempt, _): return "RECONNECTING · TRY \(attempt)"
         case .stopped: return "STOPPED"
         case .failed: return "LOST"
@@ -209,6 +258,11 @@ struct RemoteView: View {
     }
 
     private var codecLabel: String {
+        // A bitrate measured before the stall is not a bitrate now, and a codec
+        // line describing a stream that has stopped arriving is the strip
+        // claiming health it has not observed. While the picture is paused this
+        // prints the em dash the panel prints for anything unmeasured.
+        guard !picturePaused else { return "—" }
         guard let config = model.videoConfigs.values.sorted(by: { $0.streamId < $1.streamId }).first
         else { return "—" }
         if model.videoConfigs.count > 1 {
@@ -306,19 +360,21 @@ struct RemoteView: View {
     }
 
     private var pictureCaption: String {
-        if case .stalled = model.streamState {
-            return "LAST GOOD FRAME"
-        }
+        // A reconnect freezes the same frame a stall does, and this named only
+        // the stall — so while the socket was being redialled the caption over
+        // a frozen picture went on reading `… · LIVE`.
+        if picturePaused { return "LAST GOOD FRAME" }
         guard let display = model.displays.first(where: \.selected) else { return "" }
-        return "\(display.name.uppercased()) · \(display.width) × \(display.height) · LIVE"
+        let geometry = "\(display.name.uppercased()) · \(display.width) × \(display.height)"
+        // `LIVE` is a claim about arriving frames, so it is only appended where
+        // frames are arriving. Stopped, opening and lost all kept it before.
+        return model.streamState == .live ? "\(geometry) · LIVE" : geometry
     }
 
     /// Amber ticks and caption while stalled: the frozen frame keeps its
     /// geometry but stops claiming to be live.
     private var stallTint: Color? {
-        if case .stalled = model.streamState { return NS.Color.amber.opacity(0.7) }
-        if case .reconnecting = model.streamState { return NS.Color.amber.opacity(0.7) }
-        return nil
+        picturePaused ? NS.Color.amber.opacity(0.7) : nil
     }
 
     // MARK: 03C — side by side
@@ -417,8 +473,9 @@ struct RemoteView: View {
         .allowsHitTesting(false)
     }
 
-    /// A stall looks like a stall: it says how old the picture is, that input is
-    /// queued rather than lost, and when it will stop trying.
+    /// A stall looks like a stall: it says how old the picture is — where that
+    /// has been measured — that input is queued rather than lost, and when it
+    /// will stop trying.
     private var reconnectingOverlay: some View {
         VStack {
             Spacer()
@@ -426,17 +483,31 @@ struct RemoteView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 10) {
                         Spinner(size: 16, color: NS.Color.amber)
-                        MonoCaps("RECONNECTING", size: 11, color: NS.Color.amber, tracking: 1.6, weight: .medium)
+                        // The same word the strip at the top is using. Two names
+                        // for one state on one screen reads as two states.
+                        MonoCaps(
+                            stalledMillis != nil ? "STALLED" : "RECONNECTING",
+                            size: 11,
+                            color: NS.Color.amber,
+                            tracking: 1.6,
+                            weight: .medium
+                        )
                     }
 
-                    Text("The picture above is \(stallSeconds).0 seconds old. Keys and taps are being held, not dropped.")
+                    Text(overlaySentence)
                         .font(NS.Font.sans(15))
                         .foregroundStyle(NS.Color.text)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 12)
 
                     VStack(spacing: 8) {
-                        overlayRow("QUEUED INPUT", "\(queuedCount) EVENTS", NS.Color.text)
+                        // "1 EVENT", not "1 EVENTS" — the same rule the paired
+                        // device list follows for its own counted nouns.
+                        overlayRow(
+                            "QUEUED INPUT",
+                            "\(queuedCount) EVENT\(queuedCount == 1 ? "" : "S")",
+                            NS.Color.text
+                        )
                         overlayRow("DROPPING TO", "540P ON RESUME", NS.Color.amber)
                         overlayRow("GIVING UP AT", "30S", NS.Color.text)
                     }
@@ -447,6 +518,25 @@ struct RemoteView: View {
             .padding(.horizontal, 14)
             .padding(.bottom, 78)
         }
+    }
+
+    /// Two states that know two different things, so they get two different
+    /// sentences rather than one that fits neither.
+    ///
+    /// This used to print "the picture above is N seconds old" in both, with N
+    /// coming from a one-second ticker this view ran itself — a number nobody
+    /// measured, presented as the age of the frame on screen. A stall has a real
+    /// age because the host reports one. A reconnect does not, so it states the
+    /// attempt and the next retry, which is what the state actually carries.
+    private var overlaySentence: String {
+        if let millis = stalledMillis {
+            return "The picture above is \(seconds(millis)) seconds old. Keys and taps are being held, not dropped."
+        }
+        if case .reconnecting(let attempt, let nextRetryMs) = model.streamState {
+            let next = max(1, Int((Double(nextRetryMs) / 1000).rounded()))
+            return "Nothing is arriving. Try \(attempt), the next in \(next)s. Keys and taps are being held, not dropped."
+        }
+        return "Nothing is arriving. Keys and taps are being held, not dropped."
     }
 
     @State private var queuedCount = 0
@@ -605,7 +695,11 @@ struct RemoteView: View {
                     .scaleEffect(model.zoomScale, anchor: .center)
                     .offset(pan)
                     .clipped()
-                CornerTicks(color: NS.Color.accent.opacity(0.75))
+                // Amber ticks while the picture is frozen, exactly as in
+                // portrait. Landscape held the live accent through a stall, so
+                // the same frozen frame was marked healthy in one orientation
+                // and degraded in the other.
+                CornerTicks(color: stallTint ?? NS.Color.accent.opacity(0.75))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -632,12 +726,23 @@ struct RemoteView: View {
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
-                        Circle().fill(NS.Color.green).frame(width: 5, height: 5)
-                        MonoCaps(liveLabel, size: 9, color: NS.Color.green, tracking: 1.4)
+                        // Derived, like the portrait strip's. This was a
+                        // hard-coded green circle beside a hard-coded green
+                        // caption, so a stalled, reconnecting or lost picture
+                        // kept a healthy dot sitting on the frozen frame it was
+                        // describing — and the word beside it already said
+                        // STALLED. `ConditionDot` also brings the square a lost
+                        // condition is owed, which a bare `Circle` cannot draw.
+                        ConditionDot(
+                            condition: streamCondition,
+                            size: 5,
+                            animated: model.streamState != .live
+                        )
+                        MonoCaps(liveLabel, size: 9, color: streamCondition.color, tracking: 1.4)
                     }
                     .videoChip()
 
-                    VideoCaption(pictureCaption, size: 9)
+                    VideoCaption(pictureCaption, size: 9, color: stallTint ?? NS.Color.textSecondary)
                 }
                 .padding(.leading, 24)
                 .padding(.bottom, 22)
@@ -1015,27 +1120,18 @@ struct RemoteView: View {
     /// and the bottom bar every second to set two numbers that had not changed.
     /// It also awaited the socket actor for a queue depth that is only ever
     /// shown inside the reconnecting overlay.
-    private func stallTicker() async {
+    ///
+    /// The second number it carried was a stall clock, and for a reconnect that
+    /// clock was this view's own invention: the socket is gone, so nothing on
+    /// the phone is measuring the age of anything. The age of the last frame now
+    /// comes from the host's `stalled` report and from nowhere else, which
+    /// leaves the queue depth as the one thing here worth a timer.
+    private func queueTicker() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(1))
 
-            let seconds: Int
-            let stalling: Bool
-            switch model.streamState {
-            case .stalled(let millis):
-                seconds = millis / 1000
-                stalling = true
-            case .reconnecting:
-                seconds = stallSeconds + 1
-                stalling = true
-            default:
-                seconds = 0
-                stalling = false
-            }
-            if seconds != stallSeconds { stallSeconds = seconds }
-
             // Only ask, and only redraw, when there is somewhere to show it.
-            if stalling {
+            if picturePaused {
                 let queued = await model.queuedInputCount
                 if queued != queuedCount { queuedCount = queued }
             } else if queuedCount != 0 {

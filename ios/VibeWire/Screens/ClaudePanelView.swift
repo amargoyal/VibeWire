@@ -66,16 +66,25 @@ struct ClaudePanelView: View {
     /// which Mac this is talking to, and how far away it is.
     private var grabber: some View {
         HStack {
-            MonoCaps(
-                "● \(model.displays.first(where: \.selected)?.name.uppercased() ?? "MAC") · \(model.link.rttMillis.map { "\(Int($0))MS" } ?? "—")",
-                size: 9,
-                color: NS.Color.green,
-                tracking: 1.4
-            )
-            // One line: this is a status caption, and wrapping it pushed
-            // the round trip figure onto a second row.
-            .lineLimit(1)
-            .truncationMode(.tail)
+            HStack(spacing: 7) {
+                // Derived, not drawn. The dot used to be a `●` inside the
+                // caption string and the whole line was painted green, so a
+                // degraded or lost link reported itself as reachable — over an
+                // em dash, on the occasions where there was no round trip figure
+                // to print at all. The component also brings the square that a
+                // lost condition is owed, which a bullet in a string cannot.
+                ConditionDot(condition: model.link.condition, size: 6)
+                MonoCaps(
+                    "\(model.displays.first(where: \.selected)?.name.uppercased() ?? "MAC") · \(model.link.rttMillis.map { "\(Int($0))MS" } ?? "—")",
+                    size: 9,
+                    color: model.link.condition.color,
+                    tracking: 1.4
+                )
+                // One line: this is a status caption, and wrapping it pushed
+                // the round trip figure onto a second row.
+                .lineLimit(1)
+                .truncationMode(.tail)
+            }
 
             Spacer(minLength: 8)
 
