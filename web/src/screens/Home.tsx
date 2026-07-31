@@ -666,7 +666,8 @@ function NoDisplays() {
  */
 function WhatTheMacIsDoing() {
   const transport = store.transport.value
-  const frontmost = store.link.value.frontmostApp
+  const link = store.link.value
+  const frontmost = link.frontmostApp
   const address =
     transport.path === 'direct'
       ? transport.tailscaleAddress ?? transport.lanAddress
@@ -675,6 +676,17 @@ function WhatTheMacIsDoing() {
         : null
 
   const rows: [string, string, string][] = [
+    // Jitter has been measured and parsed since this client was written and shown
+    // nowhere. On a video link it explains a stutter that a round trip alone does
+    // not — a steady 90ms is workable and a 20ms average that swings to 200 is
+    // not — and this is the rail with room for a fourth reading.
+    [
+      'JITTER',
+      link.jitterMillis == null ? '—' : `${Math.round(link.jitterMillis)} MS`,
+      link.jitterMillis != null && link.jitterMillis > 40
+        ? 'var(--ns-amber)'
+        : 'var(--ns-text-secondary)',
+    ],
     [
       'PATH',
       transport.path === 'direct' ? 'DIRECT' : transport.path === 'relay' ? 'RELAY' : 'NONE',
