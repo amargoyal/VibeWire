@@ -100,7 +100,8 @@ enum NS {
         static let onAccent = SwiftUI.Color(hex: 0x0E142C)
         static let onRed = SwiftUI.Color(hex: 0x230707)
 
-        /// The scrim behind a destructive confirmation.
+        /// The scrim behind a destructive confirmation, laid on at 72% — which
+        /// is where the browser puts it too. oklch(0.10 0.006 262)
         static let scrim = SwiftUI.Color(hex: 0x030305)
 
         /// The two greys of the hatch that stands in for a picture that has not
@@ -258,6 +259,11 @@ enum NS {
         /// purpose — a 22pt rectangle with a 16pt corner reads as a pill, not as
         /// a monitor.
         static let radiusScreen: CGFloat = 3
+        /// The tip of a 3pt bar — the signal strength, the RTT trace. Barely a
+        /// corner on purpose: a row of twenty square-ended bars is a picket
+        /// fence, and rounding them any further turns the trace into a row of
+        /// lozenges that reads as decoration rather than as samples.
+        static let radiusBar: CGFloat = 1
 
         /// Grouped rows: the outer corner of the run, and the inner one. A row
         /// in the middle keeps the small corner so the 2pt gap reads as a seam

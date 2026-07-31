@@ -414,7 +414,7 @@ struct SignalBars: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 2) {
             ForEach(0..<4, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 1)
+                RoundedRectangle(cornerRadius: NS.Metric.radiusBar)
                     .fill(index < filled ? color : NS.Color.stroke)
                     .frame(width: 3, height: 5 + CGFloat(index) * 3)
             }
@@ -444,7 +444,7 @@ struct Sparkline: View {
         return HStack(alignment: .bottom, spacing: 2) {
             ForEach(Array(recent.enumerated()), id: \.offset) { index, value in
                 let scaled = max(5, CGFloat(value / peak) * height)
-                RoundedRectangle(cornerRadius: 1)
+                RoundedRectangle(cornerRadius: NS.Metric.radiusBar)
                     .fill(index >= brightFrom ? color : color.opacity(0.35))
                     .frame(height: scaled)
             }
@@ -925,9 +925,13 @@ struct TimelineMark: View {
         Circle()
             .fill(ground)
             .overlay(
+                // 4-4, the one dash in the system. Dashed means provisional
+                // everywhere it appears, so a pending marker has to be drawn in
+                // the same broken line as a placeholder rule and an unpicked
+                // option, or the pattern stops carrying the meaning.
                 Circle().stroke(
                     color,
-                    style: StrokeStyle(lineWidth: 1, dash: dashed ? [2, 2] : [])
+                    style: StrokeStyle(lineWidth: 1, dash: dashed ? [4, 4] : [])
                 )
             )
             .overlay(

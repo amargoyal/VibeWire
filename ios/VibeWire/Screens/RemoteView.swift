@@ -75,6 +75,10 @@ struct RemoteView: View {
                 if case .stalled = model.streamState { reconnectingOverlay }
                 if case .reconnecting = model.streamState { reconnectingOverlay }
 
+                // The drawer carries its own arrival — see the `rise` on the
+                // drawer inside it, which travels its own height rather than
+                // the whole screen's. The taps that open and hide it animate
+                // the change, which is what runs it.
                 if model.showHub { CommandDrawerView() }
 
                 // 05 — the keyboard bar. Three places set `showKeyboard`; until

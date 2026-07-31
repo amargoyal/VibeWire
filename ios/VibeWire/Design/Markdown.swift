@@ -178,7 +178,7 @@ private struct CodeBlock: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
                     .font(NS.Font.mono(12))
-                    .foregroundStyle(Color(hex: 0xD5DBE3))
+                    .foregroundStyle(NS.Color.codeInk)
                     .lineSpacing(2)
                     .textSelection(.enabled)
                     .padding(.horizontal, 10)
@@ -186,9 +186,12 @@ private struct CodeBlock: View {
                     .padding(.top, 2)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 8).fill(NS.Color.deepGround))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8).stroke(NS.Color.hairlineDim, lineWidth: 1)
+        // A code box takes the inner corner and its own ground, and nothing is
+        // drawn round it: Deep against the panel's Raised is already two greys
+        // apart, and a hairline on top of a fill is the one separation this
+        // system does not use.
+        .background(
+            RoundedRectangle(cornerRadius: NS.Metric.radiusInner).fill(NS.Color.deepGround)
         )
     }
 }

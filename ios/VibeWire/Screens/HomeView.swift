@@ -918,9 +918,13 @@ struct DisplayChip: View {
                     .fill(display.selected ? NS.Color.accent.opacity(0.20) : .clear)
                     .frame(width: 26, height: 17)
                     .overlay(
+                        // The same 4-4 as every other provisional stroke in the
+                        // app. An offline display's outline is dashed for the
+                        // reason a pending step is, so the two have to be drawn
+                        // in the same broken line to read as the same statement.
                         RoundedRectangle(cornerRadius: NS.Metric.radiusScreen)
                             .strokeBorder(
-                                style: StrokeStyle(lineWidth: 1, dash: dimmed ? [3, 3] : [])
+                                style: StrokeStyle(lineWidth: 1, dash: dimmed ? [4, 4] : [])
                             )
                             .foregroundStyle(display.selected ? NS.Color.accent : NS.Color.textTertiary)
                     )

@@ -24,6 +24,7 @@ import SwiftUI
 /// conditions never use it.
 struct CommandDrawerView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Command {
         let action: String
@@ -157,6 +158,13 @@ struct CommandDrawerView: View {
             .fill(NS.Color.raised)
         )
         .padding(.horizontal, 8)
+        // It rises from the bottom edge, which is the whole reason its top
+        // corners are larger than a card's: the shape says it arrived from
+        // off-screen, and a cross-fade in place contradicts it. The transition
+        // is on the drawer rather than on the view around it so the travel is
+        // the drawer's own height, and `rise` is what keeps a reader who asked
+        // for less motion still being told the panel appeared.
+        .transition(NS.Motion.rise(reduced: reduceMotion))
         .accessibilityAddTraits(.isModal)
         .accessibilityLabel("Commands")
     }

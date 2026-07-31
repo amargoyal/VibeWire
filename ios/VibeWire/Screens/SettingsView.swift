@@ -37,7 +37,10 @@ struct SettingsView: View {
                 .allowsHitTesting(model.showRevokeConfirm == nil)
 
                 if let target = model.showRevokeConfirm {
-                    Color(hex: 0x060709).opacity(0.72).ignoresSafeArea()
+                    // One scrim, defined once. This was a literal a step off the
+                    // token, so the same dimming was two colours depending on
+                    // which screen drew it.
+                    NS.Color.scrim.opacity(0.72).ignoresSafeArea()
                     RevokeConfirmSheet(target: target)
                 }
             }
@@ -50,9 +53,12 @@ struct SettingsView: View {
     /// it had already needed a hit-shape fix to be tappable at all.
     private var header: some View {
         HStack(spacing: 8) {
-            Text("Settings")
-                .font(NS.Font.sans(22, weight: .medium))
-                .foregroundStyle(NS.Color.text)
+            // The app's one heading, at the 26pt step the browser sets this
+            // title in. Set as plain 22pt sans it was a second type system for
+            // the same job — the tight tracking and the semibold weight are what
+            // make a heading a heading here, and a hand-rolled font call has
+            // neither.
+            DisplayTitle("Settings", size: 26)
 
             Spacer()
 
@@ -430,9 +436,10 @@ struct RevokeConfirmSheet: View {
         VStack {
             Spacer()
             VStack(alignment: .leading, spacing: 18) {
-                Capsule()
-                    .fill(NS.Color.stroke)
-                    .frame(width: 46, height: 4)
+                // The component, not a capsule of its own: this one was 46pt
+                // wide where every other drawer's is 40, which is the kind of
+                // difference nobody sees and everybody feels.
+                Grabber()
                     .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: 10) {

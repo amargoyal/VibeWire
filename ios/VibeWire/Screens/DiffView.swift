@@ -47,12 +47,12 @@ struct DiffView: View {
                             .padding(.vertical, 10)
                         }
                     }
+                    // Deep on the screen ground, and nothing drawn round it. Two
+                    // greys apart is the separation the listing needs; a hairline
+                    // on top of a fill is the border this system does not draw.
                     .background(
-                        RoundedRectangle(cornerRadius: 8).fill(NS.Color.deepGround)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(NS.Color.hairlineDim, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                            .fill(NS.Color.deepGround)
                     )
                     .padding(.top, 14)
                 }
@@ -174,14 +174,17 @@ private enum DiffLineKind {
         case .removed: return NS.Color.red
         case .hunk: return NS.Color.accent
         case .meta: return NS.Color.textTertiary
-        case .context: return Color(hex: 0xA8AEB8)
+        case .context: return NS.Color.context
         }
     }
 
+    /// The wash is 10%, the same figure the web token file states. Below that
+    /// the tint stops surviving a phone at minimum brightness, which is where a
+    /// diff is most often read.
     var background: Color {
         switch self {
-        case .added: return NS.Color.green.opacity(0.08)
-        case .removed: return NS.Color.red.opacity(0.08)
+        case .added: return NS.Color.green.opacity(0.10)
+        case .removed: return NS.Color.red.opacity(0.10)
         default: return .clear
         }
     }

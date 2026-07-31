@@ -140,9 +140,11 @@ struct ClaudePanelView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 11)
-            .background(RoundedRectangle(cornerRadius: 8).fill(NS.Color.raised))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8).stroke(NS.Color.hairlineDim, lineWidth: 1)
+            // A control on the screen ground takes the control corner and a
+            // fill. It carried a hairline as well, which is the border this
+            // system does not draw round something already a grey lighter.
+            .background(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.raised)
             )
         }
         .buttonStyle(.plain)
@@ -267,7 +269,7 @@ struct ClaudePanelView: View {
                         .padding(.horizontal, 20)
                         .frame(minHeight: 46)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
                                 .stroke(NS.Color.accent.opacity(0.45), lineWidth: 1)
                         )
                 }
@@ -283,7 +285,7 @@ struct ClaudePanelView: View {
         VStack(alignment: .leading, spacing: turn.role == .user ? 7 : 9) {
             if turn.role == .user {
                 MonoCaps("YOU · \(timeLabel(turn.at))", size: 9, tracking: 2)
-                MarkdownText(turn.text, color: Color(hex: 0xC3C8D0))
+                MarkdownText(turn.text, color: NS.Color.you)
             } else {
                 HStack(spacing: 8) {
                     MonoCaps("CLAUDE", size: 9, color: NS.Color.accent, tracking: 2)
@@ -346,18 +348,21 @@ struct ClaudePanelView: View {
             .accessibilityValue(filesExpanded ? "Expanded" : "Collapsed")
 
             if filesExpanded {
-                VStack(spacing: 1) {
-                    ForEach(model.changedFiles) { file in
+                // A group, not a stack on a backing that shows through: the run
+                // rounds 16 at its two outer corners and 4 at every seam, and the
+                // 2pt gaps are the dividers. Each row's corners come from where it
+                // sits in the list and from nothing else.
+                VStack(spacing: NS.Metric.groupGap) {
+                    ForEach(Array(model.changedFiles.enumerated()), id: \.element.id) { index, file in
                         Button {
                             model.openDiff(path: file.path)
                         } label: {
                             ChangedFileRow(file: file)
                         }
                         .buttonStyle(.plain)
+                        .groupedRow(GroupPosition.at(index, of: model.changedFiles.count))
                     }
                 }
-                .background(NS.Color.raised2)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
         // Attached here rather than beside the session picker: one view gets
@@ -436,10 +441,11 @@ struct ClaudePanelView: View {
             .lineLimit(1...4)
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
-            .background(RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.raised))
-            .overlay(
-                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
-                    .stroke(NS.Color.hairline, lineWidth: 1)
+            // Raised on the screen ground, and no edge round it — the field is
+            // already a grey lighter than what it sits on, which is this
+            // system's separation.
+            .background(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusControl).fill(NS.Color.raised)
             )
 
             // Stop is a permanent red target while running: runaway agents are
@@ -619,7 +625,13 @@ struct ChangedFileRow: View {
             ratioBars
         }
         .padding(12)
-        .background(NS.Color.raised)
+        // No fill of its own: the row is a member of a group, and `groupedRow`
+        // is what paints it — which is also what gives it the corners its
+        // position in the run earns. The fill used to be what made the whole
+        // row answer a tap, so the hit shape has to be declared now that the
+        // ink is a path, two counts and a gap between them.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var ratioBars: some View {
@@ -817,24 +829,28 @@ struct SessionPicker: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(14)
                                 .background(
-                                    RoundedRectangle(cornerRadius: NS.Metric.radiusSmall)
+                                    RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
                                         .fill(NS.Color.raised)
                                 )
                                 // The accent at 35%, the same edge the browser
-                                // draws: the current session is the user's own
+                                // draws, and only on the row that is current:
+                                // the current session is the user's own
                                 // selection, and violet is the colour that says
                                 // so. An edge rather than a fill, because a row
                                 // this one is about to be tapped into must not
-                                // read as already answered.
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: NS.Metric.radiusSmall)
-                                        .stroke(
-                                            current
-                                                ? NS.Color.accent.opacity(0.35)
-                                                : NS.Color.hairlineDim,
-                                            lineWidth: NS.Metric.hairline
-                                        )
-                                )
+                                // read as already answered. Every other row is
+                                // Raised on the screen ground and gets no edge
+                                // at all — a border round a fill is what this
+                                // system replaced.
+                                .overlay {
+                                    if current {
+                                        RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
+                                            .stroke(
+                                                NS.Color.accent.opacity(0.35),
+                                                lineWidth: NS.Metric.hairline
+                                            )
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
                             // An outline alone says nothing to VoiceOver, and this
