@@ -18,6 +18,7 @@ colors:
   text-disabled: "#3F4349"
   hairline: "#26292F"
   stroke: "#2F3339"
+  edge: "#656970"
   on-jade: "#002D1D"
   on-sodium: "#2E1B00"
   on-clay: "#230707"
@@ -285,6 +286,8 @@ The remote view is the exception: it runs edge to edge, and the chrome lives in 
 
 Lines survive only where a gap cannot do the job: the divider in the wide header, the top edge of a destructive drawer, the rail on the Claude timeline. Nightshift draws roughly a fifth as many of them as Longarm did.
 
+**A line between two things and the edge of a control are different jobs, and take different inks.** `stroke` is the hairline: a divider, a dashed rule, the frame of a minimap. `edge` is the boundary of a control that has no fill — an outlined action, a toggle in its off state — where the edge *is* the control and there is nothing else to find. That case is what the 3:1 non-text contrast threshold exists for, and `stroke` measures 1.5:1 against the screen ground, so it fails it by more than half. `edge` measures 3.65:1 on `deep-ground`, 3.44:1 on `screen-ground` and 3.16:1 on `raised` — the three grounds an outlined control actually sits on. Holding every hairline to that number would make this system loud in the places it is deliberately quiet, which is why there are two.
+
 ## Shapes
 
 A corner ladder taken from the containment depth rather than from a t-shirt scale: **card 20**, **control 16**, **inner 12**, **small 8**, **screen 3**, **bar 1**. The last two are not containers: `screen` is the outline of a monitor drawn small, and `bar` is the tip of a 3 pt bar in the signal strength and the RTT trace — square-ended, a row of twenty of them is a picket fence. A drawer takes **28** on its top corners only, larger than a card's so it reads as arriving from off-screen rather than as a card that grew. The screen radius is deliberately tight — a 22 pt rectangle with a 16 pt corner reads as a pill, not as a monitor.
@@ -310,7 +313,7 @@ Two custom silhouettes carry the instrument metaphor: **corner ticks** — four 
 - **Primary:** a 68 pt filled card in a signal colour with matching ink — jade to proceed, violet for a user-initiated action (wake, retry, new session), sodium when the user is proceeding into a degraded state. A 19 pt semibold title over a 9 pt mono-caps sub-label; the glyph (`→`, `↑`, `↻`, `＋`) sits right.
 - **Sub-label is mandatory.** It states what the action will do and what it costs before the thumb commits: `BUILT-IN · FIT · ~228MS TO FIRST FRAME`, `NUDGES THE DISPLAY · USUALLY 4S`, `AUTO-RETRY IN 14S · TAP TO GO NOW`.
 - **Filled:** 56 pt, no sub-label, `radius.control` — "Allow once", "Copy image", a destructive confirm at 60 pt.
-- **Outlined:** 44 pt minimum, mono-caps label, a one-point outline drawn *inside* the box so a row of these lines up with a filled sibling of the same declared height. Takes a clay tint and a 50 %-clay edge when destructive.
+- **Outlined:** 44 pt minimum, mono-caps label, a one-point edge drawn *inside* the box so a row of these lines up with a filled sibling of the same declared height, in `edge` rather than `stroke` — see Elevation. Takes a clay tint and a 50 %-clay edge when destructive.
 - **Quiet:** label only, no fill and no edge — the third option on a destructive sheet, the standing grant on a permission prompt. Deliberately weightless.
 - **Disabled:** 45 % opacity on the whole control. No separate grey palette.
 - **Pressed:** no visual pressed style; touch feedback is haptic.
