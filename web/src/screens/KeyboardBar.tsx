@@ -31,6 +31,41 @@ import {
   useSheet,
 } from '../design/components'
 
+const COMBOS_KEY = 'vibewire.combos'
+
+/**
+ * The combos this origin has, remembered.
+ *
+ * They were `useState(DEFAULT_COMBOS)`, so a combo added through the editor —
+ * the one piece of this client the user is invited to customise — lasted until
+ * the tab was reloaded and then was not there. localStorage is the right scope:
+ * the row is a property of this browser, not of the Mac, and the Mac is told
+ * nothing about it.
+ */
+function readCombos(): string[][] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(COMBOS_KEY) ?? 'null') as unknown
+    if (!Array.isArray(stored)) return DEFAULT_COMBOS
+    const combos = stored.filter(
+      (combo): combo is string[] =>
+        Array.isArray(combo) && combo.length > 0 && combo.every((key) => typeof key === 'string'),
+    )
+    return combos.length ? combos : DEFAULT_COMBOS
+  } catch {
+    // Storage refused, or something else wrote nonsense to this key. The row is
+    // more useful with its defaults than absent.
+    return DEFAULT_COMBOS
+  }
+}
+
+function writeCombos(combos: string[][]): void {
+  try {
+    localStorage.setItem(COMBOS_KEY, JSON.stringify(combos))
+  } catch {
+    /* storage refused; the row still works for this tab */
+  }
+}
+
 const DEFAULT_COMBOS: string[][] = [
   ['cmd', 's'],
   ['cmd', 'z'],
@@ -138,7 +173,7 @@ export function KeyboardField() {
 }
 
 export function KeyboardBar() {
-  const [combos, setCombos] = useState(DEFAULT_COMBOS)
+  const [combos, setCombos] = useState(readCombos)
   const [showEditor, setShowEditor] = useState(false)
   const touch = isTouchPrimary()
 
@@ -277,7 +312,11 @@ export function KeyboardBar() {
       {showEditor ? (
         <ComboEditor
           onAdd={(combo) => {
-            setCombos((current) => [...current, combo])
+            setCombos((current) => {
+              const next = [...current, combo]
+              writeCombos(next)
+              return next
+            })
             setShowEditor(false)
           }}
           onClose={() => setShowEditor(false)}
