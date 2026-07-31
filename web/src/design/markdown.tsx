@@ -28,7 +28,35 @@ type Block =
   | { kind: 'bullet'; items: string[] }
   | { kind: 'numbered'; items: string[] }
   | { kind: 'quote'; text: string }
+  | { kind: 'table'; header: string[]; rows: string[][] }
   | { kind: 'rule' }
+
+/**
+ * A GitHub-style pipe table, or null if this run is not one.
+ *
+ * The separator row is the whole test: `| --- | :--: |`. Without it a line
+ * starting with a pipe is just a line starting with a pipe, and a table that is
+ * still streaming in has a header and no separator yet — both have to come back
+ * as prose rather than as a half-built grid.
+ */
+function parseTable(lines: string[]): { kind: 'table'; header: string[]; rows: string[][] } | null {
+  if (lines.length < 2) return null
+  const cells = (line: string) =>
+    line
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((cell) => cell.trim())
+
+  const separator = cells(lines[1] ?? '')
+  const isSeparator =
+    separator.length > 0 && separator.every((cell) => /^:?-{1,}:?$/.test(cell))
+  if (!isSeparator) return null
+
+  const header = cells(lines[0] ?? '')
+  const rows = lines.slice(2).map(cells)
+  return { kind: 'table', header, rows }
+}
 
 /**
  * One pass, line by line. Fences win over everything: while a fence is open
@@ -41,6 +69,7 @@ export function parseBlocks(text: string): Block[] {
   let bullets: string[] = []
   let numbers: string[] = []
   let quote: string[] = []
+  let table: string[] = []
 
   let fenceLanguage: string | null = null
   let fenceBody: string[] = []
@@ -66,10 +95,24 @@ export function parseBlocks(text: string): Block[] {
     blocks.push({ kind: 'quote', text: quote.join('\n') })
     quote = []
   }
+  /**
+   * A run of pipe rows is a table only if the second one is the separator that
+   * says so. Anything else — one pipe in a sentence, a fragment cut off by the
+   * end of a streaming delta — goes back to being a paragraph, which is what it
+   * was before this existed.
+   */
+  const flushTable = () => {
+    if (!table.length) return
+    const parsed = parseTable(table)
+    if (parsed) blocks.push(parsed)
+    else blocks.push({ kind: 'paragraph', text: table.join('\n') })
+    table = []
+  }
   const flushAll = () => {
     flushParagraph()
     flushLists()
     flushQuote()
+    flushTable()
   }
 
   for (const line of text.split(/\r?\n/)) {
@@ -123,6 +166,18 @@ export function parseBlocks(text: string): Block[] {
       quote.push(trimmed.slice(trimmed.length > 1 ? 2 : 1))
       continue
     }
+
+    // A row of a pipe table. Claude writes these constantly and they used to
+    // fall through to a paragraph, which renders the pipes and the dashes
+    // verbatim — a table drawn as the ASCII it was typed as.
+    if (trimmed.startsWith('|')) {
+      flushParagraph()
+      flushLists()
+      flushQuote()
+      table.push(trimmed)
+      continue
+    }
+    flushTable()
 
     const bullet = bulletItem(trimmed)
     if (bullet != null) {
@@ -407,6 +462,68 @@ function BlockView({ block, size }: { block: Block; size: string }) {
           </span>
         </blockquote>
       )
+
+    case 'table': {
+      // Mono throughout, because a table in an answer is a table of values, and
+      // this system sets anything measured in mono. It scrolls sideways rather
+      // than wrapping cells: a four-column table does not fit a phone at any font
+      // size, and a wrapped cell stops lining up with its heading, which is the
+      // only thing a table is for.
+      const columns = Math.max(block.header.length, ...block.rows.map((row) => row.length))
+      const template = `repeat(${Math.max(columns, 1)}, minmax(max-content, 1fr))`
+      return (
+        <div
+          role="region"
+          aria-label="Table"
+          tabIndex={0}
+          style={{
+            overflowX: 'auto',
+            background: 'var(--ns-deep)',
+            borderRadius: 'var(--radius-inner)',
+            padding: '10px 12px',
+          }}
+        >
+          <div role="table" style={{ display: 'grid', gridTemplateColumns: template, columnGap: '18px' }}>
+            <div role="row" style={{ display: 'contents' }}>
+              {Array.from({ length: columns }, (_, index) => (
+                <span
+                  key={`h${index}`}
+                  role="columnheader"
+                  class="caps"
+                  style={{
+                    fontSize: 'var(--fs-9)',
+                    paddingBottom: '7px',
+                    whiteSpace: 'nowrap',
+                    borderBottom: '1px solid var(--ns-hairline)',
+                  }}
+                >
+                  {block.header[index] ?? ''}
+                </span>
+              ))}
+            </div>
+            {block.rows.map((row, rowIndex) => (
+              <div key={rowIndex} role="row" style={{ display: 'contents' }}>
+                {Array.from({ length: columns }, (_, index) => (
+                  <span
+                    key={index}
+                    role="cell"
+                    class="mono"
+                    style={{
+                      fontSize: 'var(--fs-12)',
+                      lineHeight: 1.9,
+                      whiteSpace: 'nowrap',
+                      color: index === 0 ? 'var(--ns-text)' : 'var(--ns-context)',
+                    }}
+                  >
+                    {inlineNodes(row[index] ?? '')}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
 
     case 'rule':
       return <div class="hairline" style={{ margin: '2px 0' }} />
