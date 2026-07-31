@@ -321,33 +321,7 @@ struct RemoteView: View {
         return "H.264 · \(String(format: "%.1f", config.bitrateMbps)) MB/S · \(config.fps)FPS"
     }
 
-    private var displayTabs: some View {
-        @Bindable var bindable = model
-        return Segmented(
-            options: tabOptions,
-            selection: Binding(
-                get: { model.sideBySide ? -1 : Int(model.displays.first(where: \.selected)?.id ?? 0) },
-                set: { value in
-                    if value == -1 {
-                        model.selectBothDisplays()
-                    } else {
-                        model.selectDisplay(UInt32(value))
-                    }
-                    model.startStream()
-                }
-            )
-        )
-    }
-
-    private var tabOptions: [(value: Int, label: String, badge: Color?)] {
-        var options = model.displays.enumerated().map { index, display in
-            (value: Int(display.id), label: "MON \(index + 1)", badge: nil as Color?)
-        }
-        if model.displays.count > 1 {
-            options.append((value: -1, label: "BOTH", badge: nil))
-        }
-        return options
-    }
+    private var displayTabs: some View { DisplayTabs() }
 
     // MARK: Picture
 
@@ -917,120 +891,8 @@ struct RemoteView: View {
                     .padding(.bottom, 12)
             }
 
-            landscapeDock
+            LandscapeDock()
                 .frame(width: 276)
-        }
-    }
-
-    private var landscapeDock: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                MonoCaps("CONTROLS", size: 9, tracking: 2)
-                Spacer()
-                // LOCK / FREE used to sit here, read from `model.scrollLock` —
-                // a flag nothing in this app and nothing in `PROTOCOL.md` ever
-                // writes, so the slot could only ever print FREE. A readout
-                // with one reachable value is not a reading, and the flag went
-                // with it rather than being left for the next reader to try to
-                // wire up.
-                //
-                // What took the slot is measured, and is the one piece of state
-                // in this dock that outlives the tap that set it: a latched
-                // modifier stays down through taps, drags and the keyboard, and
-                // the 46pt caps below it are easy to miss at a glance. Violet,
-                // because a latch is the user's own doing. Nothing is printed
-                // when nothing is held — a zero here would be a reading of the
-                // same kind FREE was.
-                if !model.heldModifiers.isEmpty {
-                    MonoCaps(
-                        "\(model.heldModifiers.count) HELD",
-                        size: 9,
-                        color: NS.Color.accent,
-                        tracking: 1.4
-                    )
-                }
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                Tile(glyph: "⌨", caption: "KEYS", spoken: "Keyboard") {
-                    model.showKeyboard = true
-                }
-                Tile(glyph: "⛶", caption: "SHOT", spoken: "Screenshot the Mac") {
-                    model.hub("shot")
-                }
-                Tile(glyph: "←", caption: "COPY", glyphSize: 13, spoken: "Copy from the Mac") {
-                    model.hub("copy")
-                }
-                Tile(glyph: "→", caption: "PASTE", glyphSize: 13, spoken: "Paste to the Mac") {
-                    model.hub("paste")
-                }
-            }
-
-            HStack(spacing: 6) {
-                ForEach(ModifierSpec.all, id: \.name) { spec in
-                    KeyCap(
-                        glyph: spec.glyph,
-                        height: 46,
-                        isHeld: model.heldModifiers.contains(spec.name),
-                        fontSize: 13
-                    ) {
-                        model.toggleModifier(spec.name)
-                    }
-                }
-            }
-
-            Spacer()
-
-            VStack(spacing: 9) {
-                dockReadout("RTT", model.link.rttMillis.map { "\(Int($0)) MS" } ?? "—")
-                dockReadout("RATE", String(format: "%.1f MB/S", model.link.downMbps))
-                dockReadout("FRONTMOST", model.link.frontmostApp.isEmpty ? "—" : model.link.frontmostApp)
-                HStack(spacing: 8) {
-                    Button {
-                        model.presented = .claude
-                        model.listClaudeSessions()
-                    } label: {
-                        MonoCaps("CLAUDE", size: 10, color: NS.Color.accent, tracking: 1.4)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
-                                    .fill(NS.Color.accent.opacity(0.12))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
-                                    .stroke(NS.Color.accent.opacity(0.4), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        model.stopStream()
-                    } label: {
-                        Text("✕")
-                            .font(NS.Font.mono(14))
-                            .foregroundStyle(NS.Color.textSecondary)
-                            .frame(width: 50, height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
-                                    .fill(NS.Color.raised)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 24)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(NS.Color.screenGround)
-    }
-
-    private func dockReadout(_ label: String, _ value: String) -> some View {
-        HStack {
-            MonoCaps(label, size: 9, tracking: 1.2)
-            Spacer()
-            MonoCaps(value, size: 9, color: NS.Color.text, tracking: 1.2)
         }
     }
 
@@ -1332,4 +1194,41 @@ struct ModifierSpec {
         ModifierSpec(name: "shift", glyph: "⇧", caption: "SHIFT"),
         ModifierSpec(name: "cmd", glyph: "⌘", caption: "CMD"),
     ]
+}
+
+/// Which screen is being sent, wherever the question can be asked.
+///
+/// One definition, because portrait and the landscape dock ask it the same way
+/// and a second copy is how the two drift: this used to be private to the
+/// portrait layout, which is the whole reason a phone in landscape with two
+/// monitors could only ever see the one it opened with.
+struct DisplayTabs: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Segmented(
+            options: options,
+            selection: Binding(
+                get: { model.sideBySide ? -1 : Int(model.displays.first(where: \.selected)?.id ?? 0) },
+                set: { value in
+                    if value == -1 {
+                        model.selectBothDisplays()
+                    } else {
+                        model.selectDisplay(UInt32(value))
+                    }
+                    model.startStream()
+                }
+            )
+        )
+    }
+
+    private var options: [(value: Int, label: String, badge: Color?)] {
+        var options = model.displays.enumerated().map { index, display in
+            (value: Int(display.id), label: "MON \(index + 1)", badge: nil as Color?)
+        }
+        if model.displays.count > 1 {
+            options.append((value: -1, label: "BOTH", badge: nil))
+        }
+        return options
+    }
 }

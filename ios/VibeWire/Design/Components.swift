@@ -820,6 +820,13 @@ struct Tile: View {
     let caption: String
     var accent: Bool = false
     var glyphSize: CGFloat = 16
+    /// A floor, not a fixed height. The drawer's tiles keep the system's 70;
+    /// the landscape dock, which has to fit six of these into the shortest
+    /// phone's landscape height, asks for a denser one. Either way the number
+    /// is a minimum, so the glyph and its caption cannot outgrow the box and
+    /// land on the row underneath — which is exactly what a fixed 70 did at the
+    /// accessibility text sizes, where this ink measures 97pt.
+    var height: CGFloat = 70
     let spoken: String
     let action: () -> Void
 
@@ -837,7 +844,7 @@ struct Tile: View {
                 )
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 70)
+            .frame(minHeight: height)
             .background(
                 RoundedRectangle(cornerRadius: NS.Metric.radiusControl)
                     .fill(accent ? NS.Color.accent.opacity(0.14) : NS.Color.raised2)
