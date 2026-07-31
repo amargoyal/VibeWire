@@ -271,6 +271,15 @@ textarea {
   outline: none;
 }
 
+/* A sheet takes focus itself when it opens, so the keyboard and a screen reader
+   start inside it rather than behind the scrim. That is the app moving focus, not
+   a reader arriving on a control, and a ring drawn around a whole drawer says
+   something is selected that nobody chose. */
+[role='dialog']:focus,
+[role='dialog']:focus-visible {
+  outline: none;
+}
+
 /* Reduce Motion is about the vestibular system, not about stillness: what has to
    go is travel, scale and parallax, not the fact that something appeared. The one
    exception is the activity spinner — a small rotating arc is not a trigger, and

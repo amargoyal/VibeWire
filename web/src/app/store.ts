@@ -263,7 +263,6 @@ export class Store {
    *  which reports only the modifiers its own fingers are on. */
   private latchedModifiers: string[] = []
   private physicalModifiers: string[] = []
-  scrollLock = signal(false)
   sessionCount = signal(0)
 
   // Clipboard

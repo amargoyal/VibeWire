@@ -1496,12 +1496,8 @@ function Dock() {
           CONTROLS
         </Caps>
         <span class="spacer" />
-        <Caps
-          size="var(--fs-9)"
-          tracking="0.14em"
-          color={store.scrollLock.value ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
-        >
-          {store.scrollLock.value ? 'LOCK' : 'FREE'}
+        <Caps size="var(--fs-9)" tracking="0.14em">
+          {held.length ? `${held.length} HELD` : ''}
         </Caps>
       </div>
 
@@ -1535,7 +1531,32 @@ function Dock() {
           spoken="Paste to the Mac"
           onClick={() => void store.hub('paste')}
         />
+        {/* The two the drawer has always had and this dock did not, which made the
+            landscape window the one place a command could be missing from. */}
+        <Tile
+          glyph="⏎"
+          caption="ENTER"
+          spoken="Press Return on the Mac"
+          onClick={() => store.key('return')}
+        />
+        <Tile
+          glyph="⏻"
+          caption="LOCK"
+          spoken="Lock the Mac’s screen"
+          onClick={() => void store.hub('lock')}
+        />
       </div>
+
+      {/* Which screen, which was reachable in portrait and nowhere in landscape —
+          so a laptop with two monitors could only see the one it opened with. */}
+      {store.displays.value.length > 1 ? (
+        <div class="stack" style={{ gap: '8px' }}>
+          <Caps size="var(--fs-9)" tracking="var(--caps-tracking-wide)">
+            SCREEN
+          </Caps>
+          <DisplayTabs />
+        </div>
+      ) : null}
 
       <div class="row" style={{ gap: '6px' }}>
         {MODIFIERS.map((spec) => (
@@ -1548,6 +1569,18 @@ function Dock() {
             onClick={() => store.toggleModifier(spec.name)}
           />
         ))}
+        {/* Latched modifiers are the one state that outlives the tap that set it,
+            so the way out of it belongs next to the way in. */}
+        <button
+          class="outlined"
+          onClick={() => store.releaseModifiers()}
+          disabled={held.length === 0}
+          style={{ width: '76px', minHeight: '46px', flex: '0 0 auto', opacity: held.length ? 1 : 0.45 }}
+        >
+          <Caps size="var(--fs-9)" tracking="0.1em" color="var(--ns-text-secondary)">
+            RELEASE
+          </Caps>
+        </button>
       </div>
 
       <span class="spacer" />
