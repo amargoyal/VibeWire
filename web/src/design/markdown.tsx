@@ -14,10 +14,10 @@
  * input to hand to a parser that can execute.
  */
 
-import { useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ComponentChildren, JSX } from 'preact'
 
-import { Caps } from './components'
+import { Announce, Caps } from './components'
 
 // MARK: - Blocks
 
@@ -328,7 +328,17 @@ function BlockView({ block, size }: { block: Block; size: string }) {
 
     case 'bullet':
       return (
-        <ul class="stack" style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+        // `role="list"` is not redundant here. Safari drops the list semantics of
+        // any `ul` whose `list-style` is `none` — the assumption being that a list
+        // without markers was never meant to be heard as one — and VoiceOver then
+        // reads these items as loose text with no count and no boundaries. The
+        // marker below is drawn rather than generated precisely so it can take the
+        // accent and hold the baseline, so the role has to be put back by hand.
+        <ul
+          class="stack"
+          role="list"
+          style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}
+        >
           {block.items.map((item, index) => (
             <li key={index} class="row row--top" style={{ gap: '8px' }}>
               <span
@@ -348,7 +358,14 @@ function BlockView({ block, size }: { block: Block; size: string }) {
 
     case 'numbered':
       return (
-        <ol class="stack" style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}>
+        // Same restoration as the bullet list above, and it matters more here: the
+        // drawn number is hidden, so with the role gone there is nothing left that
+        // says which item of how many this is.
+        <ol
+          class="stack"
+          role="list"
+          style={{ gap: '6px', margin: 0, paddingLeft: 0, listStyle: 'none' }}
+        >
           {block.items.map((item, index) => (
             <li key={index} class="row row--top" style={{ gap: '8px' }}>
               <span
@@ -357,7 +374,10 @@ function BlockView({ block, size }: { block: Block; size: string }) {
                 style={{
                   color: 'var(--ns-accent)',
                   opacity: 0.8,
-                  fontSize: `calc(${size} - 3px)`,
+                  // The 9px floor is a rule about what renders, not about the
+                  // tokens: subtracting from a size that scales with the reader's
+                  // text setting can cross the floor from above.
+                  fontSize: `max(9px, calc(${size} - 3px))`,
                   lineHeight: 1.6,
                 }}
               >
@@ -404,12 +424,61 @@ function headingSize(level: number): string {
   }
 }
 
+/** What the last tap on the copy chip actually did. */
+type CopyState = 'idle' | 'copied' | 'refused'
+
+/**
+ * How long the chip states its answer before going back to offering the copy.
+ * Long enough to be read after the thumb has moved, short enough that it is
+ * plainly about the tap that just happened.
+ */
+const COPY_ANSWER_MS = 2400
+
 /**
  * Monospace, own ground, scrolls sideways. Copy button, because the reason to
  * look at a command here is usually to run it somewhere else.
  */
 function CodeBlock({ language, code }: { language: string | null; code: string }) {
-  const [copied, setCopied] = useState(false)
+  const [copy, setCopy] = useState<CopyState>('idle')
+  const answering = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // The answer to a tap is an event, not a condition. Latched on, the chip reads
+  // COPIED for the rest of the session — reporting the last tap anyone made
+  // rather than what this control would do now, which is the one thing a label
+  // on a button is for.
+  useEffect(
+    () => () => {
+      if (answering.current) clearTimeout(answering.current)
+    },
+    [],
+  )
+
+  const answer = (state: CopyState) => {
+    if (answering.current) clearTimeout(answering.current)
+    setCopy(state)
+    answering.current = setTimeout(() => setCopy('idle'), COPY_ANSWER_MS)
+  }
+
+  const onCopy = () => {
+    // The Mac serves this page over plain HTTP on the tailnet, and a page that is
+    // not a secure context has no `navigator.clipboard` at all — so on the path
+    // this client is most often opened from, the chain below yields nothing and
+    // nothing is written. A control that does nothing and says nothing is the
+    // defect the clipboard sheet already exists to answer; this says it instead.
+    const written = navigator.clipboard?.writeText(code)
+    if (!written) {
+      answer('refused')
+      return
+    }
+    void written.then(() => answer('copied')).catch(() => answer('refused'))
+  }
+
+  const chip =
+    copy === 'copied'
+      ? { label: 'COPIED', ink: 'var(--ns-green)', spoken: 'Copied' }
+      : copy === 'refused'
+        ? { label: 'REFUSED', ink: 'var(--ns-red)', spoken: 'Copy refused' }
+        : { label: 'COPY', ink: 'var(--ns-text-secondary)', spoken: 'Copy code' }
 
   return (
     <div
@@ -425,13 +494,13 @@ function CodeBlock({ language, code }: { language: string | null; code: string }
         <Caps size="var(--fs-9)">{(language || 'code').toUpperCase()}</Caps>
         <span class="spacer" />
         <button
-          onClick={() => {
-            void navigator.clipboard
-              ?.writeText(code)
-              .then(() => setCopied(true))
-              .catch(() => undefined)
-          }}
-          aria-label={copied ? 'Code copied' : 'Copy code'}
+          onClick={onCopy}
+          // The name follows the word on the chip, so a reader driving this by
+          // voice asks for the label that is actually there. It is not where the
+          // confirmation lives, though: a name that changes under a control
+          // nobody is on is never spoken again, which is what the live region
+          // below is for.
+          aria-label={chip.spoken}
           style={{
             // 28px was below the floor for a target, and the ink is four small
             // letters. The chip looks the same; the area that answers a thumb is a
@@ -442,16 +511,31 @@ function CodeBlock({ language, code }: { language: string | null; code: string }
             alignItems: 'center',
           }}
         >
-          <Caps
-            size="var(--fs-9)"
-            color={copied ? 'var(--ns-green)' : 'var(--ns-text-secondary)'}
-          >
-            {copied ? 'COPIED' : 'COPY'}
+          <Caps size="var(--fs-9)" color={chip.ink}>
+            {chip.label}
           </Caps>
         </button>
+        {/*
+          Rendered whatever the state, deliberately. A live region that arrives on
+          the page with its sentence already in it is not reliably read — the
+          region has to be there first and the text has to land in it — so this
+          holds an empty one open and fills it when there is something to say.
+        */}
+        <Announce>
+          {copy === 'copied'
+            ? 'Code copied.'
+            : copy === 'refused'
+              ? 'This browser would not put the code on the clipboard. Select it and copy it by hand.'
+              : ''}
+        </Announce>
       </div>
       <pre
         class="mono"
+        // A block that scrolls sideways and holds nothing focusable cannot be
+        // scrolled by a keyboard at all: the rest of the line is on the page and
+        // there is no key that brings it into view. Making the listing itself the
+        // stop is what the arrow keys then scroll.
+        tabIndex={0}
         style={{
           margin: 0,
           padding: '2px 10px 10px',
