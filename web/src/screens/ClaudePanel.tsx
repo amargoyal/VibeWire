@@ -220,7 +220,12 @@ export function ClaudePanel({ onClose, half }: { onClose: () => void; half: bool
                 opacity: permission ? 0.5 : 1,
                 transition: 'opacity var(--state-change) ease-out',
               }}
-              aria-hidden={permission ? 'true' : undefined}
+              // Deliberately not aria-hidden. The dim says "answer the question
+              // first"; removing the transcript from the accessibility tree says
+              // "you may not read it", which is further than the visual design
+              // goes — half-opacity text is still text, and the sentence
+              // explaining why Claude wants to run this command is usually the
+              // one directly above the card asking.
             >
               {emptyTranscript && !hasSomewhereToSend ? <EmptyState mode={mode} /> : null}
 
@@ -687,7 +692,6 @@ function SessionWork({
         opacity: dimmed ? 0.5 : 1,
         transition: 'opacity var(--state-change) ease-out',
       }}
-      aria-hidden={dimmed ? 'true' : undefined}
     >
       {toolCalls.length ? (
         <div class="timeline">
