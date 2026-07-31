@@ -13,8 +13,16 @@
  * sent collapses into a single card that states the answer and offers EDIT. The
  * fields still exist; they are just no longer the first thing between the user and
  * the code they are holding in their head.
+ *
+ * OTHER WAYS IN carries two rows where the phone carries one. Both end in the
+ * same call: the QR is a `vibewire://pair?…` link, so reading it with the camera
+ * and reading it off the clipboard produce the same string, go through the same
+ * `parseLink`, and run the same handshake. What differs is whether this engine can
+ * do it at all — see `net/qrScan.ts` — and where it cannot, the row says which
+ * part is missing rather than sitting there as a control that does nothing.
  */
 
+import type { ComponentChildren, JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { store } from '../app/store'
@@ -22,12 +30,15 @@ import {
   Announce,
   Caps,
   Caret,
+  CornerTicks,
   Display,
   RotatesIn,
   ScreenBody,
   SectionLabel,
+  SheetDismiss,
   Spinner,
   TimelineMark,
+  useSheet,
   type TimelineState,
 } from '../design/components'
 import {
@@ -38,6 +49,7 @@ import {
   suggestedAddress,
   type Endpoint,
 } from '../net/endpoint'
+import { describeUnavailable, QrScan, scannerSupport } from '../net/qrScan'
 
 interface ExchangeStep {
   title: string
@@ -65,6 +77,7 @@ export function Pairing() {
   const [errorText, setErrorText] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
   const [pasting, setPasting] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const [editingTarget, setEditingTarget] = useState(false)
   const field = useRef<HTMLInputElement | null>(null)
   // A paste can deliver six digits more than once, and the field submits the
@@ -152,12 +165,33 @@ export function Pairing() {
   }
 
   /**
+   * What a read `vibewire://pair?host=…&port=…&code=…` link does, whichever way
+   * it arrived.
+   *
+   * The address and port are filled in whether or not a code came with them, so a
+   * link that carries only an address still leaves the screen pointed at the right
+   * Mac and the digits to type by hand.
+   */
+  const applyParsed = async (parsed: PairingLink) => {
+    setAddress(parsed.host)
+    if (parsed.port) setPort(parsed.port)
+    if (!parsed.code) return
+    setDigits(parsed.code)
+    const target = tryEndpoint(parsed.host, parsed.port ?? port)
+    if (!target) return
+    setErrorText(null)
+    await submitWith(target, parsed.code)
+  }
+
+  /**
    * `vibewire://pair?host=…&port=…&code=…` — what the Mac's QR encodes.
    *
-   * A browser cannot register for a custom scheme, so scanning that QR with a
-   * phone camera opens nothing here. Pasting it does the same job: the link is
-   * three fields and a code, and this reads all four out of it. A plain
-   * `http://mac:8787/?host=…&code=…` works too, which is the form to bookmark.
+   * A browser cannot register for a custom scheme, so aiming the phone's *system*
+   * camera at that QR opens nothing. The two ways in that work are the row below
+   * this one — the camera inside this page, where the engine has a barcode reader
+   * — and this: the link is three fields and a code, and this reads all four out
+   * of it. A plain `http://mac:8787/?host=…&code=…` works too, which is the form
+   * to bookmark.
    */
   const applyLink = async () => {
     setPasting(true)
@@ -168,16 +202,7 @@ export function Pairing() {
         setErrorText('That clipboard does not hold a VibeWire pairing link.')
         return
       }
-      setAddress(parsed.host)
-      if (parsed.port) setPort(parsed.port)
-      if (parsed.code) {
-        setDigits(parsed.code)
-        const target = tryEndpoint(parsed.host, parsed.port ?? port)
-        if (target) {
-          setErrorText(null)
-          await submitWith(target, parsed.code)
-        }
-      }
+      await applyParsed(parsed)
     } catch {
       setErrorText('The browser would not let this page read the clipboard.')
     } finally {
@@ -214,192 +239,492 @@ export function Pairing() {
   // honest version of the fact.
   const secondsLeft = CODE_ROTATION_SECONDS - (store.tick.value % CODE_ROTATION_SECONDS)
 
+  // Read at render rather than once at module load: this is a fact about the
+  // engine and the origin, and the origin is the one thing on this screen that
+  // can change under it — a client opened from Pages and then from the Mac is two
+  // different answers to the same question.
+  const scanner = scannerSupport()
+  const noScan = scanner === 'ok' ? null : describeUnavailable(scanner)
+
   return (
-    <ScreenBody scrolls>
-      <header class="row" style={{ minHeight: '34px', flex: '0 0 auto' }}>
-        <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
-          VibeWire
+    <>
+      <ScreenBody scrolls>
+        <header class="row" style={{ minHeight: '34px', flex: '0 0 auto' }}>
+          <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
+            VibeWire
+          </Caps>
+        </header>
+
+        <Display style={{ marginTop: '44px', flex: '0 0 auto' }}>
+          Six digits
+          <br />
+          from the menu bar.
+        </Display>
+
+        <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '14px', flex: '0 0 auto' }}>
+          MENU BAR → VIBEWIRE → PAIR
         </Caps>
-      </header>
 
-      <Display style={{ marginTop: '44px', flex: '0 0 auto' }}>
-        Six digits
-        <br />
-        from the menu bar.
-      </Display>
+        {/* A single field owns the keyboard; the six boxes are only a rendering of
+            its contents. That keeps paste and delete behaving the way they do
+            everywhere else. */}
+        <div style={{ position: 'relative', marginTop: '34px', flex: '0 0 auto' }}>
+          <input
+            ref={field}
+            value={digits}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            aria-label="Pairing code, six digits"
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onInput={(event) => {
+              const filtered = (event.currentTarget.value.match(/\d/g) ?? []).join('').slice(0, 6)
+              setDigits(filtered)
+              if (filtered.length === 6) void submit(filtered)
+            }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              opacity: 0.01,
+              zIndex: 1,
+              // Off-screen would stop iOS scrolling it into view; transparent and in
+              // place keeps the caret where the boxes are.
+              letterSpacing: '2em',
+            }}
+          />
+          <div class="row" style={{ gap: '8px', pointerEvents: 'none' }} aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((index) => {
+              const active = index === Math.min(digits.length, 5) && focused
+              const filled = digits[index] != null
+              return (
+                <div
+                  key={index}
+                  style={{
+                    // A maximum, not a fixed width. Six boxes and five 8px gaps have
+                    // to fit inside the gutter on the narrowest phone this app
+                    // targets, and a fixed row overflowed the app's very first screen.
+                    flex: '1 1 0',
+                    minWidth: 0,
+                    height: '84px',
+                    borderRadius: 'var(--radius-control)',
+                    background: active
+                      ? 'color-mix(in srgb, var(--ns-accent) 12%, transparent)'
+                      : filled
+                        ? 'var(--ns-raised-2)'
+                        : 'var(--ns-raised)',
+                    boxShadow: active ? 'inset 0 0 0 1.5px var(--ns-accent)' : undefined,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {filled ? (
+                    <span class="mono" style={{ fontSize: 'var(--fs-30)' }}>
+                      {digits[index]}
+                    </span>
+                  ) : active ? (
+                    <Caret height={30} />
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
-      <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '14px', flex: '0 0 auto' }}>
-        MENU BAR → VIBEWIRE → PAIR
-      </Caps>
+        <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
+          <RotatesIn fraction={secondsLeft / CODE_ROTATION_SECONDS} />
+          <Caps size="var(--fs-9)" tracking="0.14em">
+            ROTATES IN
+          </Caps>
+          <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-amber)">
+            {`${secondsLeft}S`}
+          </Caps>
+        </div>
 
-      {/* A single field owns the keyboard; the six boxes are only a rendering of
-          its contents. That keeps paste and delete behaving the way they do
-          everywhere else. */}
-      <div style={{ position: 'relative', marginTop: '34px', flex: '0 0 auto' }}>
-        <input
-          ref={field}
-          value={digits}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          aria-label="Pairing code, six digits"
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onInput={(event) => {
-            const filtered = (event.currentTarget.value.match(/\d/g) ?? []).join('').slice(0, 6)
-            setDigits(filtered)
-            if (filtered.length === 6) void submit(filtered)
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            opacity: 0.01,
-            zIndex: 1,
-            // Off-screen would stop iOS scrolling it into view; transparent and in
-            // place keeps the caret where the boxes are.
-            letterSpacing: '2em',
+        {errorText ? (
+          <p
+            class="wrap"
+            role="alert"
+            style={{
+              fontSize: 'var(--fs-13)',
+              lineHeight: 1.45,
+              color: 'var(--ns-red)',
+              margin: '16px 0 0',
+              userSelect: 'text',
+              flex: '0 0 auto',
+            }}
+          >
+            {errorText}
+          </p>
+        ) : null}
+
+        <TargetCard
+          address={address}
+          port={port}
+          blocked={blocked}
+          note={note}
+          probeMillis={probeMillis}
+          editing={editingTarget}
+          onEdit={() => setEditingTarget((current) => !current)}
+          onAddress={setAddress}
+          onPort={setPort}
+        />
+
+        <SectionLabel style={{ marginTop: '26px', flex: '0 0 auto' }}>OTHER WAYS IN</SectionLabel>
+
+        {/* Whichever of these actually works is listed first. Where the engine
+            cannot scan, the scan row is a statement rather than a control, and a
+            statement of absence sitting above the one working way in reads, for the
+            length of a glance, as the way in. */}
+        {noScan ? null : (
+          <WayIn
+            glyph={<QrGlyph />}
+            title="Scan the QR on the Mac"
+            caption="OPENS CAMERA · SAME HANDSHAKE"
+            onClick={() => setScanning(true)}
+            label="Scan the QR code"
+          />
+        )}
+
+        <WayIn
+          glyph="⌘V"
+          title={pasting ? 'Reading the clipboard…' : 'Paste the pairing link'}
+          caption="READS THE QR PAYLOAD · SAME HANDSHAKE"
+          onClick={() => void applyLink()}
+          disabled={pasting}
+          faded={pasting}
+          label="Paste a pairing link"
+        />
+
+        {noScan ? <WayIn glyph={<QrGlyph />} title={noScan.fact} caption={noScan.caption} /> : null}
+
+        <span class="spacer" style={{ minHeight: '16px' }} />
+
+        <Caps
+          size="var(--fs-9)"
+          tracking="0.14em"
+          color="var(--ns-text-faint)"
+          style={{ lineHeight: 1.8, paddingBottom: 'calc(20px + var(--safe-bottom))', flex: '0 0 auto' }}
+        >
+          {'NO ACCOUNT. NO PASSWORD.\nTHE MAC KEEPS A PUBLIC KEY AND NOTHING REPLAYABLE.'}
+        </Caps>
+      </ScreenBody>
+
+      {scanning ? (
+        <ScanSheet
+          onClose={() => setScanning(false)}
+          onLink={(parsed) => {
+            // The sheet goes first, so the camera is already off by the time the
+            // handshake screen replaces this one. `QrScan.stop()` has run by now;
+            // unmounting runs it again, which is why it is safe to call twice.
+            setScanning(false)
+            void applyParsed(parsed)
           }}
         />
-        <div class="row" style={{ gap: '8px', pointerEvents: 'none' }} aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((index) => {
-            const active = index === Math.min(digits.length, 5) && focused
-            const filled = digits[index] != null
-            return (
-              <div
-                key={index}
-                style={{
-                  // A maximum, not a fixed width. Six boxes and five 8px gaps have
-                  // to fit inside the gutter on the narrowest phone this app
-                  // targets, and a fixed row overflowed the app's very first screen.
-                  flex: '1 1 0',
-                  minWidth: 0,
-                  height: '84px',
-                  borderRadius: 'var(--radius-control)',
-                  background: active
-                    ? 'color-mix(in srgb, var(--ns-accent) 12%, transparent)'
-                    : filled
-                      ? 'var(--ns-raised-2)'
-                      : 'var(--ns-raised)',
-                  boxShadow: active ? 'inset 0 0 0 1.5px var(--ns-accent)' : undefined,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {filled ? (
-                  <span class="mono" style={{ fontSize: 'var(--fs-30)' }}>
-                    {digits[index]}
-                  </span>
-                ) : active ? (
-                  <Caret height={30} />
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
-        <RotatesIn fraction={secondsLeft / CODE_ROTATION_SECONDS} />
-        <Caps size="var(--fs-9)" tracking="0.14em">
-          ROTATES IN
-        </Caps>
-        <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-amber)">
-          {`${secondsLeft}S`}
-        </Caps>
-      </div>
-
-      {errorText ? (
-        <p
-          class="wrap"
-          role="alert"
-          style={{
-            fontSize: 'var(--fs-13)',
-            lineHeight: 1.45,
-            color: 'var(--ns-red)',
-            margin: '16px 0 0',
-            userSelect: 'text',
-            flex: '0 0 auto',
-          }}
-        >
-          {errorText}
-        </p>
       ) : null}
+    </>
+  )
+}
 
-      <TargetCard
-        address={address}
-        port={port}
-        blocked={blocked}
-        note={note}
-        probeMillis={probeMillis}
-        editing={editingTarget}
-        onEdit={() => setEditingTarget((current) => !current)}
-        onAddress={setAddress}
-        onPort={setPort}
-      />
+// MARK: - Other ways in
 
-      <SectionLabel style={{ marginTop: '26px', flex: '0 0 auto' }}>OTHER WAYS IN</SectionLabel>
+/**
+ * The shape both OTHER WAYS IN rows take: a 34 pt glyph tile, one sentence, and a
+ * mono-caps line under it.
+ *
+ * Written once because one of these rows is sometimes not a control at all. A
+ * browser with no barcode reader gets the same row saying what is missing, and
+ * the only honest way to draw that is as the same object with the tap taken out —
+ * a disabled-looking button invites the tap it cannot answer, and a differently
+ * shaped notice reads as an error the user caused.
+ */
+function WayIn({
+  glyph,
+  title,
+  caption,
+  onClick,
+  disabled = false,
+  faded = false,
+  label,
+}: {
+  glyph: ComponentChildren
+  title: string
+  caption: string
+  onClick?: () => void
+  disabled?: boolean
+  faded?: boolean
+  label?: string
+}) {
+  const box: JSX.CSSProperties = {
+    marginTop: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    width: '100%',
+    minHeight: 'var(--primary-action)',
+    paddingInline: '18px',
+    paddingBlock: '12px',
+    background: 'var(--ns-raised)',
+    borderRadius: 'var(--radius-card)',
+    textAlign: 'left',
+    flex: '0 0 auto',
+    opacity: faded ? 0.6 : 1,
+  }
 
-      <button
-        onClick={() => void applyLink()}
-        disabled={pasting}
+  const face = (
+    <>
+      <span
+        aria-hidden="true"
+        class="mono"
         style={{
-          marginTop: '10px',
+          width: '34px',
+          height: '34px',
+          flex: '0 0 auto',
           display: 'flex',
           alignItems: 'center',
-          gap: '14px',
-          width: '100%',
-          minHeight: 'var(--primary-action)',
-          paddingInline: '18px',
-          paddingBlock: '12px',
-          background: 'var(--ns-raised)',
-          borderRadius: 'var(--radius-card)',
-          textAlign: 'left',
-          flex: '0 0 auto',
-          opacity: pasting ? 0.6 : 1,
+          justifyContent: 'center',
+          borderRadius: 'var(--radius-inner)',
+          background: 'var(--ns-raised-2)',
+          // Disabled ink is for dormant indicator fills, and a tile on a row that
+          // reports an absence is exactly that.
+          color: onClick ? 'var(--ns-text-secondary)' : 'var(--ns-text-disabled)',
+          fontSize: 'var(--fs-12)',
         }}
-        aria-label="Paste a pairing link"
       >
+        {glyph}
+      </span>
+      <span class="stack" style={{ gap: '4px', minWidth: 0 }}>
         <span
-          aria-hidden="true"
-          class="mono"
+          class="wrap"
           style={{
-            width: '34px',
-            height: '34px',
-            flex: '0 0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 'var(--radius-inner)',
-            background: 'var(--ns-raised-2)',
-            color: 'var(--ns-text-secondary)',
-            fontSize: 'var(--fs-12)',
+            fontSize: 'var(--fs-15)',
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            lineHeight: 1.35,
+            color: onClick ? undefined : 'var(--ns-text-secondary)',
           }}
         >
-          ⌘V
+          {title}
         </span>
-        <span class="stack" style={{ gap: '4px', minWidth: 0 }}>
-          <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500, letterSpacing: '-0.01em' }}>
-            {pasting ? 'Reading the clipboard…' : 'Paste the pairing link'}
-          </span>
-          <Caps size="var(--fs-9)" tracking="0.1em">
-            READS THE QR PAYLOAD · SAME HANDSHAKE
+        <Caps size="var(--fs-9)" tracking="0.1em">
+          {caption}
+        </Caps>
+      </span>
+    </>
+  )
+
+  if (!onClick) return <div style={box}>{face}</div>
+
+  return (
+    <button onClick={onClick} disabled={disabled} aria-label={label} style={box}>
+      {face}
+    </button>
+  )
+}
+
+/**
+ * Three finder squares and four cells of data.
+ *
+ * Drawn rather than set in a face: no system font carries this shape, and the
+ * only glyph close enough would be a filled square, which is what a dead
+ * indicator looks like. Inherits its colour from the tile so the unavailable row
+ * dims with the rest of itself.
+ */
+function QrGlyph() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 17 17" aria-hidden="true" style={{ display: 'block' }}>
+      {[
+        [0, 0],
+        [10, 0],
+        [0, 10],
+      ].map(([x, y]) => (
+        <rect
+          key={`${x}-${y}`}
+          x={x + 0.75}
+          y={y + 0.75}
+          width="5.5"
+          height="5.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+      ))}
+      {[
+        [10, 10],
+        [14.5, 10],
+        [10, 14.5],
+        [14.5, 14.5],
+      ].map(([x, y]) => (
+        <rect key={`d${x}-${y}`} x={x} y={y} width="2" height="2" fill="currentColor" />
+      ))}
+    </svg>
+  )
+}
+
+/**
+ * The camera, for exactly as long as it takes to read one QR.
+ *
+ * Everything that can go wrong here has its own sentence, because the four
+ * failures want four different things from the person holding the phone: change a
+ * site permission, find a machine with a lens, close whatever else is using it,
+ * or point it at a different code. `net/qrScan.ts` owns which is which; this
+ * screen owns where the sentence goes.
+ *
+ * A QR that reads cleanly but is not ours is deliberately not a failure of the
+ * scan: something was read, correctly, and it belonged to somebody else. The
+ * camera stays on and the sentence sits in amber, because the next thing put in
+ * front of the lens is usually the right one.
+ */
+function ScanSheet({
+  onClose,
+  onLink,
+}: {
+  onClose: () => void
+  onLink: (parsed: PairingLink) => void
+}) {
+  const sheet = useSheet<HTMLDivElement>(onClose)
+  const preview = useRef<HTMLVideoElement | null>(null)
+  const [live, setLive] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const [foreign, setForeign] = useState<string | null>(null)
+  // The effect runs once and must keep running against the current callback
+  // without being re-run to get it. A second run is a second camera.
+  const deliver = useRef(onLink)
+  deliver.current = onLink
+
+  useEffect(() => {
+    const video = preview.current
+    if (!video) return
+    const scan = new QrScan(video, (event) => {
+      if (event.kind === 'live') {
+        setLive(true)
+        return
+      }
+      if (event.kind === 'failed') {
+        setFailure(event.sentence)
+        return
+      }
+      // The same reader the clipboard goes through, so a scan and a paste cannot
+      // disagree about what counts as a pairing link.
+      const parsed = parseLink(event.text)
+      if (!parsed) {
+        setForeign('That QR code is not a VibeWire pairing link.')
+        return
+      }
+      // Stopped here rather than left to the unmount below: the handshake takes a
+      // second or two, and there is no reason for the lens to be open for any
+      // of it.
+      scan.stop()
+      deliver.current(parsed)
+    })
+    void scan.start()
+    return () => scan.stop()
+  }, [])
+
+  return (
+    <div
+      ref={sheet}
+      class="sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Scan the Mac’s QR code"
+    >
+      <ScreenBody scrolls>
+        <Announce>
+          {failure ??
+            foreign ??
+            (live ? 'Camera live. Point it at the QR on the Mac.' : 'Asking for the camera.')}
+        </Announce>
+
+        <div class="row" style={{ minHeight: '40px', marginTop: '12px', flex: '0 0 auto' }}>
+          <Display level={26} rank={2}>
+            Scan the QR
+          </Display>
+          <span class="spacer" />
+          <SheetDismiss onClick={onClose} />
+        </div>
+
+        <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '10px', flex: '0 0 auto' }}>
+          MENU BAR → VIBEWIRE → PAIR
+        </Caps>
+
+        {/* `contain`, not `cover`. The detector reads the whole frame, and a
+            preview cropped to fill the box would show less than is being read —
+            which would make the corner ticks, whose one job is marking where the
+            real pixels end, mark the wrong place. */}
+        <div
+          style={{
+            position: 'relative',
+            marginTop: '18px',
+            flex: '1 1 auto',
+            minHeight: '240px',
+            background: 'var(--ns-deep)',
+            borderRadius: 'var(--radius-card)',
+            overflow: 'hidden',
+          }}
+        >
+          <video
+            ref={preview}
+            muted
+            playsInline
+            autoPlay
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          />
+          {live ? <CornerTicks color="var(--ns-text-tertiary)" /> : null}
+        </div>
+
+        {/* No jade on a working camera. Jade, sodium and clay report the *Mac's*
+            condition, and a lens on this device is not one of the things they are
+            about — a green READING here would be the first place in the app where
+            jade meant something other than "the Mac is reachable". A refusal takes
+            clay because the path really is gone, and the spinner keeps its violet:
+            waiting for a permission the user was just asked for is the user's own
+            state, which is exactly what violet is for. */}
+        <div class="row" style={{ gap: '9px', marginTop: '16px', minHeight: '20px', flex: '0 0 auto' }}>
+          {failure || live ? null : <Spinner size={16} />}
+          <Caps
+            size="var(--fs-9)"
+            tracking="0.14em"
+            color={failure ? 'var(--ns-red)' : live ? 'var(--ns-text-secondary)' : undefined}
+          >
+            {failure ? 'CAMERA STOPPED' : live ? 'READING · POINT AT THE MAC' : 'ASKING FOR THE CAMERA'}
           </Caps>
-        </span>
-      </button>
+        </div>
 
-      <span class="spacer" style={{ minHeight: '16px' }} />
+        {(failure ?? foreign) ? (
+          <p
+            class="wrap"
+            role="alert"
+            style={{
+              margin: '12px 0 0',
+              fontSize: 'var(--fs-13)',
+              lineHeight: 1.45,
+              color: failure ? 'var(--ns-red)' : 'var(--ns-on-amber-wash)',
+              userSelect: 'text',
+              flex: '0 0 auto',
+            }}
+          >
+            {failure ?? foreign}
+          </p>
+        ) : null}
 
-      <Caps
-        size="var(--fs-9)"
-        tracking="0.14em"
-        color="var(--ns-text-faint)"
-        style={{ lineHeight: 1.8, paddingBottom: 'calc(20px + var(--safe-bottom))', flex: '0 0 auto' }}
-      >
-        {'NO ACCOUNT. NO PASSWORD.\nTHE MAC KEEPS A PUBLIC KEY AND NOTHING REPLAYABLE.'}
-      </Caps>
-    </ScreenBody>
+        <Caps
+          size="var(--fs-9)"
+          tracking="0.14em"
+          color="var(--ns-text-faint)"
+          style={{
+            marginTop: '18px',
+            lineHeight: 1.8,
+            paddingBottom: 'calc(20px + var(--safe-bottom))',
+            flex: '0 0 auto',
+          }}
+        >
+          {'THE CAMERA STOPS THE MOMENT A CODE IS READ.\nFRAMES ARE READ IN THIS PAGE AND SENT NOWHERE.'}
+        </Caps>
+      </ScreenBody>
+    </div>
   )
 }
 
@@ -720,7 +1045,14 @@ function tryEndpoint(address: string, port: string): Endpoint | null {
   }
 }
 
-function parseLink(text: string): { host: string; port: string | null; code: string | null } | null {
+/** The three fields the Mac's QR carries, once one has been read out of it. */
+interface PairingLink {
+  host: string
+  port: string | null
+  code: string | null
+}
+
+function parseLink(text: string): PairingLink | null {
   const trimmed = text.trim()
   if (!trimmed) return null
   // `vibewire://pair?…` is not a hierarchical URL every engine will parse the same
