@@ -77,8 +77,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.system = system
         let menuBar = MenuBarController(pairing: pairing, trust: trust, transport: transport)
         // The three values above the menu items come from the router, and the
-        // menu is rebuilt each time it opens, so this is a read rather than a
-        // subscription.
+        // menu refills itself every time it opens — `MenuBarController` is its
+        // own `NSMenuDelegate` — so this is a read rather than a subscription.
+        //
+        // That delegate was the missing half of this sentence until recently:
+        // the comment described the intent, nothing implemented it, and the
+        // header sat frozen at whatever it read a moment after launch.
         menuBar.router = router
         self.menuBar = menuBar
 

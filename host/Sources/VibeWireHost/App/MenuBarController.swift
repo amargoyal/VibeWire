@@ -34,6 +34,17 @@ final class MenuBarController: NSObject {
     /// that blocked the main thread on an actor hop to say "DIRECT" would be a
     /// worse trade than a header that is occasionally one second stale.
     private var lastStatus: TransportManager.Status?
+    /// The last answer the keychain gave about paired devices.
+    ///
+    /// Same shape as `lastStatus` and held for the same reason: the store is an
+    /// actor, the menu is built on the main actor, and the first keychain read
+    /// after a rebuild can take tens of seconds — which is what `prime()` is
+    /// for. An open draws this and asks for a fresh one behind it.
+    ///
+    /// Three states rather than two. `nil` is "never asked", `.failure` is "the
+    /// keychain did not answer", and an empty array is "no devices paired". The
+    /// middle one is the fact this menu used to print as the last one.
+    private var lastDevices: Result<[TrustedDevice], Error>?
     private var pairingWindow: NSWindow?
     /// One field per digit box. The six of them are the code.
     private var digitFields: [NSTextField] = []
@@ -90,23 +101,36 @@ final class MenuBarController: NSObject {
         button.toolTip = "VibeWire"
     }
 
+    /// Builds the menu object and hands it to the status item.
+    ///
+    /// The contents are filled by `populate(_:)`, which runs again on every open
+    /// — see `menuWillOpen(_:)`. This has three callers, none of which is
+    /// "someone is about to look at it": `init`, `--pair`, and the pairing window
+    /// closing. That is why the delegate exists.
     func rebuildMenu() {
         let menu = NSMenu()
+        menu.delegate = self
+        populate(menu)
+        statusItem.menu = menu
+        // Warms the two cached readings so the first open has something true to
+        // draw. Worth doing from the other two callers as well: the pairing
+        // window closing is the one moment a device is most likely to have just
+        // been added to the list this menu shows.
+        refreshCachedReadings()
+    }
 
+    /// Fills a menu with the answers as they stand right now.
+    ///
+    /// Called on every open, so nothing here may block. The two readings that
+    /// would have to cross an actor to be taken are drawn from cache and asked
+    /// for again behind the open; everything else is either a live in-process
+    /// probe or a lock read, and cheap enough to pay for each time.
+    private func populate(_ menu: NSMenu) {
         let header = NSMenuItem()
         header.view = readoutHeader()
         header.isEnabled = false
         menu.addItem(header)
         menu.addItem(.separator())
-
-        Task { [weak self] in
-            guard let self else { return }
-            let status = await transport.status()
-            await MainActor.run {
-                self.lastStatus = status
-                header.view = self.readoutHeader()
-            }
-        }
 
         menu.addItem(withTitle: "Show pairing code…", action: #selector(openPairing), keyEquivalent: "p")
             .target = self
@@ -115,6 +139,12 @@ final class MenuBarController: NSObject {
 
         // Permission state, because a missing grant is the single most likely
         // reason the phone shows a black screen or dead input.
+        //
+        // Probed on every open rather than once at launch. Both calls are
+        // in-process and neither prompts, and granting a permission is something
+        // the user does *from this menu* and then comes straight back to: read
+        // once, it answered "Grant Screen Recording…" for the rest of the
+        // process to someone who had just granted it.
         let screen = DisplayCatalog.hasScreenRecordingPermission()
         let accessibility = InputInjector.hasAccessibilityPermission()
 
@@ -142,38 +172,56 @@ final class MenuBarController: NSObject {
         devicesHeader.isEnabled = false
         menu.addItem(devicesHeader)
 
-        Task { [weak self] in
-            guard let self else { return }
-            // A keychain that could not be read and a Mac with nothing paired
-            // to it are different facts. `TrustStore` is careful to keep them
-            // apart — its own note explains that caching a failed read as an
-            // empty set once made every paired phone come back `unknown device`
-            // for the rest of the process — and folding the throw into `[]`
-            // here spent that care to print "None yet" about devices that are
-            // still paired.
-            let devices = try? await trust.all()
-            await MainActor.run {
-                let lines: [String]
-                switch devices {
-                case .none:
-                    lines = ["   Keychain did not answer"]
-                case .some(let list) where list.isEmpty:
-                    lines = ["   None yet"]
-                case .some(let list):
-                    lines = list.map { "   \($0.name)" }
-                }
-                for (offset, title) in lines.enumerated() {
-                    let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-                    item.isEnabled = false
-                    menu.insertItem(item, at: menu.index(of: devicesHeader) + 1 + offset)
-                }
-            }
+        for title in deviceLines() {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
         }
 
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit VibeWire", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    }
 
-        statusItem.menu = menu
+    /// The paired-device rows, from the last answer the keychain gave.
+    ///
+    /// A keychain that could not be read and a Mac with nothing paired to it are
+    /// different facts. `TrustStore` is careful to keep them apart — its own note
+    /// explains that caching a failed read as an empty set once made every paired
+    /// phone come back `unknown device` for the rest of the process — so this
+    /// keeps them apart too, and adds the third state the cache introduces: an
+    /// em dash while nothing has been asked yet, because not-yet-read is not the
+    /// same as read-and-empty either.
+    private func deviceLines() -> [String] {
+        switch lastDevices {
+        case .none:
+            return ["   —"]
+        case .some(.failure):
+            return ["   Keychain did not answer"]
+        case .some(.success(let list)):
+            return list.isEmpty ? ["   None yet"] : list.map { "   \($0.name)" }
+        }
+    }
+
+    /// Re-asks for the two readings the main thread cannot take itself, and
+    /// leaves them where the next open will find them.
+    ///
+    /// Both live behind actors, and a menu that blocked the main thread on an
+    /// actor hop to say "DIRECT" would be the worse trade — so an open draws the
+    /// last known answer and this runs behind it. One open stale is the cost, and
+    /// it is the trade this controller already documents for the transport.
+    private func refreshCachedReadings() {
+        Task { [weak self] in
+            guard let self else { return }
+            let status = await transport.status()
+            let devices: Result<[TrustedDevice], Error>
+            do {
+                devices = .success(try await trust.all())
+            } catch {
+                devices = .failure(error)
+            }
+            self.lastStatus = status
+            self.lastDevices = devices
+        }
     }
 
     // MARK: The readout header
@@ -986,6 +1034,30 @@ final class MenuBarController: NSObject {
 
     @objc private func requestAccessibilityPermission() {
         InputInjector.requestAccessibilityPermission()
+    }
+}
+
+extension MenuBarController: NSMenuDelegate {
+    /// Retakes every reading in the menu just before it is shown.
+    ///
+    /// This was missing, and without it the whole menu was a photograph. The
+    /// header was built once in `init`, before `router` had even been set, and
+    /// then drawn unchanged for the life of the process: a Mac that had been
+    /// paired and streaming for an hour still read `CLIENT 0 · SCREENS 0` and
+    /// whichever path was live at launch. Everything below it was stale the same
+    /// way — the two permission rows were probed once, so a grant made from this
+    /// very menu still read "Grant Screen Recording…" afterwards, and the device
+    /// list never gained a phone that paired while the process was running.
+    ///
+    /// An open is the only moment any of it is worth taking, and this costs
+    /// nothing while the menu is closed. That is the point rather than a
+    /// convenience: this app is a menu bar item beside a live video stream, and
+    /// a header kept current on a timer is a process woken sixty times a minute
+    /// to redraw something nobody is looking at.
+    func menuWillOpen(_ menu: NSMenu) {
+        menu.removeAllItems()
+        populate(menu)
+        refreshCachedReadings()
     }
 }
 

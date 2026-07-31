@@ -842,6 +842,12 @@ textarea {
   padding: 4px 8px;
   border-radius: var(--radius-small);
   background: color-mix(in srgb, var(--ns-deep) 92%, transparent);
+  /* At a raised text size a caption wraps, and an inline background across two
+     lines draws one box with a bitten-off corner and a second box hanging under
+     it. Cloning the decoration gives each line its own chip, which is what the
+     mark is: a legible ground under a reading laid over a picture. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* The band above and below a 16:10 picture inside a phone's glass. The chrome
