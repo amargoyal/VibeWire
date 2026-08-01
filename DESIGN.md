@@ -371,9 +371,13 @@ A padded track with a filled thumb, not a row of bordered cells: 3 pt of padding
 
 ### The Mac host
 
-The host follows macOS rather than iOS: a menu bar item and one window. The menu opens with **three measured values before any menu item** — the machine, whether a client is attached and how many screens are going out, and which path it is on — because the reason to open that menu is almost always to check whether the Mac is still serving. Drawn as a view rather than as greyed-out menu entries, since these are readings, not disabled commands.
+The host follows macOS rather than iOS: a menu bar item and one window. The status item carries **the app's own mark**, a stroked path rather than a borrowed SF Symbol — an icon in that bar is found by shape at a glance, and a stock symbol is the one shape that cannot be recognised because some other app is already wearing it.
 
-The pairing window is the one exception to "follow the platform", and it earns it: it is the only screen a user compares side by side with the phone in their other hand. It is drawn in the app's own colours — six digit boxes, a rotation dial, one card per way in — so the digits on the Mac and the boxes on the phone look like the same instrument.
+What it opens is **a panel, not a menu**. It leads with the machine, its condition as one chip, and **three measured values before any action** — whether a client is attached, how many screens are going out, and which path it is on — because the reason to open it is almost always to check whether the Mac is still serving. Below that, what the link measured: round trip as a number and as a sparkline of the last minute, and outbound throughput with a bar *only when the cellular cap is actually being applied*, since off the cap there is no ceiling anybody set and a bar against nothing is a picture of nothing.
+
+An `NSMenu` can only ever be a list of titles in the system's dress, which forced every one of those readings to be either a greyed-out row or left out; a greyed-out row also says "you cannot do this", which is not what a reading means. The panel is the answer, and it earns the same exception the pairing window does — it paints its own Nightshift ground in Dark regardless of the system appearance, which is also what makes the palette's contrast numbers hold. **Permission rows appear only when a permission is missing.** Two permanent "granted" rows no click could change were most of what the old menu showed; the chip reads `DEGRADED` in sodium instead, and the row that repairs it is the only thing in that section.
+
+The pairing window is the other exception to "follow the platform", and it earns it: it is the only screen a user compares side by side with the phone in their other hand. It is drawn in the app's own colours — six digit boxes, a rotation dial, one card per way in — so the digits on the Mac and the boxes on the phone look like the same instrument.
 
 ### Named Rules
 

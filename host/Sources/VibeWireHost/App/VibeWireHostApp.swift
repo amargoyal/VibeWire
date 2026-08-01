@@ -79,7 +79,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.router = router
         self.transport = transport
         self.system = system
-        let menuBar = MenuBarController(pairing: pairing, trust: trust, transport: transport)
+        let menuBar = MenuBarController(
+            pairing: pairing,
+            trust: trust,
+            transport: transport,
+            telemetry: telemetry
+        )
         // The three values above the menu items come from the router, and the
         // menu refills itself every time it opens — `MenuBarController` is its
         // own `NSMenuDelegate` — so this is a read rather than a subscription.
