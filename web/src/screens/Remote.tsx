@@ -811,7 +811,14 @@ function PortraitLayout({
         </div>
       ) : null}
 
-      <span class="spacer" />
+      {/* One picture is centred in the band by the two spacers, because it carries
+          its own height: an aspect ratio and a canvas with real pixels in it. Two
+          panes do not. They are told to share the space they are given, and a
+          spacer either side means the space they are given is none — which is
+          exactly what BOTH did on a phone: two panes zero pixels tall, their
+          captions landing on top of each other in the middle of an empty screen.
+          Side by side, the panes take the band and the spacers stand down. */}
+      {store.sideBySide.value ? null : <span class="spacer" />}
 
       {store.sideBySide.value ? (
         <SideBySidePanes />
@@ -821,7 +828,7 @@ function PortraitLayout({
 
       <PictureCaption dragging={dragging} />
 
-      <span class="spacer" />
+      {store.sideBySide.value ? null : <span class="spacer" />}
 
       <div
         class="stack"
@@ -1104,6 +1111,10 @@ function PictureCaption({ dragging }: { dragging: boolean }) {
   const left = (() => {
     if (state.kind === 'stalled' || state.kind === 'reconnecting') return 'LAST GOOD FRAME'
     if (dragging) return 'DRAGGING · LIFT TO DROP'
+    // Side by side, every pane names itself in its own corner. Naming one of them
+    // again down here says the band is about that display, which it is not — the
+    // scale on the right is the only reading that still belongs to both.
+    if (store.sideBySide.value) return ''
     if (!display) return ''
     return `${display.name.toUpperCase()} · ${display.width} × ${display.height}`
   })()
@@ -1135,7 +1146,7 @@ function PictureCaption({ dragging }: { dragging: boolean }) {
 function SideBySidePanes() {
   const displays = store.displays.value
   return (
-    <div class="stack" style={{ gap: '10px', flex: '0 1 auto', minHeight: 0 }}>
+    <div class="stack" style={{ gap: '10px', flex: '1 1 auto', minHeight: 0 }}>
       {displays.map((display, index) => {
         const focused = store.inputPane.value === index
         return (

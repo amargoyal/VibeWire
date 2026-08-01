@@ -34,13 +34,13 @@ enum Log {
     static func info(_ area: Area, _ message: @autoclosure () -> String) {
         let text = message()
         area.logger.info("\(text, privacy: .public)")
-        emit("INFO ", area, text)
+        emit("INFO", area, text)
     }
 
     static func warn(_ area: Area, _ message: @autoclosure () -> String) {
         let text = message()
         area.logger.warning("\(text, privacy: .public)")
-        emit("WARN ", area, text)
+        emit("WARN", area, text)
     }
 
     static func error(_ area: Area, _ message: @autoclosure () -> String) {
@@ -56,11 +56,16 @@ enum Log {
         emit("DEBUG", area, text)
     }
 
+    /// The one funnel. Three consumers now: the unified log above, stderr when
+    /// something is watching it, and the in-memory ring the dashboard's Log pane
+    /// reads. The ring is filled unconditionally — it is the only one of the
+    /// three that answers "what happened while nobody was looking".
     private static func emit(_ level: String, _ area: Area, _ text: String) {
+        EventLog.shared.record(level: level, area: area.rawValue, text: text)
         guard mirrorToStderr else { return }
         let stamp = Timestamps.wallClock()
         FileHandle.standardError.write(
-            Data("\(stamp) \(level) [\(area.rawValue)] \(text)\n".utf8)
+            Data("\(stamp) \(level.padding(toLength: 5, withPad: " ", startingAt: 0)) [\(area.rawValue)] \(text)\n".utf8)
         )
     }
 }

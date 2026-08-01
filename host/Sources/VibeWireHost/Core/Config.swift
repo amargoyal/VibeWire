@@ -1,5 +1,6 @@
 import Foundation
 import IOKit
+import Security
 
 /// Host configuration. Reads `~/.config/vibewire/config.json` if present,
 /// otherwise uses defaults. Settings changed from the phone (07A) are written
@@ -66,6 +67,88 @@ enum Config {
     static let maxPairAttempts = 5
     static let pairLockout: TimeInterval = 60
 
+    /// When this process started, for the UP 6D 04H readout.
+    ///
+    /// A `static let` on an enum is initialised on first touch rather than at
+    /// launch, so this is read once from `applicationDidFinishLaunching` to fix
+    /// it at the right moment. Left to the dashboard's first request it would
+    /// report an uptime measured from whenever someone first opened the window.
+    static let launchedAt = Date()
+
+    /// The secret that stands between this Mac's whole control surface and
+    /// anything else that can reach port 8787.
+    ///
+    /// Fresh every launch and never written anywhere: not to the settings file,
+    /// not to the keychain, not to the log. The dashboard window is handed it
+    /// in the URL it is opened with, which is the only copy that exists outside
+    /// this process.
+    ///
+    /// It gates both halves of the dashboard — the bundle at `/dashboard/<key>`
+    /// and the API at `/v1/dashboard/*` — because a page nobody can fetch is a
+    /// smaller surface than a page that is merely inert. The host serves plain
+    /// HTTP by design and the port is reachable over the tailnet, so "it is
+    /// only local" is not a claim this code is allowed to make.
+    static let dashboardKey: String = {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, 32, &bytes)
+        // URL-safe and unpadded: this rides in a path segment.
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }()
+
+    /// Where the built Mac dashboard lives, or nil if it was never built.
+    ///
+    /// The same four places as `webRoot`, in the same order and for the same
+    /// reasons — an override, the installed copy, the checkout, then whatever
+    /// was packaged into the app bundle. A host with none of them has no
+    /// dashboard and says so; nothing else depends on it.
+    static var dashboardRoot: URL? {
+        let manager = FileManager.default
+
+        if let override = ProcessInfo.processInfo.environment["VIBEWIRE_DASHBOARD_ROOT"],
+           !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
+        }
+
+        let installed = configDirectory.appendingPathComponent("dashboard", isDirectory: true)
+        if manager.fileExists(atPath: installed.appendingPathComponent("index.html").path) {
+            return installed
+        }
+
+        // .../host/Sources/VibeWireHost/Core/Config.swift → .../web/dist-dashboard
+        let checkout = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Core/
+            .deletingLastPathComponent()   // VibeWireHost/
+            .deletingLastPathComponent()   // Sources/
+            .deletingLastPathComponent()   // host/
+            .deletingLastPathComponent()   // the checkout root
+            .appendingPathComponent("web/dist-dashboard", isDirectory: true)
+        if manager.fileExists(atPath: checkout.appendingPathComponent("index.html").path) {
+            return checkout
+        }
+
+        return bundled("dashboard")
+    }
+
+    /// A directory inside VibeWire.app's Resources, or nil when the host is not
+    /// running from a bundle or was packaged without that directory.
+    ///
+    /// Last of the four, deliberately. `package-app.sh` copies the built client
+    /// and dashboard in here so the copy in /Applications keeps working if the
+    /// checkout is moved or deleted — but it must never shadow the checkout,
+    /// because during development the whole point of the checkout path is that
+    /// `npm run build` reaches a running host with no copy step.
+    private static func bundled(_ name: String) -> URL? {
+        guard let resources = Bundle.main.resourceURL else { return nil }
+        let candidate = resources.appendingPathComponent(name, isDirectory: true)
+        guard FileManager.default.fileExists(
+            atPath: candidate.appendingPathComponent("index.html").path
+        ) else { return nil }
+        return candidate
+    }
+
     static var configDirectory: URL {
         let base = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config", isDirectory: true)
@@ -92,7 +175,7 @@ enum Config {
 
     /// Where the built web client lives, or nil if it was never built.
     ///
-    /// Three places, in order of how deliberate they are:
+    /// Four places, in order of how deliberate they are:
     ///
     ///  1. `VIBEWIRE_WEB_ROOT`, for anyone who wants to point the host at a bundle
     ///     somewhere else entirely.
@@ -102,6 +185,9 @@ enum Config {
     ///     path. Only ever true for a host built from the checkout, which is exactly
     ///     when it is wanted: `npm run build` in `web/` and the running host serves
     ///     the new client with no copy step.
+    ///  4. `VibeWire.app/Contents/Resources/web`, the copy `package-app.sh` put in
+    ///     the bundle. Last, so it is only reached when none of the above answered —
+    ///     the checkout is gone, or this Mac never had one.
     static var webRoot: URL? {
         let manager = FileManager.default
 
@@ -126,21 +212,56 @@ enum Config {
             return checkout
         }
 
-        return nil
+        return bundled("web")
     }
 
     static func loadSettings() -> HostSettings {
-        guard let data = try? Data(contentsOf: settingsURL),
-              let decoded = try? JSONDecoder().decode(HostSettings.self, from: data)
-        else { return .default }
-        return decoded
+        var settings = HostSettings.default
+        if let data = try? Data(contentsOf: settingsURL),
+           let decoded = try? JSONDecoder().decode(HostSettings.self, from: data) {
+            settings = decoded
+        }
+        // `--port <n>` runs this host somewhere other than the stored port
+        // without editing the stored port, which is what makes a second host
+        // testable beside a real one that is already serving on 8787. Applied
+        // here rather than at the call site so every reader of the settings —
+        // the server, the QR builder, the dashboard — agrees about which port
+        // this process is on.
+        if let override = portOverride { settings.port = override }
+        return settings
     }
 
+    private static let portOverride: UInt16? = {
+        let arguments = CommandLine.arguments
+        guard let flag = arguments.firstIndex(of: "--port"),
+              arguments.index(after: flag) < arguments.endIndex,
+              let value = UInt16(arguments[arguments.index(after: flag)]),
+              value > 0
+        else { return nil }
+        return value
+    }()
+
     static func saveSettings(_ settings: HostSettings) {
+        var settings = settings
+        // A port supplied on the command line belongs to this run, not to the
+        // file. Without this, changing any setting from the dashboard would
+        // quietly write the override back and make it permanent — the first
+        // save after `--port 8899` would move the real host to 8899 for good.
+        if portOverride != nil {
+            settings.port = storedPort
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(settings) else { return }
         try? data.write(to: settingsURL, options: .atomic)
+    }
+
+    /// The port as the file has it, ignoring any override.
+    private static var storedPort: UInt16 {
+        guard let data = try? Data(contentsOf: settingsURL),
+              let decoded = try? JSONDecoder().decode(HostSettings.self, from: data)
+        else { return HostSettings.default.port }
+        return decoded.port
     }
 
     /// Human name for this Mac, e.g. "MacBook Pro 14"".

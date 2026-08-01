@@ -291,3 +291,52 @@ not depend on it.
 `connect-src *` because the client may be pointed at a different address than the
 one that served it. Path traversal is refused before the filesystem is touched
 and again after resolution, and `/v1/` is never served from disk.
+
+## 8. Mac dashboard
+
+The host's own window — the Mac app — is a third surface on the same port. It is
+not part of the phone protocol: no client speaks it, no version negotiation
+applies to it, and a host serving it behaves identically to one that is not.
+
+**It is not defended by being local.** `SocketForwarder` splices every connection
+through loopback, so the host cannot tell a request from this Mac apart from one
+off the tailnet. A per-launch key is therefore the only check, and it gates the
+bundle as well as the API — a page nobody can fetch is a smaller surface than a
+page that is merely inert.
+
+```
+GET  /dashboard/<key>/          the dashboard bundle (308 from the slashless form)
+GET  /dashboard/<key>/assets/…  its own fingerprinted assets
+GET  /v1/dashboard/state        one snapshot of everything measured, polled at 1 Hz
+GET  /v1/dashboard/events?since= claude messages, the same ones §5 sends the phone
+GET  /v1/dashboard/snapshot?display=&width=   one PNG frame — a screenshot, not the stream
+GET  /v1/dashboard/qr?kind=app|browser        the pairing QR, with the payload in a header
+POST /v1/dashboard/command      { "do": "…" }
+```
+
+The key is 32 random bytes, base64url, minted at launch and held only in memory:
+never in the settings file, never in the keychain, never in the log. The window
+is opened with it in its URL; `--dashboard-url` prints it for a browser. Wrong or
+absent gets `401` from the API and `404` from the bundle — a `403` there would
+confirm the path exists, which is the one thing a guess learns for free.
+
+The trailing slash on the bundle path is load-bearing. The build has no fixed
+base — the key changes every launch — so its asset references are relative, and
+at `/dashboard/<key>` they would resolve a directory up and lose the key. The
+slashless form redirects rather than serving a page whose assets 404.
+
+Commands: `pair.begin` `{name, reusable}`, `pair.end`, `device.revoke`
+`{deviceId}|{all}`, `device.sever` `{deviceId}`, `device.rename`
+`{deviceId, name}`, `display.select` `{displayIds, sideBySide}`, `capture.stop`,
+`setting.set` `{key, value}`, `transport.tunnel` `{on}`, `transport.refresh`,
+`permission.request` `{which}`, and `claude` carrying any §5 phone → host `sub`.
+
+Everything routes through the paths the phone already uses, so the two surfaces
+cannot disagree: settings persist and retune the encoder identically, a revoke
+severs the socket within the same second, and Claude's output is fanned to the
+attached phone and the window both — one session, two readers.
+
+Polled rather than socketed, deliberately. The host measures on a one-second
+heartbeat, so a faster poll returns the same numbers twice; the one thing that
+genuinely streams is Claude, and `events` is a cursor over exactly the messages
+§5 defines rather than a second description of them.

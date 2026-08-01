@@ -46,6 +46,25 @@ final class HostRouter: Router, @unchecked Sendable {
     /// `Config.webRoot` — so a host without a bundle costs nothing per request.
     private let web = WebAssets(root: Config.webRoot)
 
+    /// The Mac dashboard's own surface: its bundle and its API, both behind the
+    /// launch key. Built at the end of `init` because it holds this router.
+    private(set) var dashboard: DashboardService?
+
+    /// Messages the phone's socket would have received, kept for the dashboard
+    /// to collect on its next poll.
+    ///
+    /// The dashboard shows the same Claude session the phone does — that is the
+    /// point of it — so it reads the same `claude` messages rather than a
+    /// parallel description of them. A ring rather than a queue: a dashboard
+    /// nobody has open must not grow a backlog for the life of the process.
+    private let events = Guarded(EventRing())
+
+    private struct EventRing {
+        var messages: [(sequence: Int, payload: [String: Any])] = []
+        var nextSequence = 1
+        static let capacity = 400
+    }
+
     weak var server: HTTPServer?
 
     /// What the menu bar reports before any menu item.
@@ -86,6 +105,59 @@ final class HostRouter: Router, @unchecked Sendable {
         self.transport = transport
         self.state = Guarded(State(settings: settings))
         injector.update(sensitivity: settings.sensitivity, naturalScrolling: settings.naturalScrolling)
+        self.dashboard = DashboardService(
+            router: self,
+            trust: trust,
+            pairing: pairing,
+            catalog: catalog,
+            transport: transport,
+            telemetry: telemetry,
+            system: system
+        )
+    }
+
+    /// Points Claude's output at this router rather than at whichever socket
+    /// happened to open last.
+    ///
+    /// Called once at launch. It used to be set inside `socketOpened`, which
+    /// meant Claude's output existed only while a phone was attached — and the
+    /// dashboard, which is on the same Mac and never opens a socket, could not
+    /// see the session it was showing. Routing everything through `fanOut`
+    /// leaves the phone's behaviour identical: the active socket still gets
+    /// every message, and now so does the window on this desk.
+    func activateClaudeFanOut() async {
+        await claude.setEmitter { [weak self] payload in
+            self?.fanOut(payload)
+        }
+        await channel.setEmitter { [weak self] payload in
+            self?.fanOut(payload)
+        }
+    }
+
+    /// One message to both surfaces: the attached phone, and the dashboard's
+    /// next poll.
+    private func fanOut(_ payload: [String: Any]) {
+        state.read { $0.activeSocket }?.sendJSON(payload)
+        events.withLock { ring in
+            ring.messages.append((ring.nextSequence, payload))
+            ring.nextSequence += 1
+            if ring.messages.count > EventRing.capacity {
+                ring.messages.removeFirst(ring.messages.count - EventRing.capacity)
+            }
+        }
+    }
+
+    /// Everything emitted after `since`, and the sequence to ask from next.
+    ///
+    /// A dashboard that has fallen behind the ring gets whatever survives and a
+    /// `dropped` count, rather than a silently truncated transcript.
+    func drainEvents(since: Int) -> (next: Int, dropped: Int, messages: [[String: Any]]) {
+        events.read { ring in
+            let fresh = ring.messages.filter { $0.sequence > since }
+            let oldestHeld = ring.messages.first?.sequence ?? ring.nextSequence
+            let dropped = since > 0 ? max(0, oldestHeld - since - 1) : 0
+            return (ring.nextSequence, dropped, fresh.map(\.payload))
+        }
     }
 
     // MARK: HTTP
@@ -138,6 +210,14 @@ final class HostRouter: Router, @unchecked Sendable {
             )
 
         default:
+            // The Mac dashboard: its own bundle behind the launch key, and its
+            // own API behind the same key. Both are checked before the web
+            // client, because `/dashboard/…` is not a route the phone client has
+            // and must not fall through to its index.
+            if let response = await dashboard?.response(for: request) {
+                return response
+            }
+
             // The web client, served from the same port so the browser sees one
             // origin for the page and the protocol both. Anything under /v1 has
             // already been matched above, and `WebAssets` refuses that prefix too.
@@ -193,9 +273,22 @@ final class HostRouter: Router, @unchecked Sendable {
         } catch PairingService.PairError.badPublicKey {
             Log.info(.net, "pair rejected 400 bad_public_key")
             return .error(400, "bad_public_key")
-        } catch {
-            Log.info(.net, "pair rejected 401 bad_code: \(error)")
+        } catch PairingService.PairError.badCode {
+            Log.info(.net, "pair rejected 401 bad_code")
             return .error(401, "bad_code")
+        } catch {
+            // Everything left is the trust store failing to record the pairing,
+            // and it is not a bad code. It used to be reported as one, which is
+            // the collapsed-failure defect this product has already paid for
+            // once: the phone said "wrong code" and the person retyped a code
+            // that was right five times, into a host whose keychain was the
+            // thing that would not answer.
+            //
+            // The digits were already accepted at this point — `pair()` records
+            // that in its progress — so the honest answer is that the Mac could
+            // not store the trust, and retrying the code will not help.
+            Log.error(.net, "pair failed after the code was accepted: \(error)")
+            return .error(503, "trust_unavailable", extra: ["detail": "\(error)"])
         }
     }
 
@@ -261,9 +354,10 @@ final class HostRouter: Router, @unchecked Sendable {
         await transport.noteContact()
         system.preventSleep(true)
 
-        await claude.setEmitter { [weak socket] payload in
-            socket?.sendJSON(payload)
-        }
+        // The fourth step of the pairing window's handshake list, and the only
+        // one that arrives from a different request than the other three. It is
+        // ignored unless this is the device that window just paired.
+        await pairing.noteSocketOpened(deviceId: device.id)
 
         let hostId = (try? await trust.hostId()) ?? ""
         socket.sendJSON(Outbound.hello(
@@ -433,7 +527,7 @@ final class HostRouter: Router, @unchecked Sendable {
             }
 
         case .claude(let inbound):
-            await handleClaude(inbound, socket: socket)
+            await handleClaude(inbound)
 
         case .revoke(let deviceId, let all):
             await handleRevoke(deviceId: deviceId, all: all, socket: socket)
@@ -632,7 +726,14 @@ final class HostRouter: Router, @unchecked Sendable {
 
     // MARK: Claude
 
-    private func handleClaude(_ inbound: ClaudeInbound, socket: SocketConnection) async {
+    /// Replies go to `fanOut`, not to the socket that asked.
+    ///
+    /// There is one Claude session on this Mac, and both surfaces are looking at
+    /// it. A session list answered only to the asker would leave the dashboard
+    /// showing an empty picker while the phone had one, and a permission prompt
+    /// answered only to the asker would leave whichever surface is nearer the
+    /// user unable to say yes.
+    private func handleClaude(_ inbound: ClaudeInbound) async {
         switch inbound {
         case .listSessions(let cwd):
             var listed = ClaudeSessionIndex.recentSessions(cwd: cwd).map(\.wire)
@@ -651,7 +752,7 @@ final class HostRouter: Router, @unchecked Sendable {
                     "modifiedAt": ISO8601DateFormatter().string(from: Date()),
                 ], at: 0)
             }
-            socket.sendJSON([
+            fanOut([
                 "t": "claude",
                 "sub": "sessions",
                 "sessions": listed,
@@ -661,11 +762,8 @@ final class HostRouter: Router, @unchecked Sendable {
             // Joining the terminal's session rather than starting one.
             if sessionId == Self.liveSessionId {
                 await claude.close()
-                await channel.setEmitter { [weak socket] payload in
-                    socket?.sendJSON(payload)
-                }
                 await channel.attach()
-                socket.sendJSON([
+                fanOut([
                     "t": "claude",
                     "sub": "opened",
                     "sessionId": Self.liveSessionId,
@@ -695,7 +793,7 @@ final class HostRouter: Router, @unchecked Sendable {
                 // a new session is assigned one here, and the phone needs it to
                 // show the session and to find it again later.
                 let openedId = await claude.sessionId ?? sessionId ?? ""
-                socket.sendJSON([
+                fanOut([
                     "t": "claude",
                     "sub": "opened",
                     "sessionId": openedId,
@@ -710,7 +808,7 @@ final class HostRouter: Router, @unchecked Sendable {
                 if let sessionId {
                     let turns = ClaudeSessionIndex.transcript(sessionId: sessionId)
                     if !turns.isEmpty {
-                        socket.sendJSON([
+                        fanOut([
                             "t": "claude",
                             "sub": "history",
                             "sessionId": sessionId,
@@ -723,7 +821,7 @@ final class HostRouter: Router, @unchecked Sendable {
                 // the phone before Claude touches anything else.
                 await claude.publishWorkingTree()
             } catch {
-                socket.sendJSON(["t": "claude", "sub": "error", "message": "\(error)"])
+                fanOut(["t": "claude", "sub": "error", "message": "\(error)"])
             }
 
         case .send(let text):
@@ -732,7 +830,7 @@ final class HostRouter: Router, @unchecked Sendable {
             // cannot see.
             if await channel.isAttached {
                 if await !channel.send(text: text) {
-                    socket.sendJSON([
+                    fanOut([
                         "t": "claude",
                         "sub": "error",
                         "message": "The terminal session is no longer listening. Reopen it with the channel loaded.",
@@ -840,6 +938,156 @@ final class HostRouter: Router, @unchecked Sendable {
                 "hostVersion": Config.hostVersion,
             ]
         }
+    }
+
+    // MARK: The dashboard's view of this router
+
+    /// What the dashboard needs that nothing else on this Mac can answer.
+    ///
+    /// Everything here is read out of the same lock the streaming path uses, in
+    /// one pass, so a snapshot cannot describe a stream that stopped halfway
+    /// through building it. `nil` where nothing has been measured — the pane
+    /// draws an em dash for those, and never a zero.
+    struct Facts: Sendable {
+        struct Stream: Sendable {
+            var streamId: Int
+            var displayId: UInt32
+            var width: Int
+            var height: Int
+            var fps: Int
+            var bitrate: Int
+            var ladder: Int
+            var measuredMbps: Double
+            var framesEncoded: Int
+            /// The encoder is configured with `MaxKeyFrameInterval = fps * 2`
+            /// and a two-second ceiling, so both of these are read off the
+            /// running configuration rather than assumed.
+            var gop: Int { fps * 2 }
+            var keyframeSeconds: Double { 2.0 }
+        }
+
+        var settings: HostSettings
+        var streams: [Stream]
+        var selectedDisplays: [UInt32]
+        var attachedDeviceId: String?
+        var attachedDeviceName: String?
+        var attachedSince: Date?
+        var attachedBytesSent: Int
+        var attachedFramesDropped: Int
+        var secondsSincePong: TimeInterval?
+        var phoneOnExpensiveLink: Bool
+        var lastKeyframeAgeSeconds: Int?
+    }
+
+    var facts: Facts {
+        state.read { current in
+            Facts(
+                settings: current.settings,
+                streams: current.streams
+                    .sorted { $0.key < $1.key }
+                    .map { streamId, stream in
+                        let size = stream.currentSize
+                        return Facts.Stream(
+                            streamId: Int(streamId),
+                            displayId: UInt32(stream.displayId),
+                            width: size.width,
+                            height: size.height,
+                            fps: stream.currentQuality.fps,
+                            bitrate: stream.currentQuality.bitrate,
+                            ladder: stream.currentQuality.maxHeight,
+                            measuredMbps: stream.measuredMbps,
+                            framesEncoded: stream.framesEncoded
+                        )
+                    },
+                selectedDisplays: current.selectedDisplays.map { UInt32($0) },
+                attachedDeviceId: current.activeSocket?.deviceId,
+                attachedDeviceName: current.activeSocket?.deviceName,
+                attachedSince: current.activeSocket?.openedAt,
+                attachedBytesSent: current.activeSocket?.traffic.bytesSent ?? 0,
+                attachedFramesDropped: current.activeSocket?.traffic.framesDropped ?? 0,
+                secondsSincePong: current.activeSocket?.secondsSincePong,
+                phoneOnExpensiveLink: current.phoneOnExpensiveLink,
+                lastKeyframeAgeSeconds: current.lastKeyframe
+                    .map { Int(Date().timeIntervalSince($0.at)) }
+            )
+        }
+    }
+
+    /// The same setting path the phone uses, so a change made at the Mac and a
+    /// change made on the phone cannot diverge. Both persist, both retune the
+    /// encoder, and both tell the attached phone what the new value is.
+    func dashboardApplySetting(key: String, value: SettingValue) async {
+        await applySetting(key: key, value: value)
+        state.read { $0.activeSocket }?.sendJSON(settingsPayload())
+    }
+
+    /// Revoke, from the Mac rather than from a phone.
+    ///
+    /// The severing is the point: PROTOCOL §1.1 promises a live socket dies
+    /// within a second of the key being destroyed, and that promise is what
+    /// makes revoking from this desk worth doing while the phone is still in
+    /// someone's hand.
+    func dashboardRevoke(deviceId: String?, all: Bool) async throws -> Int {
+        if all {
+            let removed = try await trust.revokeAll()
+            server?.severSockets(deviceIds: Set(removed))
+            return removed.count
+        }
+        guard let deviceId else { return 0 }
+        guard try await trust.revoke(id: deviceId) else { return 0 }
+        server?.severSockets(deviceIds: [deviceId])
+        return 1
+    }
+
+    /// Closes the socket and keeps the key, which is the other half of the pair
+    /// of verbs on the Devices pane. The phone reconnects on its own backoff —
+    /// this is not a ban, it is a hang-up.
+    func dashboardSever(deviceId: String) {
+        server?.severSockets(deviceIds: [deviceId])
+    }
+
+    func dashboardRename(deviceId: String, to name: String) async throws -> Bool {
+        let renamed = try await trust.rename(id: deviceId, to: name)
+        if renamed, let socket = state.read({ $0.activeSocket }) {
+            await pushDevices(to: socket)
+        }
+        return renamed
+    }
+
+    /// Which displays the phone is watching, chosen from the Mac.
+    ///
+    /// Selecting is not starting: with nothing attached there is no socket to
+    /// send frames to, and this only records the choice and refocuses input.
+    /// A live session picks the change up on its next retune.
+    func dashboardSelectDisplays(_ ids: [UInt32], sideBySide: Bool) async {
+        let displayIds = ids.map { CGDirectDisplayID($0) }
+        let selection = state.withLock { current -> [CGDirectDisplayID] in
+            current.selectedDisplays = sideBySide ? displayIds : Array(displayIds.prefix(1))
+            return current.selectedDisplays
+        }
+        if let first = selection.first { injector.focus(display: first) }
+        if let socket = state.read({ $0.activeSocket }) {
+            await pushDisplays(to: socket)
+            await startStreams(
+                displays: selection,
+                maxHeight: nil,
+                fps: nil,
+                socket: socket
+            )
+        }
+    }
+
+    /// STOP CAPTURE on the Displays pane. Ends every stream and says so to the
+    /// phone, which is the same thing the phone's own ✕ does.
+    func dashboardStopCapture() async {
+        await stopAllStreams()
+        state.read { $0.activeSocket }?.sendJSON(["t": "streamState", "state": "stopped"])
+    }
+
+    /// Claude, driven from the Mac. Identical to the phone's path — see
+    /// `handleClaude` for why the replies go to both surfaces.
+    func dashboardClaude(_ inbound: ClaudeInbound) async {
+        await handleClaude(inbound)
     }
 
     // MARK: Pushes

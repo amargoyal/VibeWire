@@ -34,6 +34,7 @@ npm-debug.log*
 # committed copy would only ever be a stale one. `web/package-lock.json` stays
 # tracked — it is what `npm ci` builds from.
 web/dist/
+web/dist-dashboard/
 web/.vite/
 
 # Secrets — the host keeps trust records and the channel token in

@@ -19,6 +19,11 @@ actor Telemetry {
         var downMbps: Double
         /// Last 60 s of RTT, one value per second, for the sparkline on 02A.
         var rttHistory: [Double]
+        /// Last 60 s of measured outbound rate, one value per second, for the
+        /// dashboard's encoder trace. Filled from the host's own heartbeat
+        /// rather than from a client report, so it exists whether or not a phone
+        /// is answering pings.
+        var mbpsHistory: [Double]
         var sampleCount: Int
 
         var wire: [String: Any] {
@@ -45,6 +50,7 @@ actor Telemetry {
     private var history: [Double] = []
     private var lastHistoryTick = Date()
     private var currentMbps: Double = 0
+    private var mbpsHistory: [Double] = []
 
     private let windowSeconds: TimeInterval = 60
 
@@ -66,8 +72,13 @@ actor Telemetry {
         }
     }
 
+    /// Called once a second from the host's heartbeat, which is what makes the
+    /// history a per-second series rather than a series of however often
+    /// somebody happened to ask.
     func noteThroughput(mbps: Double) {
         currentMbps = mbps
+        mbpsHistory.append(mbps)
+        if mbpsHistory.count > 60 { mbpsHistory.removeFirst(mbpsHistory.count - 60) }
     }
 
     func snapshot() -> Snapshot {
@@ -103,6 +114,7 @@ actor Telemetry {
             lossPercent: loss,
             downMbps: currentMbps,
             rttHistory: history,
+            mbpsHistory: mbpsHistory,
             sampleCount: samples.count
         )
     }
@@ -122,6 +134,7 @@ actor Telemetry {
         highestSequence = 0
         pingsReceived = 0
         currentMbps = 0
+        mbpsHistory.removeAll()
     }
 
     private func prune() {

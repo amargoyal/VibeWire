@@ -3,12 +3,15 @@
   "version": "0.9.4",
   "private": true,
   "type": "module",
-  "description": "VibeWire web client — the same instrument as the iPhone app, in a browser.",
+  "description": "VibeWire web client \u2014 the same instrument as the iPhone app, in a browser.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:dashboard": "vite --config vite.dashboard.config.ts",
+    "build:dashboard": "tsc --noEmit -p tsconfig.dashboard.json && vite build --config vite.dashboard.config.ts",
+    "build:all": "npm run build && npm run build:dashboard"
   },
   "dependencies": {
     "@noble/ed25519": "^2.1.0",

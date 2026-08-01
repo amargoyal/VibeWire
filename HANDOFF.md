@@ -29,6 +29,19 @@ VIBEWIRE_VERBOSE=1 nohup /Users/amargoyal/Github/VibeWire/host/.build/arm64-appl
 
 `--pair` now opens the pairing window itself (code + QR), not just the log line. Verbose is required or stderr stays empty.
 
+Install it as a real app — Spotlight, Finder, Login Items:
+
+```
+cd host && ./package-app.sh
+```
+
+Wraps the release binary in `VibeWire.app`, signs it with the Apple Development
+certificate, and installs to `/Applications`. `--no-install` leaves the bundle in
+`host/build/` instead. The bundle is `LSUIElement`, so it stays a menu-bar app with
+no Dock icon; that does not hide it from Spotlight. Signing with a real certificate
+is what makes the Screen Recording and Accessibility grants survive a rebuild — an
+ad-hoc signature changes every time and TCC treats each build as a new app.
+
 ---
 
 # THE BUG YOU ARE ON

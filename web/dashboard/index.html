@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VibeWire</title>
+    <!--
+      No `user-scalable=no` here, unlike the phone client. That exception exists
+      there because the document is a trackpad and a pinch has to reach the Mac;
+      this document is a dashboard on the Mac, and pinch-zoom is just zoom.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0F1114" />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

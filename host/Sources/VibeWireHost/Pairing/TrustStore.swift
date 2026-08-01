@@ -127,6 +127,27 @@ actor TrustStore {
         try? await persist(devices)
     }
 
+    /// Renames a paired device without touching its key.
+    ///
+    /// The name is a label the person at the Mac chose; the key is what the
+    /// device proves it holds. Changing one must never disturb the other, which
+    /// is why this is a rename rather than a revoke-and-repair.
+    ///
+    /// Returns false when there is no such device, so the caller can say so
+    /// instead of reporting a rename that renamed nothing.
+    @discardableResult
+    func rename(id: String, to name: String) async throws -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        var devices = try await loadDevices()
+        guard var device = devices[id] else { return false }
+        device.name = String(trimmed.prefix(64))
+        devices[id] = device
+        try await persist(devices)
+        Log.info(.net, "renamed device \(id) to \(device.name)")
+        return true
+    }
+
     /// Returns true when something was actually removed, so callers can decide
     /// whether to sever a live socket.
     @discardableResult

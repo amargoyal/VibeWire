@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The bundle metadata for VibeWire.app. `package-app.sh` copies this in and
+  substitutes __VERSION__ with Config.hostVersion, so the version lives in one
+  place — the Swift source — rather than being kept in step by hand.
+
+  LSUIElement keeps VibeWire out of the Dock and the app switcher, which is what
+  NSApplication.setActivationPolicy(.accessory) already asks for at runtime.
+  Declaring it here as well means the Dock never flashes an icon during launch.
+  It does NOT hide the app from Spotlight or from Finder: an agent app in
+  /Applications is indexed like any other.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>VibeWire</string>
+	<key>CFBundleDisplayName</key>
+	<string>VibeWire</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.vibewire.host</string>
+	<key>CFBundleExecutable</key>
+	<string>VibeWire</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__VERSION__</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+	<key>NSHumanReadableCopyright</key>
+	<string>VibeWire</string>
+</dict>
+</plist>

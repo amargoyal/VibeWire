@@ -225,10 +225,20 @@ final class ClientConnection: @unchecked Sendable {
 final class SocketConnection: @unchecked Sendable {
     let deviceId: String?
     let deviceName: String
+    /// When this socket was upgraded, for the ATTACHED 1H 12M readout. Taken at
+    /// construction, which is the moment authentication succeeded.
+    let openedAt = Date()
     private let connection: NWConnection
     private let sendLock = NSLock()
     private var isClosed = false
     private var lastPongAt = Date()
+    /// Bytes handed to the transport on this socket, both framings.
+    ///
+    /// Counted here rather than derived from the encoder's rate because this is
+    /// what actually left for this device — a dropped frame never reaches the
+    /// wire, and the dashboard says SENT, not ENCODED.
+    private var bytesSentTotal = 0
+    private var framesDroppedTotal = 0
 
     /// Video is dropped rather than queued when the socket is congested.
     /// A stale frame is worthless; a growing queue is worse than worthless.
@@ -257,10 +267,12 @@ final class SocketConnection: @unchecked Sendable {
         sendLock.lock()
         let congested = inFlightBinaryBytes + payload.count > maxInFlightBinaryBytes
         if congested {
+            framesDroppedTotal += 1
             sendLock.unlock()
             return false
         }
         inFlightBinaryBytes += payload.count
+        bytesSentTotal += payload.count
         sendLock.unlock()
 
         let framed = WebSocketCodec.encode(
@@ -277,9 +289,17 @@ final class SocketConnection: @unchecked Sendable {
         return true
     }
 
+    /// Total bytes sent, and frames dropped for congestion, since the upgrade.
+    var traffic: (bytesSent: Int, framesDropped: Int) {
+        sendLock.lock()
+        defer { sendLock.unlock() }
+        return (bytesSentTotal, framesDroppedTotal)
+    }
+
     func sendRaw(_ data: Data) {
         sendLock.lock()
         let closed = isClosed
+        if !closed { bytesSentTotal += data.count }
         sendLock.unlock()
         guard !closed else { return }
         connection.send(content: data, completion: .contentProcessed { error in

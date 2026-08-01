@@ -18,11 +18,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var server: HTTPServer?
     private var router: HostRouter?
     private var menuBar: MenuBarController?
+    private var dashboard: DashboardWindow?
     private var transport: TransportManager?
     private var system: SystemServices?
     private var heartbeat: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Touched here so the uptime readout counts from launch rather than
+        // from whenever something first asked. `static let` is lazy.
+        _ = Config.launchedAt
         let settings = Config.loadSettings()
 
         let trust = TrustStore()
@@ -84,15 +88,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // the comment described the intent, nothing implemented it, and the
         // header sat frozen at whatever it read a moment after launch.
         menuBar.router = router
+
+        // The Mac app's one window. Built now rather than on first open so the
+        // menu item has something to hand to; nothing loads until it is shown.
+        let dashboard = DashboardWindow(port: settings.port)
+        menuBar.dashboard = dashboard
+        self.dashboard = dashboard
         self.menuBar = menuBar
 
         observeSleepAndWake(system: system)
 
         // One second is enough to keep the condition report honest without
         // burning battery on either end.
+        //
+        // The code rotation rides this timer now. It used to ride a second timer
+        // owned by the pairing window, which meant the code only rotated while
+        // that window was on screen — reasonable when the window was the only
+        // thing that could show a code, and wrong now that the code is one pane
+        // of a window that may be sitting on the Log. `rotateIfNeeded` is a
+        // no-op when no pairing is open, so this costs a lock read a second.
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            Task { @MainActor in await router.tick() }
+            Task { @MainActor in
+                await router.tick()
+                await pairing.rotateIfNeeded()
+            }
         }
+
+        // Claude's output goes to both surfaces from here on: the attached
+        // phone, and the dashboard's poll. Set once, rather than per socket.
+        Task { await router.activateClaudeFanOut() }
 
         // The first keychain read after a rebuild can take tens of seconds.
         // Spend that at launch rather than inside the first pairing request.
@@ -105,15 +129,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             await Self.logStartupSummary(transport: transport, settings: settings)
 
-            // `--pair` opens the pairing window at launch and prints the code.
-            // This is not a bypass: the code still rotates every 60 s and still
-            // requires someone at the Mac to read it, whether from the menu bar
-            // or from the terminal they started the host in.
+            // `--pair` opens the window on the pairing pane at launch and prints
+            // the code. This is not a bypass: the code still rotates every 60 s
+            // and still requires someone at the Mac to read it, whether from the
+            // window or from the terminal they started the host in.
             if CommandLine.arguments.contains("--pair") {
-                let code = await pairing.beginPairing()
-                Log.info(.app, "pairing open — code \(code.value) (rotates in 60s)")
-                self.menuBar?.present(code: code)
-                self.menuBar?.rebuildMenu()
+                await self.menuBar?.beginPairing()
+            }
+
+            // `--dashboard` is the same window with no code showing, for when
+            // the reason to open it is to look rather than to pair.
+            if CommandLine.arguments.contains("--dashboard") {
+                self.dashboard?.show()
+            }
+
+            // `--dashboard-url` prints the address, key and all, for opening the
+            // dashboard in a browser instead of the app's own window.
+            //
+            // Opt-in and nothing else. The key is the whole control surface of
+            // this Mac, so it is never logged as a matter of course — printing it
+            // on every launch would put it in every terminal scrollback and every
+            // redirected log file for the sake of a case that comes up rarely.
+            if CommandLine.arguments.contains("--dashboard-url") {
+                FileHandle.standardOutput.write(
+                    Data("http://127.0.0.1:\(settings.port)/dashboard/\(Config.dashboardKey)/\n".utf8)
+                )
             }
         }
 

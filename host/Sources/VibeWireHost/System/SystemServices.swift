@@ -37,13 +37,41 @@ final class SystemServices: @unchecked Sendable {
     // MARK: Screenshot
 
     /// SHOT on the hub arc. Returns PNG bytes for the selected display.
-    func screenshot(display: CGDirectDisplayID) -> Data? {
+    ///
+    /// `maxWidth` exists for the dashboard's hero panel, which asks once a
+    /// second and draws the answer at about 900 px. Sending a 5120 px Studio
+    /// Display PNG for that would be several megabytes a second of loopback
+    /// traffic and a PNG encode per frame, to be scaled down by the browser
+    /// anyway. Unset, the full display is returned — which is what the phone's
+    /// SHOT wants, since that one is meant to be pinched into.
+    func screenshot(display: CGDirectDisplayID, maxWidth: Int? = nil) -> Data? {
         guard let image = CGDisplayCreateImage(display) else {
             Log.warn(.app, "screenshot failed for display \(display)")
             return nil
         }
-        let bitmap = NSBitmapImageRep(cgImage: image)
-        return bitmap.representation(using: .png, properties: [:])
+        guard let maxWidth, image.width > maxWidth else {
+            return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        }
+
+        let scale = Double(maxWidth) / Double(image.width)
+        let width = maxWidth
+        let height = max(1, Int((Double(image.height) * scale).rounded()))
+
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else {
+            return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        }
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let scaled = context.makeImage() else { return nil }
+        return NSBitmapImageRep(cgImage: scaled).representation(using: .png, properties: [:])
     }
 
     // MARK: Lock

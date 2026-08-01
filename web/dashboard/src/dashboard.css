@@ -1,0 +1,459 @@
+/*
+ * The Mac dashboard's own layer, on top of Nightshift.
+ *
+ * Everything the phone client and this window share — the palette, the type
+ * ramp, cards, grouped rows, the toggle, the segmented control, the timeline —
+ * comes from `nightshift.css` and is not restated here. What is here is the
+ * shape a window has and a phone does not: a title bar with the traffic lights
+ * in it, a fixed sidebar, and panes that scroll inside a frame rather than a
+ * document that scrolls as a whole.
+ *
+ * The design was drawn as a picture of a Mac window inside a browser page,
+ * complete with three painted dots at the top left. This is a Mac window, so the
+ * dots are the real ones: `fullSizeContentView` runs the content under a
+ * transparent title bar, the header reserves 78px for them, and the top 28px
+ * stays free of controls so the system's own drag region still works.
+ */
+
+@import '../../src/design/nightshift.css';
+
+html,
+body,
+#root {
+  height: 100%;
+  /* The window is the viewport; nothing here scrolls as a document. Panes own
+     their own overflow so the header and the sidebar hold still. */
+  overflow: hidden;
+}
+
+.mac {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ns-screen);
+}
+
+/* ── Title bar ────────────────────────────────────────────────────────── */
+
+.mac__bar {
+  height: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* 78px clears the three traffic lights. They are the window's, not the
+     page's, so this is a measurement of AppKit rather than a design choice. */
+  padding: 0 18px 0 78px;
+  background: var(--ns-chrome);
+  box-shadow: inset 0 -1px 0 var(--ns-hairline);
+}
+
+.mac__wordmark {
+  font-family: var(--ns-mono);
+  font-size: var(--fs-11);
+  letter-spacing: 0.32em;
+  font-weight: 500;
+  color: var(--ns-text-secondary);
+}
+
+.mac__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--ns-hairline);
+  flex: 0 0 auto;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+
+.mac__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.mac__nav {
+  width: 214px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px 14px;
+  box-shadow: inset -1px 0 0 var(--ns-hairline);
+  overflow-y: auto;
+}
+
+.mac__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding-inline: 10px;
+  font-family: var(--ns-mono);
+  font-size: var(--fs-10);
+  letter-spacing: var(--caps-tracking);
+  color: var(--ns-text-secondary);
+  background: transparent;
+  transition: background var(--state-change) ease-out;
+}
+
+.mac__nav-item:hover {
+  background: var(--ns-raised);
+}
+
+.mac__nav-item[aria-current='page'] {
+  background: color-mix(in srgb, var(--ns-accent) 12%, transparent);
+  color: var(--ns-accent);
+}
+
+/* ── Panes ────────────────────────────────────────────────────────────── */
+
+.mac__pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* A pane that is a single scrolling column. */
+.pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  overflow-y: auto;
+}
+
+/* A pane that is two columns, each scrolling on its own. */
+.pane--split {
+  flex-direction: row;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.pane__col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.pane__col--rail {
+  width: 340px;
+  flex: 0 0 auto;
+}
+
+.pane__col--rail-narrow {
+  width: 300px;
+  flex: 0 0 auto;
+}
+
+.pane__col--main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ── The hero: a screenshot, and everything that sits over it ─────────── */
+
+.hero-shot {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 220px;
+  border-radius: var(--radius-card-large);
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ns-raised-2) 0 8px,
+    var(--ns-raised) 8px 16px
+  );
+}
+
+.hero-shot__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--ns-deep);
+}
+
+.hero-shot__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.hero-shot__corner {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 0 solid var(--ns-accent);
+  opacity: 0.6;
+}
+
+.hero-shot__corner--tl {
+  left: 12px;
+  top: 12px;
+  border-left-width: 1.5px;
+  border-top-width: 1.5px;
+}
+.hero-shot__corner--tr {
+  right: 12px;
+  top: 12px;
+  border-right-width: 1.5px;
+  border-top-width: 1.5px;
+}
+.hero-shot__corner--bl {
+  left: 12px;
+  bottom: 12px;
+  border-left-width: 1.5px;
+  border-bottom-width: 1.5px;
+}
+.hero-shot__corner--br {
+  right: 12px;
+  bottom: 12px;
+  border-right-width: 1.5px;
+  border-bottom-width: 1.5px;
+}
+
+/* Chips over the picture. `.video-chip` from Nightshift carries the ground; this
+   only places them. */
+.hero-shot__chips {
+  position: absolute;
+  display: flex;
+  gap: 6px;
+  max-width: calc(100% - 28px);
+}
+
+.hero-shot__chips--tl {
+  left: 14px;
+  top: 14px;
+}
+.hero-shot__chips--tr {
+  right: 14px;
+  top: 14px;
+}
+.hero-shot__chips--bl {
+  left: 14px;
+  bottom: 14px;
+}
+.hero-shot__chips--br {
+  right: 14px;
+  bottom: 14px;
+}
+
+/* ── Small shared shapes ──────────────────────────────────────────────── */
+
+/* A label-left value-right line inside a card. Used by every readout block.
+   `min-height` rather than `height` for the same reason `.group-row` uses it. */
+.kv {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  font-family: var(--ns-mono);
+  font-size: var(--fs-9);
+  letter-spacing: 0.12em;
+}
+
+.kv--boxed {
+  padding-inline: 12px;
+  border-radius: var(--radius-group-inner);
+  background: var(--ns-raised-2);
+}
+
+.kv--ruled {
+  box-shadow: inset 0 -1px 0 var(--ns-raised-2);
+  min-height: 38px;
+}
+
+.kv__label {
+  color: var(--ns-text-tertiary);
+  flex: 0 0 auto;
+}
+
+/* The two-column detail grid on the Devices pane. One column under 1180px, where
+   112px of label plus a value stops fitting twice over. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 32px;
+}
+
+@media (max-width: 1180px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .pane__col--rail,
+  .pane__col--rail-narrow {
+    width: 280px;
+  }
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 22px;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The six digit boxes. A control, so `--radius-control`, and the same 16 the
+   phone draws its own six with — which is the whole point of the two being
+   comparable side by side. */
+.digits {
+  display: flex;
+  gap: 8px;
+}
+
+.digit {
+  flex: 1 1 0;
+  height: 78px;
+  border-radius: var(--radius-control);
+  background: var(--ns-raised-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ns-mono);
+  font-size: var(--fs-38);
+  color: var(--ns-text);
+}
+
+.digit--spent {
+  background: var(--ns-raised);
+  color: var(--ns-text-tertiary);
+}
+
+/* The rotation dial: a sweep rather than a ticking number, because the number is
+   beside it. Drawn as a conic gradient and repainted once a second by the poll,
+   so there is no animation to freeze under Reduce Motion. */
+.dial {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dial::after {
+  content: '';
+  width: 58%;
+  height: 58%;
+  border-radius: 50%;
+  background: var(--ns-screen);
+}
+
+/* The QR plate. White is not an ink here — a scanner needs the quiet zone, which
+   is why this colour is a requirement rather than a choice. */
+.qr-plate {
+  width: 86px;
+  height: 86px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-small);
+  background: #fff;
+  padding: 6px;
+}
+
+.qr-plate > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* The sheet, centred rather than arriving from an edge: this is a window with a
+   pointer in it, not a phone with a thumb. */
+.mac-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+
+/* `--radius-drawer`, which is the token for a surface that arrives over the
+   rest — the design sketched 24px, which is not on the scale and would read as
+   a large card rather than as a sheet.
+
+   Separation comes from the scrim and the hairline, not from a drop shadow.
+   Nightshift draws no shadows anywhere; a sheet that floated on one would be the
+   only object in either client that did.
+
+   `z-index: 50` is not decoration and it is not optional. Nightshift's `.scrim`
+   carries `z-index: 40`, so a panel left at `auto` loses to it on both counts a
+   layer decides: the scrim's 72% wash paints over the sheet, and — the one that
+   actually cost something — every click lands on the scrim instead of the
+   control under the pointer. Pressing "Show a code" dismissed the sheet, because
+   dismissing is what the scrim is for. 40 for the wash and 50 for the thing
+   above it is the system's own pairing; see `.sheet`. */
+.mac-sheet__panel {
+  position: relative;
+  z-index: 50;
+  width: min(820px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--ns-screen);
+  border-radius: var(--radius-drawer);
+  box-shadow: inset 0 0 0 1px var(--ns-hairline);
+  padding: 26px 28px 24px;
+  animation: mac-rise var(--state-change) ease-out;
+}
+
+@keyframes mac-rise {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* A banner across the top of the window when the host stops answering. It is not
+   a toast: it stays until the condition it reports goes away. */
+.mac__notice {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding-inline: 18px;
+  font-family: var(--ns-mono);
+  font-size: var(--fs-9);
+  letter-spacing: var(--caps-tracking);
+}
+
+.mac__notice--lost {
+  background: color-mix(in srgb, var(--ns-red) 12%, transparent);
+  color: var(--ns-red);
+}
+
+.mac__notice--warn {
+  background: color-mix(in srgb, var(--ns-amber) 12%, transparent);
+  color: var(--ns-amber);
+}
+
+/* Hover affordances. A window has a pointer, so rows say they are targets before
+   they are clicked — which is a thing the phone's own screens never had to do. */
+.hoverable {
+  transition: background var(--state-change) ease-out;
+}
+
+.hoverable:hover {
+  background: var(--ns-raised-2);
+}

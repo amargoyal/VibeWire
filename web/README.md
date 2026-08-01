@@ -7,6 +7,13 @@ and this client speaks version 1 of it unchanged.
 Preact + TypeScript, built by Vite, no runtime dependency on anything it does not
 ship: 50 KB gzipped, one script, one stylesheet, nothing fetched from a CDN.
 
+**There are two builds in this directory.** `npm run build` is this client, the one
+the phone and any browser use. `npm run build:dashboard` is the Mac app's window —
+same `node_modules`, same design system, its own `dist-dashboard`. It is not a
+second copy of this client: it is the host's own surface, and it lives here so the
+two cannot drift apart in the palette. See `dashboard/README.md` and `PROTOCOL.md`
+§8. `npm run build:all` builds both.
+
 ---
 
 ## When you have picked the GitHub Pages name
@@ -158,6 +165,13 @@ it covers everything that needs no pairing.
 The first run after `swift build` raises a keychain prompt, because a rebuilt binary
 has a new signature. Choose **Always Allow**, or the pairing half fails with
 `bad_code` while the host log says `keychain did not respond`.
+
+`host/package-app.sh` builds the same host as `/Applications/VibeWire.app`, signed
+with a stable certificate — so the prompt comes once rather than after every build,
+and the app is findable from Spotlight. The bundled copy serves the client from
+`Contents/Resources/web`, which `package-app.sh` fills from `dist/`. That copy is the
+last place `Config.webRoot` looks, after this checkout, so a host run out of the tree
+still picks up `npm run build` with no copy step.
 
 ---
 
