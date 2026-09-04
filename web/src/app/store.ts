@@ -11,7 +11,13 @@ import { batch, computed, signal } from '@preact/signals'
 import { HostClient, type ConnectionState, type ControlMessage } from '../net/hostClient'
 import { Identity, type KeyStorage, type PairedHost } from '../net/identity'
 import { LinkMonitor } from '../net/linkMonitor'
-import { describe, parseEndpoint, reachability, type Endpoint } from '../net/endpoint'
+import {
+  describe,
+  normaliseOrigins,
+  parseEndpoint,
+  reachability,
+  type Endpoint,
+} from '../net/endpoint'
 import { RendererPool, type VideoRenderer } from '../video/renderer'
 import { conditionFrom, type Condition } from '../design/components'
 
@@ -52,6 +58,9 @@ export interface TransportStatus {
   cloudflareRunning: boolean
   cloudflareHostname: string | null
   lanAddress: string | null
+  /** Every origin the Mac believes it can be reached on, best first. The Mac is
+   *  the only thing that knows all of them. */
+  candidates: string[]
 }
 
 export type StreamState =
@@ -272,6 +281,7 @@ export class Store {
     cloudflareRunning: false,
     cloudflareHostname: null,
     lanAddress: null,
+    candidates: [],
   })
   displays = signal<DisplayEntry[]>([])
   settings = signal<HostSettingsMirror>({
@@ -421,6 +431,22 @@ export class Store {
         this.renderers.renderer(frame.streamId).enqueue(frame)
       },
       state: (state) => this.connectionChanged(state),
+      // The client promotes whichever address carried a working socket and
+      // learns new ones off the Mac's own report, both while the screen is
+      // drawn from this record. Without this the Settings sheet keeps naming the
+      // address that stopped answering an hour ago.
+      hostRecord: (host) => {
+        this.pairedHost.value = host
+      },
+    })
+
+    // A radio change is the one event that says "everything you knew about how
+    // to reach the Mac may have just become wrong", and it is the moment this
+    // client used to sit out: the socket had already given up, and nothing asked
+    // it to try again until the tab was hidden and shown. Walking out of the
+    // house and back in is exactly this event, twice.
+    addEventListener('online', () => {
+      void this.connectIfPaired()
     })
 
     // Tell the host which radio we are on so the cellular cap applies only when
@@ -471,9 +497,18 @@ export class Store {
     this.streamState.value = { kind: 'stopped' }
   }
 
-  async completePairing(endpoint: Endpoint, code: string): Promise<string | null> {
+  /**
+   * `alternates` are the Mac's other addresses when the pairing link carried
+   * them. They are kept with the pairing so this browser can find the same Mac
+   * from a different network without trading keys again.
+   */
+  async completePairing(
+    endpoint: Endpoint,
+    code: string,
+    alternates: string[] = [],
+  ): Promise<string | null> {
     try {
-      const paired = await this.client.pair(endpoint, code)
+      const paired = await this.client.pair(endpoint, code, alternates)
       batch(() => {
         this.pairedHost.value = paired
         this.hostName.value = paired.hostName
@@ -517,11 +552,17 @@ export class Store {
       return `Nothing answered at ${endpoint.host}. The address is unchanged.`
     }
 
+    // The addresses already known for this Mac are kept rather than discarded: a
+    // Mac at a new tunnel hostname is still at the same LAN address when this
+    // browser comes home.
     const moved: PairedHost = {
       ...paired,
       origin: endpoint.origin,
       host: endpoint.host,
       port: endpoint.port,
+      alternates: normaliseOrigins([paired.origin, ...paired.alternates]).filter(
+        (entry) => entry !== endpoint.origin,
+      ),
     }
     await Identity.savePairedHost(moved)
     this.pairedHost.value = moved
@@ -564,7 +605,7 @@ export class Store {
       return
     }
 
-    const address = parameters.get('host') ?? location.origin
+    const address = parameters.get('origin') ?? parameters.get('host') ?? location.origin
     let endpoint: Endpoint
     try {
       const port = Number(parameters.get('port') ?? 8787)
@@ -573,6 +614,12 @@ export class Store {
       this.banner.value = { text: (error as Error).message }
       return
     }
+
+    // `alt` is the Mac's other addresses, comma-separated. Usually absent — the
+    // QR stays small by leaving them out, and they arrive over the socket within
+    // a second of connecting — but honoured when a link does carry them, so a
+    // pairing that happens from cellular already knows the way home.
+    const alternates = normaliseOrigins((parameters.get('alt') ?? '').split(','))
 
     const paired = this.pairedHost.value
     if (paired) {
@@ -587,11 +634,12 @@ export class Store {
       // device id do not depend on where the Mac is, and this is the fix for a
       // Cloudflare quick tunnel whose hostname changes on every host restart.
       const problem = await this.repoint(endpoint)
+      if (!problem && alternates.length > 0) this.client.learn(alternates)
       this.banner.value = problem ? { text: problem } : null
       return
     }
 
-    const failure = await this.completePairing(endpoint, code)
+    const failure = await this.completePairing(endpoint, code, alternates)
     if (failure) this.banner.value = { text: failure }
   }
 
@@ -740,8 +788,8 @@ export class Store {
         break
       }
 
-      case 'transport':
-        this.transport.value = {
+      case 'transport': {
+        const transport: TransportStatus = {
           path: (str(payload['path']) as TransportStatus['path']) ?? 'none',
           tailscaleRunning: bool(payload['tailscaleRunning'], false),
           tailscaleAddress: str(payload['tailscaleAddress']),
@@ -749,8 +797,18 @@ export class Store {
           cloudflareRunning: bool(payload['cloudflareRunning'], false),
           cloudflareHostname: str(payload['cloudflareHostname']),
           lanAddress: str(payload['lanAddress']),
+          candidates: [],
         }
+        transport.candidates = candidateOrigins(payload, transport, this.pairedHost.value)
+        this.transport.value = transport
+        // The Mac is the only thing that knows all of its own addresses, and a
+        // Cloudflare quick tunnel's hostname exists nowhere else — it is minted
+        // at host launch and never written down. Learning it here, over a socket
+        // that is already up, is what lets this browser reach the same Mac from
+        // cellular later without pairing again.
+        this.client.learn(transport.candidates)
         break
+      }
 
       case 'settings':
         this.settings.value = {
@@ -1563,6 +1621,50 @@ export class Store {
 // The wire is JSON and the host is Swift, so `nil` arrives as `null` on some
 // fields and is simply absent on others. These four keep every read site from
 // spelling that out again.
+
+/**
+ * Every address this Mac can be reached on, best first.
+ *
+ * A current host works this out itself and sends the list; that answer is taken
+ * whole, because the order in it is the Mac's judgement about which path is
+ * worth preferring and this page is in no position to second-guess it.
+ *
+ * A host built before that field existed sends the same facts spread across
+ * three keys, so the list is assembled from those instead. The order is the
+ * Mac's: the tailnet address first, since it is a direct route where a direct
+ * route exists and falls back to DERP rather than to nothing; the LAN address
+ * next, which answers only at home but answers fastest there; the Cloudflare
+ * tunnel last, because it is a round trip through Cloudflare — and it is on the
+ * list at all because it is the one address that answers from a browser with no
+ * Wi-Fi and no Tailscale.
+ *
+ * The port is not on the wire in that older shape either. The paired origin's
+ * port is the right guess: it is the port this browser is already talking to
+ * this Mac on.
+ */
+function candidateOrigins(
+  payload: Record<string, unknown>,
+  transport: TransportStatus,
+  paired: PairedHost | null,
+): string[] {
+  const reported = payload['candidates']
+  if (Array.isArray(reported)) {
+    const origins = reported.filter((entry): entry is string => typeof entry === 'string')
+    if (origins.length > 0) return normaliseOrigins(origins)
+  }
+
+  const port = num(payload['port']) ?? paired?.port ?? 8787
+  const local: string[] = []
+  if (transport.tailscaleAddress) local.push(`http://${transport.tailscaleAddress}:${port}`)
+  if (transport.lanAddress) local.push(`http://${transport.lanAddress}:${port}`)
+
+  const tunnel =
+    transport.cloudflareRunning && transport.cloudflareHostname
+      ? transport.cloudflareHostname.replace(/\/+$/, '')
+      : null
+
+  return normaliseOrigins(tunnel ? [...local, tunnel] : local)
+}
 
 function str(value: unknown): string | null {
   return typeof value === 'string' ? value : null
