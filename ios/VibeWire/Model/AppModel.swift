@@ -352,11 +352,37 @@ final class AppModel {
         ])
     }
 
+    /// Whether a picture was on the glass when the socket last went away.
+    ///
+    /// A closed socket stops every stream on the Mac — that is the promise, and
+    /// it is the right one. What was wrong was leaving the phone to notice on
+    /// its own: locking the screen backgrounds the app, the socket closes, and
+    /// coming back reconnected to a Mac that was no longer sending anything.
+    /// The screen then said the stream had stopped and the way out was ✕, Home,
+    /// and view the screen again — three taps to undo a lock.
+    ///
+    /// Set when a stream is running and cleared the moment the user says stop,
+    /// so an explicit ✕ is never undone by a reconnect.
+    private var resumeStreamOnReconnect = false
+
     func disconnect() async {
+        // Read before the state is cleared, or every disconnect looks like one
+        // that happened with nothing on the glass.
+        resumeStreamOnReconnect = streamIsRunning
         await client.disconnect()
         renderers.resetAll()
         decodeFailures.removeAll()
         streamState = .stopped
+    }
+
+    /// Whether the Mac should be sending frames right now, whether or not any
+    /// are arriving. A stall and a reconnect are both a running stream having a
+    /// bad moment, not a stopped one.
+    private var streamIsRunning: Bool {
+        switch streamState {
+        case .starting, .live, .stalled, .reconnecting: return true
+        case .stopped, .failed: return false
+        }
     }
 
     /// Pairs against the addresses the QR offered, best first.
@@ -499,7 +525,16 @@ final class AppModel {
         switch state {
         case .connected:
             banner = nil
-            if case .reconnecting = streamState { streamState = .live }
+            // A new socket is a new session to the Mac: the old one's streams
+            // were released when it closed, so the picture has to be asked for
+            // again rather than declared live. Declaring it was the older
+            // behaviour and it was a claim about frames that had stopped —
+            // after a reconnect the glass held one frozen frame under the word
+            // LIVE until someone stopped and started the stream by hand.
+            if resumeStreamOnReconnect || streamIsRunning {
+                resumeStreamOnReconnect = false
+                startStream()
+            }
         case .reconnecting(let attempt, let nextRetryMs):
             streamState = .reconnecting(attempt: attempt, nextRetryMs: nextRetryMs)
         case .failed(let reason):
@@ -958,6 +993,9 @@ final class AppModel {
     }
 
     func startStream() {
+        // Whatever happens to the socket from here, this is a session the phone
+        // means to be watching.
+        resumeStreamOnReconnect = true
         // Stream ids are reassigned per start; keeping the old configs would
         // point a pane at a decoder the host is no longer filling. Resetting
         // the renderers is not enough for the same reason — a reset renderer is
@@ -985,6 +1023,9 @@ final class AppModel {
     }
 
     func stopStream() {
+        // The user said stop. Nothing that happens to the socket afterwards is
+        // a reason to start it again.
+        resumeStreamOnReconnect = false
         send(["t": "stopStream"])
         renderers.resetAll()
         decodeFailures.removeAll()
@@ -1161,6 +1202,7 @@ final class AppModel {
     }
 
     private func unpairLocally() {
+        resumeStreamOnReconnect = false
         Identity.forgetHost()
         pairedHost = nil
         route = .pairing

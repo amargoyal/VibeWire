@@ -455,7 +455,34 @@ export class Store {
     })
   }
 
+  /**
+   * Whether a picture was on the glass when the socket last went away.
+   *
+   * A closed socket stops every stream on the Mac — that is the promise, and it
+   * is the right one. What was wrong was leaving the client to notice on its
+   * own: switching tabs long enough, or swiping the browser away on a phone,
+   * closes the socket, and coming back reconnected to a Mac that was no longer
+   * sending anything. The screen then said the stream had stopped and the way
+   * out was ✕, Home, and view the screen again — three taps to undo a tab
+   * switch.
+   *
+   * Set when a stream is running and cleared the moment the user says stop, so
+   * an explicit ✕ is never undone by a reconnect.
+   */
+  private resumeStreamOnReconnect = false
+
+  /** Whether the Mac should be sending frames right now, whether or not any are
+   *  arriving. A stall and a reconnect are both a running stream having a bad
+   *  moment, not a stopped one. */
+  private get streamIsRunning(): boolean {
+    const kind = this.streamState.value.kind
+    return kind === 'starting' || kind === 'live' || kind === 'stalled' || kind === 'reconnecting'
+  }
+
   disconnect(): void {
+    // Read before the state is cleared, or every disconnect looks like one that
+    // happened with nothing on the glass.
+    this.resumeStreamOnReconnect = this.streamIsRunning
     this.client.disconnect()
     this.renderers.resetAll()
     this.streamState.value = { kind: 'stopped' }
@@ -652,8 +679,15 @@ export class Store {
     switch (state.kind) {
       case 'connected':
         this.banner.value = null
-        if (this.streamState.value.kind === 'reconnecting') {
-          this.streamState.value = { kind: 'live' }
+        // A new socket is a new session to the Mac: the old one's streams were
+        // released when it closed, so the picture has to be asked for again
+        // rather than declared live. Declaring it was the older behaviour and it
+        // was a claim about frames that had stopped — after a reconnect the
+        // glass held one frozen frame under the word LIVE until someone stopped
+        // and started the stream by hand.
+        if (this.resumeStreamOnReconnect || this.streamIsRunning) {
+          this.resumeStreamOnReconnect = false
+          this.startStream()
         }
         break
       case 'reconnecting':
@@ -1223,6 +1257,9 @@ export class Store {
   }
 
   startStream(): void {
+    // Whatever happens to the socket from here, this is a session this client
+    // means to be watching.
+    this.resumeStreamOnReconnect = true
     // Stream ids are reassigned per start; keeping the old configs would point a
     // pane at a decoder the host is no longer filling. Resetting the renderers is
     // not enough for the same reason — a reset renderer is still the object stream
@@ -1242,6 +1279,9 @@ export class Store {
   }
 
   stopStream(): void {
+    // The user said stop. Nothing that happens to the socket afterwards is a
+    // reason to start it again.
+    this.resumeStreamOnReconnect = false
     this.send({ t: 'stopStream' })
     this.renderers.resetAll()
     batch(() => {
@@ -1454,6 +1494,7 @@ export class Store {
   }
 
   private unpairLocally(): void {
+    this.resumeStreamOnReconnect = false
     // Everything below used to sit behind `await Identity.forgetHost()`. That is
     // an IndexedDB round trip, and a browser can leave one pending indefinitely —
     // a blocked upgrade, a storage prompt, an origin under pressure. When it did,
