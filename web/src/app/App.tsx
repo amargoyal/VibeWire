@@ -68,12 +68,25 @@ export function App() {
       void store.connectIfPaired()
     }
     const onPageHide = () => store.disconnect()
+    // The other half of `pagehide`, and the reason a phone needed it. Swiping
+    // the browser away and coming back restores this page from the back/forward
+    // cache, and a restored page is not a new one: no reload runs, and the
+    // `visibilitychange` that would otherwise reconnect is not guaranteed to
+    // fire. Without this the tab came back to a socket that had been closed on
+    // the way out and nothing asking for another.
+    const onPageShow = () => {
+      if (hiddenTimer.current) clearTimeout(hiddenTimer.current)
+      hiddenTimer.current = null
+      void store.connectIfPaired()
+    }
 
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', onPageHide)
+    window.addEventListener('pageshow', onPageShow)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', onPageHide)
+      window.removeEventListener('pageshow', onPageShow)
     }
   }, [])
 
