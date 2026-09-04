@@ -30,6 +30,46 @@ actor TransportManager {
         var cloudflareHostname: String?
         var lanAddress: String?
         var lastContact: Date?
+        /// The port the host is serving on, so a client can build an origin out
+        /// of the addresses below without being told separately.
+        var port: UInt16 = 8787
+
+        /// Every origin this Mac can be reached on, in the order a phone should
+        /// try them.
+        ///
+        /// The tailnet first: it is a direct route where a direct route exists,
+        /// and it falls back to DERP rather than to nothing. The LAN address
+        /// next, since it answers only at home but answers fastest there. The
+        /// Cloudflare tunnel last, because it is a round trip through Cloudflare
+        /// — and it is on the list at all because it is the one address that
+        /// answers from a phone with no Tailscale and no Wi-Fi.
+        ///
+        /// A client stores the whole list. One address is what made the phone
+        /// work on exactly the network it was paired on.
+        var candidates: [String] {
+            var origins: [String] = []
+            if let tailscale = tailscaleAddress { origins.append("http://\(tailscale):\(port)") }
+            if let lan = lanAddress { origins.append("http://\(lan):\(port)") }
+            if cloudflareRunning, let tunnel = cloudflareHostname {
+                origins.append(tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel)
+            }
+            return origins
+        }
+
+        /// The address to hand out when only one can be given.
+        ///
+        /// The tunnel wins here even though it is last in `candidates`, and the
+        /// two are not in disagreement: a client that can hold a list should
+        /// prefer the fast path and fall back, while a client that gets one
+        /// address should get the one that works from anywhere. A browser opened
+        /// from an `https` page is the second kind and cannot open an `http`
+        /// address at all.
+        var preferredOrigin: String? {
+            if cloudflareRunning, let tunnel = cloudflareHostname {
+                return tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel
+            }
+            return candidates.first
+        }
 
         var wire: [String: Any] {
             var payload: [String: Any] = [
@@ -37,6 +77,8 @@ actor TransportManager {
                 "path": path.rawValue,
                 "tailscaleRunning": tailscaleRunning,
                 "cloudflareRunning": cloudflareRunning,
+                "port": Int(port),
+                "candidates": candidates,
             ]
             payload["tailscaleAddress"] = tailscaleAddress
             payload["tailscaleDNSName"] = tailscaleDNSName
@@ -64,13 +106,45 @@ actor TransportManager {
 
     private var cloudflared: Process?
     private var cloudflareHostname: String?
+    private var lastRefresh: Date?
+
+    /// The same child process, reachable without going through the actor.
+    ///
+    /// `applicationWillTerminate` gets one synchronous moment before the process
+    /// is gone, and an `await` does not survive it: the teardown hop was
+    /// scheduled and the host exited first, so every restart left a cloudflared
+    /// running — a public endpoint to this Mac, owned by nothing, accumulating
+    /// one per launch. This box is what termination can reach in that moment.
+    private let liveTunnel = Guarded<Process?>(nil)
     private let port: UInt16
+    /// cloudflared's own metrics server, pinned rather than left to the random
+    /// port it picks otherwise. `/quicktunnel` on it reports the hostname the
+    /// tunnel is actually serving, which is the authoritative answer — see
+    /// `quickTunnelHostname()`.
+    private let metricsPort: UInt16
+    /// Whether the cloudflared on `metricsPort` is the one this host started.
+    private var metricsOwned = false
 
     init(port: UInt16) {
         self.port = port
+        self.metricsPort = port &+ 2
     }
 
     func status() -> Status { cached }
+
+    /// Refreshes unless it was done in the last `interval` seconds.
+    ///
+    /// The full refresh forks `tailscale status --json`, so it is not something
+    /// to do on a one-second heartbeat. It is also not something that can be
+    /// left to the heartbeat's *socket*, which is where it lived: `tick()`
+    /// returns early when no phone is connected, so a host sitting idle kept
+    /// whatever addresses it had a second after launch — before the tunnel it
+    /// had just started had finished coming up. The QR then handed out an
+    /// address the phone could not use, which is the failure this is under.
+    func refreshIfStale(after interval: TimeInterval = 10) async {
+        if let lastRefresh, Date().timeIntervalSince(lastRefresh) < interval { return }
+        await refresh()
+    }
 
     func noteContact() {
         cached.lastContact = Date()
@@ -80,6 +154,7 @@ actor TransportManager {
 
     func refresh() async {
         var next = cached
+        next.port = port
         next.lanAddress = Self.primaryLANAddress()
 
         if let tailscale = await Self.tailscaleStatus() {
@@ -97,10 +172,63 @@ actor TransportManager {
             next.path = next.cloudflareRunning ? .relay : .none
         }
 
+        // A tunnel that died stays dead otherwise, and nothing says so: the
+        // relay switch reads on, the status pane reads on, and the only symptom
+        // is that the phone stops answering to anything but the LAN.
+        if let existing = cloudflared, !existing.isRunning {
+            Log.warn(.transport, "cloudflare tunnel exited; restarting")
+            cloudflared = nil
+            cloudflareHostname = nil
+            if Config.loadSettings().relayOverInternet {
+                await startCloudflareTunnel()
+            }
+        }
+
         next.cloudflareRunning = cloudflared?.isRunning ?? false
+        // Asked of cloudflared rather than remembered from its output. The
+        // hostname used to be scraped once out of the startup banner, which
+        // makes the whole relay path depend on a log line arriving in one piece:
+        // a chunk boundary in the middle of the URL, or a tunnel that reconnects
+        // under a new name, and the host advertises a plain `http` IP address
+        // for the rest of its life while a perfectly good tunnel is up. Every
+        // client then gets an address it cannot use from anywhere but the LAN,
+        // and a browser on an `https` page cannot use it at all.
+        if next.cloudflareRunning, let live = await quickTunnelHostname() {
+            cloudflareHostname = live
+        }
+        if !next.cloudflareRunning { cloudflareHostname = nil }
         next.cloudflareHostname = cloudflareHostname
 
         cached = next
+        lastRefresh = Date()
+    }
+
+    /// The hostname cloudflared says it is serving, read from its metrics server.
+    ///
+    /// Only asked when this host is the one that put a cloudflared on that port.
+    /// A tunnel outlives its host when the host is killed rather than quit, and
+    /// the orphan keeps the metrics port — so a host that asked without checking
+    /// would read a hostname belonging to a *different* tunnel, pointing at a
+    /// process that may not be serving any more, and hand it out on the QR as
+    /// its own. Silently advertising someone else's address is the exact failure
+    /// this whole path exists to end.
+    private func quickTunnelHostname() async -> String? {
+        guard metricsOwned,
+              let url = URL(string: "http://127.0.0.1:\(metricsPort)/quicktunnel")
+        else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hostname = body["hostname"] as? String,
+              !hostname.isEmpty
+        else { return nil }
+        let origin = hostname.contains("://") ? hostname : "https://\(hostname)"
+        if origin != cloudflareHostname {
+            Log.info(.transport, "cloudflare tunnel serving \(origin)")
+        }
+        return origin
     }
 
     // MARK: Tailscale
@@ -200,6 +328,17 @@ actor TransportManager {
             return
         }
 
+        // Whoever is already on that port is not ours, and the hostname it would
+        // report is not ours either. cloudflared is left to pick its own port in
+        // that case and the startup banner is the only source — which is what
+        // this was before, so nothing is lost but the certainty.
+        metricsOwned = Self.portIsFree(metricsPort)
+        if !metricsOwned {
+            Log.warn(.transport, "metrics port \(metricsPort) is taken — probably an orphaned "
+                + "cloudflared from a host that was killed rather than quit; "
+                + "reading the tunnel hostname from its output instead")
+        }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = [
@@ -207,6 +346,12 @@ actor TransportManager {
             "--no-autoupdate",
             "--url", "http://127.0.0.1:\(port)",
         ]
+        if metricsOwned {
+            // Left to itself cloudflared picks a random metrics port, and the
+            // hostname it is serving can then only be had by reading its log.
+            // Pinned, `refresh()` can ask it outright.
+            process.arguments?.append(contentsOf: ["--metrics", "127.0.0.1:\(metricsPort)"])
+        }
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -227,6 +372,7 @@ actor TransportManager {
         do {
             try process.run()
             cloudflared = process
+            liveTunnel.withLock { $0 = process }
             Log.info(.transport, "cloudflare tunnel starting")
         } catch {
             Log.error(.transport, "failed to start cloudflared: \(error)")
@@ -241,9 +387,47 @@ actor TransportManager {
         Log.info(.transport, "cloudflare tunnel live at \(hostname)")
     }
 
+    /// True when nothing holds `port` on loopback right now.
+    ///
+    /// Asked by binding it, because that is the only answer that is not a guess.
+    /// The port is released immediately and handed to cloudflared, which is a
+    /// race in theory and has one contender in practice.
+    private static func portIsFree(_ port: UInt16) -> Bool {
+        let fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+
+        let bound = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        return bound == 0
+    }
+
+    /// Kills the tunnel synchronously, from wherever the caller happens to be.
+    ///
+    /// The one thing `applicationWillTerminate` can do about a child process.
+    /// Callable from outside the actor precisely because reaching the actor is
+    /// what the exiting process has no time left to do.
+    nonisolated func terminateTunnelNow() {
+        liveTunnel.withLock { process in
+            if let process, process.isRunning { process.terminate() }
+            process = nil
+        }
+    }
+
     func stopCloudflareTunnel() {
         guard let cloudflared else { return }
         if cloudflared.isRunning { cloudflared.terminate() }
+        liveTunnel.withLock { $0 = nil }
+        metricsOwned = false
         self.cloudflared = nil
         cloudflareHostname = nil
         cached.cloudflareRunning = false

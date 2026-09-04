@@ -496,8 +496,8 @@ actor DashboardService {
 
         let origin: String
         let reach: String
-        if let tunnel = status.cloudflareHostname, status.cloudflareRunning {
-            origin = tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel
+        if let tunnel = status.preferredOrigin, tunnel.hasPrefix("https://") {
+            origin = tunnel
             reach = "Works on cellular."
         } else {
             origin = "http://\(host):\(port)"
@@ -516,6 +516,7 @@ actor DashboardService {
             "reachable": reachable != nil,
             "host": host,
             "port": Int(port),
+            "candidates": status.candidates,
             "listening": [
                 "LISTENING ON :\(port)",
                 reachable == nil ? "NO ADDRESS BUT LOOPBACK" : nil,
@@ -594,6 +595,11 @@ actor DashboardService {
         guard let code = await pairing.currentCode() else {
             return .error(409, "not_pairing")
         }
+        // A QR is read once and acted on immediately, so it is worth a fresh
+        // look at where this Mac can be reached rather than whatever the last
+        // heartbeat cached. Someone standing at the Mac with a phone in their
+        // hand is the moment the address has to be right.
+        await transport.refresh()
         let status = await transport.status()
         let port = Config.loadSettings().port
         let addresses = Self.addresses(status: status, port: port)
@@ -604,11 +610,56 @@ actor DashboardService {
         switch request.query["kind"] {
         case "app":
             // A custom scheme, which only the iOS app can open. It carries the
-            // address as well as the code, because the app has no origin to
+            // addresses as well as the code, because the app has no origin to
             // read one off.
-            payload = "vibewire://pair?host=\(host)&port=\(port)&code=\(code.value)"
+            //
+            // Two addresses at most, and only when the second one says something
+            // the first cannot.
+            //
+            // This QR used to carry `host=<ip>&port=8787` alone — the LAN or
+            // tailnet address and nothing else — so a phone paired at home was a
+            // phone that worked at home. The tunnel had to get in here. But
+            // every address that goes in costs modules, and the first attempt
+            // put all three in and took the code from 33 modules to 55, which is
+            // no longer something a camera can read off an 86-pixel plate. A QR
+            // nobody can scan is a worse regression than the one being fixed.
+            //
+            // So: `host` and `port` carry the local address, as they always did
+            // and as a phone built before this still expects, and `origin` is
+            // added only when it is the tunnel — the one address those two
+            // cannot express. The app learns the rest over the socket within a
+            // second of connecting, which is where a list belongs.
+            let local = "http://\(host):\(port)"
+            var link = "vibewire://pair?host=\(host)&port=\(port)&code=\(code.value)"
+            if let preferred = status.preferredOrigin, preferred != local {
+                link += "&origin=\(preferred)"
+            }
+            payload = link
         default:
-            if let site = Config.webClientURL, !site.isEmpty {
+            // A published client on `https` cannot open an `http` address: the
+            // browser refuses it as mixed content before a packet leaves, and
+            // the page can only report that nothing answered at an address that
+            // was answering perfectly. When there is no `https` origin to give
+            // it, the QR sends the phone to the copy this host serves instead,
+            // which is same-origin with the protocol and needs no address at all.
+            let published = Config.webClientURL.flatMap { $0.isEmpty ? nil : $0 }
+            let publishable: String? = {
+                guard let published else { return nil }
+                guard published.hasPrefix("https://"), !origin.hasPrefix("https://") else {
+                    return published
+                }
+                return nil
+            }()
+
+            if publishable == nil, published != nil {
+                Log.info(
+                    .net,
+                    "browser QR points at this host: \(origin) is not https, "
+                        + "and the published client is"
+                )
+            }
+
+            if let site = publishable {
                 let trimmed = site.hasSuffix("/") ? String(site.dropLast()) : site
                 guard var components = URLComponents(string: trimmed) else {
                     return .error(422, "web_client_url_not_a_url")
@@ -648,7 +699,11 @@ actor DashboardService {
     private static func qrPNG(from string: String) -> Data? {
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(string.utf8)
-        filter.correctionLevel = "M"
+        // L, not M. Error correction buys nothing here that matters — this code
+        // is drawn on a screen a foot from the camera, not printed on a box that
+        // gets scuffed — and it costs modules, which is the one thing this code
+        // cannot spare once a tunnel hostname is in the payload.
+        filter.correctionLevel = "L"
         guard let output = filter.outputImage else { return nil }
         let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
         let context = CIContext()

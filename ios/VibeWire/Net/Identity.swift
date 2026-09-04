@@ -51,16 +51,96 @@ enum Identity {
         var hostName: String
         var hostKey: String
         var deviceId: String
-        var host: String
-        var port: Int
+        /// The origin that answered last, e.g. `http://192.168.1.24:8787` or
+        /// `https://four-words.trycloudflare.com`.
+        var origin: String
+        /// The Mac's other addresses, in the order to try them when `origin`
+        /// stops answering.
+        ///
+        /// One Mac has up to three: the tunnel, which answers from anywhere; the
+        /// tailnet address, which answers wherever Tailscale is up; and the LAN
+        /// address, which answers at home and nowhere else. Storing one of them
+        /// meant the phone worked on exactly the network it was paired on — it
+        /// was paired at home over Wi-Fi, so it worked at home over Wi-Fi.
+        var alternates: [String]
         var pairedAt: Date
 
-        var baseURL: URL? {
-            URL(string: "http://\(host):\(port)")
+        init(
+            hostId: String,
+            hostName: String,
+            hostKey: String,
+            deviceId: String,
+            origin: String,
+            alternates: [String] = [],
+            pairedAt: Date
+        ) {
+            self.hostId = hostId
+            self.hostName = hostName
+            self.hostKey = hostKey
+            self.deviceId = deviceId
+            self.origin = origin
+            self.alternates = alternates
+            self.pairedAt = pairedAt
         }
 
-        var socketURL: URL? {
-            URL(string: "ws://\(host):\(port)/v1/socket")
+        var endpoint: Endpoint {
+            Endpoint.lenient(origin)
+                ?? Endpoint(origin: "http://127.0.0.1:8787", host: "127.0.0.1", port: 8787, secure: false)
+        }
+
+        /// Every origin worth dialling for this Mac, best first.
+        var candidates: [String] {
+            Endpoint.normalise([origin] + alternates)
+        }
+
+        var host: String { endpoint.host }
+        var port: Int { endpoint.port }
+        var baseURL: URL? { endpoint.baseURL }
+        var socketURL: URL? { endpoint.socketURL }
+
+        // MARK: Codable
+
+        /// Written with the legacy `host` and `port` beside the origin, and read
+        /// back from either. A record stored by a build that predates the origin
+        /// is not a reason to make someone pair again — and leaving the two old
+        /// keys populated means downgrading the app does not either.
+        private enum CodingKeys: String, CodingKey {
+            case hostId, hostName, hostKey, deviceId, origin, alternates, pairedAt
+            case legacyHost = "host"
+            case legacyPort = "port"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            hostId = try container.decode(String.self, forKey: .hostId)
+            hostName = try container.decode(String.self, forKey: .hostName)
+            hostKey = try container.decode(String.self, forKey: .hostKey)
+            deviceId = try container.decode(String.self, forKey: .deviceId)
+            pairedAt = try container.decode(Date.self, forKey: .pairedAt)
+            alternates = try container.decodeIfPresent([String].self, forKey: .alternates) ?? []
+
+            if let stored = try container.decodeIfPresent(String.self, forKey: .origin),
+               !stored.isEmpty {
+                origin = stored
+            } else {
+                let host = try container.decodeIfPresent(String.self, forKey: .legacyHost)
+                    ?? "127.0.0.1"
+                let port = try container.decodeIfPresent(Int.self, forKey: .legacyPort) ?? 8787
+                origin = "http://\(host):\(port)"
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(hostId, forKey: .hostId)
+            try container.encode(hostName, forKey: .hostName)
+            try container.encode(hostKey, forKey: .hostKey)
+            try container.encode(deviceId, forKey: .deviceId)
+            try container.encode(origin, forKey: .origin)
+            try container.encode(alternates, forKey: .alternates)
+            try container.encode(pairedAt, forKey: .pairedAt)
+            try container.encode(endpoint.host, forKey: .legacyHost)
+            try container.encode(endpoint.port, forKey: .legacyPort)
         }
     }
 

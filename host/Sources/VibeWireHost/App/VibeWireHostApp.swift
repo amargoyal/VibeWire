@@ -116,6 +116,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 await router.tick()
                 await pairing.rotateIfNeeded()
+                // Not inside `tick()`: that returns early with no phone
+                // connected, and the addresses the QR hands out have to be
+                // current precisely when nothing is connected yet. Rate-limited
+                // to once every ten seconds by the manager itself.
+                await transport.refreshIfStale()
             }
         }
 
@@ -169,8 +174,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         heartbeat?.invalidate()
         server?.stop()
         system?.preventSleep(false)
-        let transport = self.transport
-        Task { await transport?.stopCloudflareTunnel() }
+        // Synchronously, here, on the way out. This used to be a `Task` that
+        // awaited the actor, and the process exited before it ran — so every
+        // quit left cloudflared alive with a public hostname pointing at a port
+        // this host no longer served, and the next launch found its metrics port
+        // taken by the ghost of the last one.
+        transport?.terminateTunnelNow()
     }
 
     // MARK: Sleep tracking

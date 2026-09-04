@@ -27,6 +27,9 @@ struct PairingView: View {
     @State private var errorText: String?
     @State private var showScanner = false
     @State private var editingTarget = false
+    /// The Mac's other addresses, as the scanned QR listed them. Kept with the
+    /// pairing so this phone can find the same Mac from a different network.
+    @State private var scannedAlternates: [String] = []
     /// Where the dial's arc is, and nothing else. It is a second hand for the
     /// cadence, not a countdown on this particular code — see the caption it
     /// sits beside.
@@ -236,7 +239,7 @@ struct PairingView: View {
 
                 if editingTarget {
                     HStack(spacing: 8) {
-                        TextField("192.168.1.24 or mac.tailnet.ts.net", text: $address)
+                        TextField("192.168.1.24, mac.tailnet.ts.net, or an https:// tunnel", text: $address)
                             .nsMono(13)
                             .foregroundStyle(NS.Color.text)
                             .textInputAutocapitalization(.never)
@@ -262,7 +265,11 @@ struct PairingView: View {
                             )
                     }
                 } else {
-                    Text(address.isEmpty ? "No address" : "\(address):\(port)")
+                    // Printed as the endpoint resolves it, not as two fields
+                    // concatenated: `https://four-words.trycloudflare.com:443`
+                    // is the same address written wrongly, and the port field is
+                    // not part of a tunnel address at all.
+                    Text(targetDescription)
                         .nsMono(14)
                         .foregroundStyle(NS.Color.text)
                         .lineLimit(1)
@@ -276,6 +283,14 @@ struct PairingView: View {
             .padding(.top, 16)
             .padding(.bottom, 18)
         }
+    }
+
+    private var targetDescription: String {
+        guard !address.isEmpty else { return "No address" }
+        guard let endpoint = try? Endpoint.parse(address, fallbackPort: Int(port) ?? 8787) else {
+            return address
+        }
+        return endpoint.origin
     }
 
     private var discovery: (text: String, tone: Color, square: Bool) {
@@ -407,7 +422,12 @@ struct PairingView: View {
             advance(0, .done, detail: "\(Int(probeMillis ?? 0)) MS")
             advance(1, .running)
 
-            let failure = await model.completePairing(host: address, port: portValue, code: code)
+            let failure = await model.completePairing(
+                address: address,
+                port: portValue,
+                code: code,
+                alternates: scannedAlternates
+            )
 
             if let failure {
                 advance(1, .failed, detail: "FAILED")
@@ -434,12 +454,25 @@ struct PairingView: View {
     }
 
     private func apply(scanned payload: String) {
-        // vibewire://pair?host=…&port=…&code=…
+        // vibewire://pair?origin=…&alt=…&host=…&port=…&code=…
         guard let components = URLComponents(string: payload) else { return }
         let items = components.queryItems ?? []
-        if let host = items.first(where: { $0.name == "host" })?.value { address = host }
-        if let scannedPort = items.first(where: { $0.name == "port" })?.value { port = scannedPort }
-        if let code = items.first(where: { $0.name == "code" })?.value, code.count == 6 {
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+
+        let link = PairingLink(
+            origin: value("origin"),
+            alternates: value("alt"),
+            host: value("host"),
+            port: value("port")
+        )
+        if let scannedAddress = link.address { address = scannedAddress }
+        if let scannedPort = value("port") { port = scannedPort }
+        // Held for the handshake: the address on the card is the one being
+        // dialled, and the rest are what the phone falls back to — here because
+        // the Mac is answering somewhere the phone is not standing.
+        scannedAlternates = link.alternates
+
+        if let code = value("code"), code.count == 6 {
             digits = code.map(String.init)
             submit(code: code)
         }
@@ -456,7 +489,7 @@ struct PairingView: View {
                 continue
             }
             if !address.isEmpty, let portValue = Int(port) {
-                let millis = await model.probe(host: address, port: portValue)
+                let millis = await model.probe(address: address, port: portValue)
                 if millis != probeMillis { probeMillis = millis }
             } else if probeMillis != nil {
                 probeMillis = nil
