@@ -37,10 +37,28 @@ export interface PairedHost {
   hostName: string
   hostKey: string
   deviceId: string
-  /** Canonical origin, e.g. `http://192.168.1.24:8787`. */
+  /** Canonical origin, e.g. `http://192.168.1.24:8787`. The one that answered
+   *  last, which is not necessarily the one it was paired on. */
   origin: string
   host: string
   port: number
+  /**
+   * The Mac's other addresses, in the order to try them when `origin` stops
+   * answering.
+   *
+   * One Mac has up to three: the Cloudflare tunnel, which answers from anywhere;
+   * the tailnet address, which answers wherever Tailscale is up; and the LAN
+   * address, which answers at home and nowhere else. Storing one of them meant
+   * this browser worked on exactly the network it was paired on — paired at home
+   * over Wi-Fi, so it worked at home over Wi-Fi, and a phone that walked out of
+   * the front door got "the Mac is unreachable" about a Mac that was answering
+   * on its other two addresses the whole time.
+   *
+   * The list is learned rather than typed: the Mac reports every address it
+   * believes in once a second over the socket, and a quick tunnel's hostname
+   * exists nowhere else — it is minted at host launch and never written down.
+   */
+  alternates: string[]
   /** ISO 8601, so the record survives a structured-clone round trip legibly. */
   pairedAt: string
 }
@@ -237,8 +255,33 @@ export const Identity = {
     return wide ? 'tablet' : 'phone'
   },
 
+  /**
+   * The stored pairing, brought up to the current shape.
+   *
+   * A record written before this browser knew about alternates is not a reason
+   * to make anyone pair again: the key and the device id do not depend on where
+   * the Mac is, so an old record needs only the fields it never had. `origin` is
+   * rebuilt from the host and port it did store, and the alternates start empty
+   * and are refilled from the Mac's own report within a second of connecting.
+   */
   async loadPairedHost(): Promise<PairedHost | null> {
-    return read<PairedHost>(HOST_RECORD)
+    const stored = await read<Partial<PairedHost>>(HOST_RECORD)
+    if (!stored?.hostId || !stored.deviceId) return null
+    const origin =
+      stored.origin && stored.origin.length > 0
+        ? stored.origin
+        : `http://${stored.host ?? '127.0.0.1'}:${stored.port ?? 8787}`
+    return {
+      hostId: stored.hostId,
+      hostName: stored.hostName ?? 'Mac',
+      hostKey: stored.hostKey ?? '',
+      deviceId: stored.deviceId,
+      origin,
+      host: stored.host ?? '',
+      port: stored.port ?? 8787,
+      alternates: stored.alternates ?? [],
+      pairedAt: stored.pairedAt ?? new Date().toISOString(),
+    }
   },
 
   async savePairedHost(host: PairedHost): Promise<void> {

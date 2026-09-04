@@ -151,3 +151,59 @@ export function isHostServed(): boolean {
   const port = location.port ? Number(location.port) : 0
   return port === 8787
 }
+
+/**
+ * The same parse, for strings that arrived over the wire rather than off a
+ * keyboard.
+ *
+ * A candidate list is not worth failing a connection over: the Mac reporting one
+ * address this build cannot make sense of is not a reason to drop the two it
+ * can.
+ */
+export function lenientEndpoint(input: string): Endpoint | null {
+  try {
+    return parseEndpoint(input)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Candidate origins in the order they should be dialled, with duplicates and
+ * unparseable entries dropped.
+ *
+ * Order is the whole point and it is the Mac's judgement, not this page's: the
+ * tailnet address before the tunnel because one is a direct route and the other
+ * is a round trip through Cloudflare. This only guarantees that the order given
+ * survives and that nothing is dialled twice.
+ */
+export function normaliseOrigins(origins: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const ordered: string[] = []
+  for (const entry of origins) {
+    const endpoint = lenientEndpoint(entry)
+    if (!endpoint || seen.has(endpoint.origin)) continue
+    seen.add(endpoint.origin)
+    ordered.push(endpoint.origin)
+  }
+  return ordered
+}
+
+/**
+ * Whether this page is allowed to open this origin at all.
+ *
+ * The one place the browser differs from the phone in a way that cannot be
+ * papered over. The phone holds three addresses and may dial any of them; a page
+ * on `https` may dial only the `https` one, and dialling the others is not a
+ * failed connection but a `SecurityError` thrown before a packet leaves. A
+ * blocked origin left in the rotation costs a real attempt and a real backoff
+ * for an outcome that was decided in advance, so it is dropped here instead.
+ *
+ * Loopback is kept: `reachability` reports it as `warn` rather than `blocked`
+ * because Chromium allows it and Safari does not, and a dial that might work is
+ * worth one attempt.
+ */
+export function dialable(origin: string): boolean {
+  const endpoint = lenientEndpoint(origin)
+  return endpoint != null && reachability(endpoint) !== 'blocked'
+}

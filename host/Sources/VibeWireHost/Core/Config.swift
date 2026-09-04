@@ -221,6 +221,17 @@ enum Config {
            let decoded = try? JSONDecoder().decode(HostSettings.self, from: data) {
             settings = decoded
         }
+        // GitHub Pages keeps the account name in its hostname. GitHub account
+        // renames do not reliably redirect Pages sites, so an existing host
+        // config can otherwise keep putting a dead URL in the browser QR.
+        // Migrate the one hostname this app shipped before the account rename
+        // while leaving custom domains and user-edited URLs untouched.
+        if let webClientURL = settings.webClientURL,
+           var components = URLComponents(string: webClientURL),
+           components.host?.lowercased() == "amar-goyal8.github.io" {
+            components.host = "amargoyal.github.io"
+            settings.webClientURL = components.url?.absoluteString ?? webClientURL
+        }
         // `--port <n>` runs this host somewhere other than the stored port
         // without editing the stored port, which is what makes a second host
         // testable beside a real one that is already serving on 8787. Applied

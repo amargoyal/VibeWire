@@ -23,6 +23,7 @@ import { useEffect } from 'preact/hooks'
 
 import { bitrateMbps, store, type PairedDeviceEntry, type RevokeTarget } from '../app/store'
 import { decoderSupport } from '../video/renderer'
+import { dialable } from '../net/endpoint'
 import {
   Caps,
   Card,
@@ -611,8 +612,68 @@ function BrowserSection() {
           appears as its own device on the Mac.
           {paired ? ` This one talks to ${paired.origin}.` : ''}
         </p>
+
+        <FallbackAddresses />
       </div>
     </Card>
+  )
+}
+
+/**
+ * The addresses this browser will fall back to, and which of them it may use.
+ *
+ * Worth stating rather than leaving implicit. The whole point of the list is
+ * that it works without anyone thinking about it — but when it does not, the
+ * reason is nearly always one of two facts on this row: the Mac has named only
+ * one address, or it has named three and this page is on `https` and so may open
+ * only the one that is too. Both are invisible otherwise, and both look
+ * identical to "the Mac is unreachable".
+ */
+function FallbackAddresses() {
+  const paired = store.pairedHost.value
+  if (!paired) return null
+
+  const fallbacks = paired.alternates
+  const blocked = fallbacks.filter((origin) => !dialable(origin))
+  const usable = fallbacks.filter(dialable)
+
+  return (
+    <div class="stack" style={{ gap: '8px' }}>
+      <FactRow
+        label="FALLBACK ADDRESSES"
+        value={usable.length > 0 ? String(usable.length) : 'NONE'}
+        tone={usable.length > 0 ? 'var(--ns-green)' : 'var(--ns-text-tertiary)'}
+      />
+      {usable.map((origin) => (
+        <div key={origin} class="row">
+          <span
+            class="wrap"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'var(--fs-12)',
+              color: 'var(--ns-text-secondary)',
+            }}
+          >
+            {origin}
+          </span>
+        </div>
+      ))}
+      <p
+        class="wrap"
+        style={{
+          margin: 0,
+          fontSize: 'var(--fs-13)',
+          lineHeight: 1.45,
+          color: blocked.length > 0 ? 'var(--ns-on-amber-wash)' : 'var(--ns-text-secondary)',
+        }}
+      >
+        {usable.length === 0 && blocked.length === 0
+          ? 'The Mac has named only one address so far. It reports the rest over the socket, so this fills in a second after connecting — and until it does, leaving this network ends the session.'
+          : blocked.length > 0
+            ? `${blocked.length === 1 ? 'One further address is' : `${blocked.length} further addresses are`} plain HTTP, which this page cannot open because it is served over HTTPS. Turn on Relay over internet on the Mac for an https:// address that works from anywhere.`
+            : 'When the address in use stops answering, these are tried in turn. Changing network costs a reconnect rather than a re-pair.'}
+      </p>
+    </div>
   )
 }
 

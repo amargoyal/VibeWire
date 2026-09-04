@@ -101,7 +101,29 @@ Five ways in, fastest first:
 - **Paste the pairing link.** Reads either QR's payload off the clipboard.
 - **A link with the fields in it.** `…/?host=<mac>&port=8787&code=<code>`. `host`
   and `port` are optional — left out, the page's own origin is used. That is the
-  form to bookmark.
+  form to bookmark. `origin=<full origin>` outranks `host` where a link carries
+  one, and `alt=<origin>,<origin>` names the Mac's other addresses.
+
+**One Mac, several addresses.** The pairing record keeps the address that answered
+*and* the others the Mac named, so leaving the network the pairing was made on
+costs a reconnect rather than a re-pair. The list is learned rather than typed: the
+host reports every address it believes in once a second over the socket, which is
+the only place a Cloudflare quick tunnel's hostname exists at all — it is minted on
+each host launch and written down nowhere.
+
+When a socket fails without ever being accepted, the next address is dialled and the
+backoff carries on; the address that carries a working socket becomes the one dialled
+first next time. A connected socket that stops answering pings for eight seconds is
+treated the same way, because a radio that changes under a live TCP connection does
+not always close it, and a socket nobody can hear would otherwise hold the rotation
+on an address that is already dead.
+
+The one thing a browser cannot copy from the phone: **a page on `https` may dial only
+`https` addresses.** The Mac's plain-HTTP addresses are dropped from the rotation
+there rather than dialled and failed, and Settings → THIS BROWSER says how many were
+dropped and what to do about it. From the copy the Mac serves over `http` there is no
+such rule, so all three are in play — which is why a tab opened at
+`http://<mac>:8787/` survives the walk from Wi-Fi to cellular.
 
 **Browser storage is per-origin.** A key made on `https://you.github.io` is a
 different device from one made on `http://mac:8787`, so each address you use pairs
