@@ -22,6 +22,7 @@ struct SettingsView: View {
                         group("ACCESS") { accessSection }
 
                         revokeEverything.padding(.top, 12)
+                        logOut.padding(.top, 9)
 
                         MonoCaps(
                             "VIBEWIRE \(model.settings.appVersion) · HOST \(model.settings.hostVersion) · NO ACCOUNT, NO CLOUD",
@@ -335,6 +336,38 @@ struct SettingsView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Quieter than the revoke above it, and below it, because it is the smaller
+    /// act: this phone forgets the Mac and the Mac forgets nothing.
+    ///
+    /// The same pair of buttons the web client has, in the same order and with
+    /// the same wording. Until now the only way off a paired phone was to revoke
+    /// every device — destroying every other device's key to put this one back
+    /// on the pairing screen. Neutral rather than red: nothing is destroyed on
+    /// the other end, and colour in this system reports a condition.
+    private var logOut: some View {
+        Button {
+            model.logOut()
+            dismiss()
+        } label: {
+            HStack {
+                Text("Log out")
+                    .nsSans(15)
+                    .foregroundStyle(NS.Color.text)
+                Spacer()
+                MonoCaps("BACK TO PAIRING", size: 9, tracking: 1.2)
+            }
+            .padding(.horizontal, 18)
+            .frame(minHeight: 54)
+            .overlay(
+                RoundedRectangle(cornerRadius: NS.Metric.radiusCard)
+                    .stroke(NS.Color.hairline, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Log out")
+        .accessibilityHint("This phone forgets the Mac and returns to pairing. Nothing is revoked.")
     }
 }
 

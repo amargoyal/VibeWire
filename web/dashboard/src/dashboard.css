@@ -358,9 +358,14 @@ body,
 
 /* The QR plate. White is not an ink here — a scanner needs the quiet zone, which
    is why this colour is a requirement rather than a choice. */
+/* 86px was sized for a code that carried an IP address and six digits: 33
+   modules, 2.2 pixels each, which a phone camera could just about resolve. A
+   payload with a tunnel hostname in it is 41 modules and that plate put them
+   under 1.8 pixels — the code rendered perfectly and no camera would read it.
+   Sized to the payload it has to carry, not to the one it used to. */
 .qr-plate {
-  width: 86px;
-  height: 86px;
+  width: 132px;
+  height: 132px;
   flex: 0 0 auto;
   border-radius: var(--radius-small);
   background: #fff;

@@ -30,6 +30,22 @@ actor HostClient {
     private var onControl: ControlHandler?
     private var onVideo: VideoHandler?
     private var onState: StateHandler?
+    /// Fired when the stored pairing record changes underneath the app — a new
+    /// address won, or the Mac told us about one we did not have.
+    private var onHostRecord: (@Sendable (Identity.PairedHost) -> Void)?
+
+    /// Which of the Mac's addresses this client is dialling.
+    ///
+    /// A Mac has up to three and only one of them answers from where the phone
+    /// happens to be: the tunnel from cellular, the tailnet address wherever
+    /// Tailscale is up, the LAN address at home. Rather than ask the user which
+    /// network they are on, a failed attempt moves to the next address and the
+    /// backoff carries on as before — so walking out of the house costs one
+    /// reconnect, not a re-pair.
+    private var dialIndex = 0
+    /// The origin the live socket was opened against, so a socket that proves
+    /// itself can promote the address that carried it.
+    private var dialledOrigin: String?
 
     /// Input generated while the socket is down. Capped so a long outage does
     /// not replay a minute of stale gestures when it comes back.
@@ -67,11 +83,13 @@ actor HostClient {
     func setHandlers(
         control: @escaping ControlHandler,
         video: @escaping VideoHandler,
-        state: @escaping StateHandler
+        state: @escaping StateHandler,
+        hostRecord: (@Sendable (Identity.PairedHost) -> Void)? = nil
     ) {
         onControl = control
         onVideo = video
         onState = state
+        onHostRecord = hostRecord
     }
 
     var queuedInputCount: Int { queuedOutbound.count }
@@ -137,10 +155,52 @@ actor HostClient {
         )
     }
 
+    /// Pairs against the first of the Mac's addresses that answers.
+    ///
+    /// The QR carries every address the Mac believes it can be reached on, and
+    /// which of them works depends on where the phone is standing — so trying
+    /// them in order is the difference between pairing and reading an IP address
+    /// off a failure banner. The order comes from the host and is respected.
+    ///
+    /// A refusal is not a reason to keep going. `code did not match` came from
+    /// the Mac, which means this address is the right one and the digits are
+    /// wrong; only a failure to *reach* an address moves on to the next.
+    func pair(candidates: [Endpoint], code: String) async throws -> Identity.PairedHost {
+        guard !candidates.isEmpty else { throw PairFailure.unreachable }
+        let alternates = candidates.map(\.origin)
+        var lastFailure: Error = PairFailure.unreachable
+
+        // Probed together, dialled in order. Sequential 8-second timeouts across
+        // three addresses can spend most of the code's sixty-second life finding
+        // out which one is even there, and the code rotating mid-handshake is
+        // the failure this is here to avoid.
+        let responding = await Self.reachable(among: candidates)
+        let ordered = responding.isEmpty ? candidates : responding
+
+        for endpoint in ordered {
+            do {
+                return try await pairOnce(endpoint: endpoint, code: code, alternates: alternates)
+            } catch let failure as PairFailure {
+                switch failure {
+                case .unreachable, .transport, .badAddress, .badResponse:
+                    lastFailure = failure
+                    continue
+                default:
+                    throw failure
+                }
+            }
+        }
+        throw lastFailure
+    }
+
     /// One-shot handshake against a host that is showing a code.
-    func pair(host address: String, port: Int, code: String) async throws -> Identity.PairedHost {
-        guard let url = URL(string: "http://\(address):\(port)/v1/pair") else {
-            throw PairFailure.badAddress("\(address):\(port)")
+    private func pairOnce(
+        endpoint: Endpoint,
+        code: String,
+        alternates: [String]
+    ) async throws -> Identity.PairedHost {
+        guard let url = endpoint.baseURL?.appendingPathComponent("/v1/pair") else {
+            throw PairFailure.badAddress(endpoint.origin)
         }
 
         var request = URLRequest(url: url)
@@ -187,19 +247,52 @@ actor HostClient {
             hostName: decoded.hostName,
             hostKey: decoded.hostKey,
             deviceId: decoded.deviceId,
-            host: address,
-            port: port,
+            origin: endpoint.origin,
+            // The address that answered leads; the rest are kept so the phone
+            // can find this Mac again from a different network.
+            alternates: Endpoint.normalise(alternates.filter { $0 != endpoint.origin }),
             pairedAt: Date()
         )
         try Identity.save(paired)
         self.host = paired
+        dialIndex = 0
         return paired
+    }
+
+    /// Which of these addresses answer, asked all at once, reported in the order
+    /// they were given rather than the order they replied.
+    ///
+    /// Order is the Mac's judgement about which path is worth preferring — the
+    /// tailnet before the relay, because one of those is a direct route and the
+    /// other is a trip through Cloudflare — and a race would replace it with
+    /// whichever happened to be quickest to answer a health check.
+    private static func reachable(among candidates: [Endpoint]) async -> [Endpoint] {
+        await withTaskGroup(of: (Int, Bool).self) { group in
+            for (index, endpoint) in candidates.enumerated() {
+                group.addTask {
+                    guard let url = endpoint.baseURL?.appendingPathComponent("/v1/health") else {
+                        return (index, false)
+                    }
+                    var request = URLRequest(url: url)
+                    request.timeoutInterval = 3
+                    let answered = (try? await URLSession.shared.data(for: request))
+                        .map { ($0.1 as? HTTPURLResponse)?.statusCode == 200 } ?? false
+                    return (index, answered)
+                }
+            }
+
+            var alive: Set<Int> = []
+            for await (index, answered) in group where answered { alive.insert(index) }
+            return candidates.enumerated()
+                .filter { alive.contains($0.offset) }
+                .map(\.element)
+        }
     }
 
     /// Best-effort probe so pairing can say "MACBOOK PRO FOUND · 4 MS" before
     /// the user commits to typing six digits into a void.
-    func probe(host address: String, port: Int) async -> Double? {
-        guard let url = URL(string: "http://\(address):\(port)/v1/health") else { return nil }
+    func probe(endpoint: Endpoint) async -> Double? {
+        guard let url = endpoint.baseURL?.appendingPathComponent("/v1/health") else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = 2
         let started = Date()
@@ -232,7 +325,36 @@ actor HostClient {
         shouldReconnect = true
         reconnectAttempt = 0
         reconnectStartedAt = nil
+        // A fresh session starts from the address that worked last, not from
+        // wherever the previous session's rotation happened to stop.
+        dialIndex = 0
         await openSocket()
+    }
+
+    /// Records addresses the Mac has told us about over the socket.
+    ///
+    /// The host reports its own transport once a second, and that report is the
+    /// only place a Cloudflare quick tunnel's hostname exists — it is minted on
+    /// every host launch. Learning it while connected over Wi-Fi is what makes
+    /// the phone able to reach the same Mac from cellular later, without anyone
+    /// typing a hostname or scanning anything again.
+    func learn(alternates offered: [String]) {
+        guard var host else { return }
+        let merged = Endpoint.normalise([host.origin] + offered + host.alternates)
+        let updated = merged.filter { $0 != host.origin }
+        guard updated != host.alternates else { return }
+        host.alternates = updated
+        self.host = host
+        try? Identity.save(host)
+        onHostRecord?(host)
+    }
+
+    /// The origin currently being dialled, wrapping round the candidate list.
+    private func currentEndpoint() -> Endpoint? {
+        guard let host else { return nil }
+        let candidates = host.candidates
+        guard !candidates.isEmpty else { return Endpoint.lenient(host.origin) }
+        return Endpoint.lenient(candidates[dialIndex % candidates.count])
     }
 
     func disconnect() {
@@ -266,7 +388,7 @@ actor HostClient {
     }
 
     private func openSocket() async {
-        guard let host else { return }
+        guard let host, let endpoint = currentEndpoint() else { return }
 
         // Opening is not instantaneous: fetching the nonce is an await, and the
         // actor is free during it, so a second caller arriving in that window
@@ -289,11 +411,22 @@ actor HostClient {
             ? .connecting(attempt: 1)
             : .reconnecting(attempt: reconnectAttempt + 1, nextRetryMs: backoffMillis()))
 
+        // Cleared here rather than after the nonce comes back, because the nonce
+        // is the first thing a dead address kills. Set later, an attempt that
+        // threw on the challenge left this reading `true` from the socket that
+        // worked ten seconds ago — and the reconnect below only moves to the
+        // next address when the current one has *not* proven itself. The phone
+        // then retried a dead address until it gave up, with the Mac answering
+        // on the other two the whole time.
+        handshakeConfirmed = false
+        dialledOrigin = endpoint.origin
+        print("[VibeWire] dialing \(endpoint.origin)")
+
         do {
-            let nonce = try await fetchNonce(host: host)
+            let nonce = try await fetchNonce(endpoint: endpoint, deviceId: host.deviceId)
             let signature = try Identity.sign(nonce: Data(base64Encoded: nonce) ?? Data())
 
-            guard let url = host.socketURL else { throw PairFailure.unreachable }
+            guard let url = endpoint.socketURL else { throw PairFailure.unreachable }
             var request = URLRequest(url: url)
             request.setValue(host.deviceId, forHTTPHeaderField: "X-VibeWire-Device")
             request.setValue(nonce, forHTTPHeaderField: "X-VibeWire-Nonce")
@@ -301,7 +434,6 @@ actor HostClient {
 
             let task = session.webSocketTask(with: request)
             self.task = task
-            handshakeConfirmed = false
             task.resume()
 
             // `resume()` only *starts* the HTTP upgrade — it says nothing about
@@ -327,20 +459,39 @@ actor HostClient {
         handshakeConfirmed = true
         reconnectAttempt = 0
         reconnectStartedAt = nil
+        promoteDialledOrigin()
         transition(to: .connected)
         flushQueue()
         startPinging()
     }
 
-    private func fetchNonce(host: Identity.PairedHost) async throws -> String {
-        guard let base = host.baseURL,
+    /// The address that carried a working socket becomes the one this phone
+    /// tries first next time.
+    ///
+    /// Only after the socket has proven itself, never on `resume()`: an address
+    /// that merely accepted a TCP connection has not shown it can reach the Mac,
+    /// and promoting it would make a captive portal the phone's idea of home.
+    private func promoteDialledOrigin() {
+        print("[VibeWire] connected on \(dialledOrigin ?? "?")")
+        guard var host, let winner = dialledOrigin, winner != host.origin else { return }
+        host.alternates = Endpoint.normalise([host.origin] + host.alternates)
+            .filter { $0 != winner }
+        host.origin = winner
+        self.host = host
+        dialIndex = 0
+        try? Identity.save(host)
+        onHostRecord?(host)
+    }
+
+    private func fetchNonce(endpoint: Endpoint, deviceId: String) async throws -> String {
+        guard let base = endpoint.baseURL,
               var components = URLComponents(
                   url: base.appendingPathComponent("/v1/challenge"),
                   resolvingAgainstBaseURL: false
               )
         else { throw PairFailure.unreachable }
 
-        components.queryItems = [URLQueryItem(name: "deviceId", value: host.deviceId)]
+        components.queryItems = [URLQueryItem(name: "deviceId", value: deviceId)]
         guard let url = components.url else { throw PairFailure.unreachable }
 
         var request = URLRequest(url: url)
@@ -511,8 +662,22 @@ actor HostClient {
 
         if reconnectStartedAt == nil { reconnectStartedAt = Date() }
 
-        // 03D: "GIVING UP AT 30S".
-        if let started = reconnectStartedAt, Date().timeIntervalSince(started) > 30 {
+        // The socket never proved itself, so the address it was opened against
+        // is a suspect. Move to the next one the Mac gave us — this is what
+        // turns "the phone works on the Wi-Fi it was paired on" into "the phone
+        // works", since the LAN address and the tunnel fail in exactly this way
+        // from the other side of the front door.
+        if let host, host.candidates.count > 1 {
+            dialIndex = (dialIndex + 1) % host.candidates.count
+        }
+        print("[VibeWire] socket failed on \(dialledOrigin ?? "?"): \(reason)")
+
+        // 03D: "GIVING UP AT 30S" — thirty seconds per address, not thirty
+        // shared between them. A phone holding three addresses that split one
+        // budget gives each ten seconds and reports a Mac unreachable that was
+        // answering on the third.
+        if let started = reconnectStartedAt,
+           Date().timeIntervalSince(started) > giveUpSeconds {
             transition(to: .failed(reason))
             shouldReconnect = false
             return
@@ -525,6 +690,12 @@ actor HostClient {
         try? await Task.sleep(for: .milliseconds(delay))
         guard shouldReconnect else { return }
         await openSocket()
+    }
+
+    /// How long an outage runs before this client stops retrying: 30 seconds
+    /// for each address the Mac gave it.
+    var giveUpSeconds: TimeInterval {
+        30 * Double(max(1, host?.candidates.count ?? 1))
     }
 
     /// 0.5 s doubling to a 8 s ceiling.
