@@ -54,3 +54,10 @@ devices.secret
 .claude/
 .impeccable/config.local.json
 .impeccable/live/
+
+# Local agent tooling. Machine-specific configuration and caches, not project
+# source — committing them would put one developer's tool setup in everyone's
+# checkout.
+.agents/
+.codex/
+.relay/

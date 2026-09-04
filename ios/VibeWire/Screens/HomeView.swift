@@ -813,7 +813,9 @@ struct MovedAddress: View {
         Button {
             // Prefilled with the address that stopped answering, because the part
             // that changed is usually the tail of it.
-            address = model.pairedHost?.host ?? ""
+            // The whole origin, because the address that changed may be a tunnel
+            // hostname on 443 rather than a number on 8787.
+            address = model.pairedHost?.origin ?? ""
             port = model.pairedHost.map { String($0.port) } ?? "8787"
             failure = nil
             withAnimation(NS.Motion.stateChange) { open = true }

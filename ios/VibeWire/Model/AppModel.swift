@@ -50,6 +50,8 @@ struct TransportStatus: Equatable {
     var cloudflareRunning = false
     var cloudflareHostname: String?
     var lanAddress: String?
+    /// Every origin this Mac believes it can be reached on, best first.
+    var candidates: [String] = []
 }
 
 enum StreamState: Equatable {
@@ -330,6 +332,9 @@ final class AppModel {
             },
             state: { [weak self] state in
                 Task { @MainActor in self?.connectionChanged(state) }
+            },
+            hostRecord: { [weak self] record in
+                Task { @MainActor in self?.pairedHost = record }
             }
         )
     }
@@ -354,9 +359,33 @@ final class AppModel {
         streamState = .stopped
     }
 
-    func completePairing(host: String, port: Int, code: String) async -> String? {
+    /// Pairs against the addresses the QR offered, best first.
+    ///
+    /// `address` is whatever was typed or scanned — a bare IP, a host and port,
+    /// or a full `https://` tunnel URL. `alternates` are the Mac's other
+    /// addresses, which the phone keeps so it can find the same Mac from a
+    /// different network without pairing again.
+    func completePairing(
+        address: String,
+        port: Int,
+        code: String,
+        alternates: [String] = []
+    ) async -> String? {
+        let candidates: [Endpoint]
         do {
-            let paired = try await client.pair(host: host, port: port, code: code)
+            let primary = try Endpoint.parse(address, fallbackPort: port)
+            candidates = ([primary.origin] + alternates).compactMap(Endpoint.lenient)
+                .reduce(into: [Endpoint]()) { unique, endpoint in
+                    if !unique.contains(where: { $0.origin == endpoint.origin }) {
+                        unique.append(endpoint)
+                    }
+                }
+        } catch {
+            return error.localizedDescription
+        }
+
+        do {
+            let paired = try await client.pair(candidates: candidates, code: code)
             pairedHost = paired
             hostName = paired.hostName
             await client.connect(to: paired)
@@ -367,8 +396,9 @@ final class AppModel {
         }
     }
 
-    func probe(host: String, port: Int) async -> Double? {
-        await client.probe(host: host, port: port)
+    func probe(address: String, port: Int) async -> Double? {
+        guard let endpoint = try? Endpoint.parse(address, fallbackPort: port) else { return nil }
+        return await client.probe(endpoint: endpoint)
     }
 
     /// The Mac moved. Same Mac, same key, new address.
@@ -385,17 +415,29 @@ final class AppModel {
     /// Probes before committing, and leaves the stored address alone if nothing
     /// answers: replacing a working address with a typo is a worse outcome than
     /// the problem being solved.
+    ///
+    /// The addresses already known for this Mac are kept as alternates rather
+    /// than discarded — a Mac at a new tunnel hostname is still at the same LAN
+    /// address when the phone comes home.
     func repoint(host address: String, port: Int) async -> String? {
         guard var moved = pairedHost else {
             return "Nothing is paired, so there is no address to change."
         }
 
-        guard await client.probe(host: address, port: port) != nil else {
-            return "No answer from \(address). The address is unchanged."
+        let endpoint: Endpoint
+        do {
+            endpoint = try Endpoint.parse(address, fallbackPort: port)
+        } catch {
+            return error.localizedDescription
         }
 
-        moved.host = address
-        moved.port = port
+        guard await client.probe(endpoint: endpoint) != nil else {
+            return "No answer from \(endpoint.display). The address is unchanged."
+        }
+
+        moved.alternates = Endpoint.normalise([moved.origin] + moved.alternates)
+            .filter { $0 != endpoint.origin }
+        moved.origin = endpoint.origin
         do {
             try Identity.save(moved)
         } catch {
@@ -413,9 +455,13 @@ final class AppModel {
         return nil
     }
 
-    /// `vibewire://pair?host=…&port=…&code=…` — the payload behind the QR the
-    /// Mac shows. Handled here rather than in the pairing view so it works from
-    /// a cold launch as well as from the scanner.
+    /// `vibewire://pair?origin=…&alt=…&host=…&port=…&code=…` — the payload behind
+    /// the QR the Mac shows. Handled here rather than in the pairing view so it
+    /// works from a cold launch as well as from the scanner.
+    ///
+    /// `origin` and `alt` are what a current host sends: full origins, tunnel
+    /// first. `host` and `port` are still read, because a phone updated ahead of
+    /// the Mac it talks to must still be able to pair with it.
     func handlePairingURL(_ url: URL) async {
         guard url.scheme == "vibewire", url.host == "pair",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -426,15 +472,24 @@ final class AppModel {
             items.first { $0.name == name }?.value
         }
 
-        guard let host = value("host"),
-              let code = value("code"), code.count == 6
-        else {
+        let offered = PairingLink(
+            origin: value("origin"),
+            alternates: value("alt"),
+            host: value("host"),
+            port: value("port")
+        )
+
+        guard let address = offered.address, let code = value("code"), code.count == 6 else {
             banner = "That pairing link is missing an address or code."
             return
         }
 
-        let port = value("port").flatMap(Int.init) ?? 8787
-        if let failure = await completePairing(host: host, port: port, code: code) {
+        if let failure = await completePairing(
+            address: address,
+            port: offered.port,
+            code: code,
+            alternates: offered.alternates
+        ) {
             banner = failure
         }
     }
@@ -526,6 +581,16 @@ final class AppModel {
             transport.cloudflareRunning = payload["cloudflareRunning"] as? Bool ?? false
             transport.cloudflareHostname = payload["cloudflareHostname"] as? String
             transport.lanAddress = payload["lanAddress"] as? String
+            // The Mac is the only thing that knows all of its own addresses, and
+            // a Cloudflare quick tunnel's hostname exists nowhere else — it is
+            // minted at host launch and never written down. Learning it here,
+            // over a socket that is already up, is what lets this phone reach
+            // the same Mac from cellular later without pairing again.
+            transport.candidates = (payload["candidates"] as? [String]) ?? []
+            let learned = transport.candidates
+            if !learned.isEmpty {
+                Task { await client.learn(alternates: learned) }
+            }
 
         case "settings":
             settings.quality = payload["quality"] as? String ?? "auto"
@@ -1078,6 +1143,21 @@ final class AppModel {
             }
             unpairLocally()
         }
+    }
+
+    /// This phone forgets the Mac, and nothing else happens.
+    ///
+    /// Deliberately not a revoke. Revoking deletes keys on the Mac and takes
+    /// every other device with it; this drops only what this phone holds, so the
+    /// Mac keeps its row for this device and the next pairing reuses it rather
+    /// than adding a second. Two different acts with two different costs, and
+    /// the screen says which is which.
+    ///
+    /// No confirmation, because there is nothing to confirm: the cost of a
+    /// mistaken tap is six digits off the menu bar, and the socket it drops was
+    /// going to be dropped by the next lock screen anyway.
+    func logOut() {
+        unpairLocally()
     }
 
     private func unpairLocally() {
