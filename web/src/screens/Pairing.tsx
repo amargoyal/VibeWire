@@ -42,7 +42,9 @@ import {
 } from '../design/components'
 import {
   describe,
+  dialable,
   isHostServed,
+  normaliseOrigins,
   parseEndpoint,
   reachability,
   suggestedAddress,
@@ -78,6 +80,11 @@ export function Pairing() {
   const [pasting, setPasting] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [editingTarget, setEditingTarget] = useState(false)
+  // The Mac's other addresses, as the scanned or pasted link listed them. Held
+  // for the handshake: the address on the card is the one being dialled, and the
+  // rest are what this browser falls back to when the Mac is answering somewhere
+  // it is not standing.
+  const [alternates, setAlternates] = useState<string[]>([])
   const field = useRef<HTMLInputElement | null>(null)
   // A paste can deliver six digits more than once, and the field submits the
   // moment it holds six. Pairing twice burns the code: the second attempt arrives
@@ -86,8 +93,21 @@ export function Pairing() {
   const submitting = useRef(false)
 
   const endpoint = tryEndpoint(address, port)
-  const blocked = endpoint ? reachability(endpoint) === 'blocked' : false
-  const note = endpoint ? describe(endpoint) : null
+  // A link that named a second address this page *can* open is not blocked, even
+  // when the address on the card is one it cannot: the handshake tries them in
+  // order and stops at the first that answers. Only a card with no way through
+  // at all gets the mixed-content sentence.
+  const escape = alternates.find(dialable) ?? null
+  const blocked = endpoint ? reachability(endpoint) === 'blocked' && escape == null : false
+  const note = endpoint && escape == null ? describe(endpoint) : null
+  // What discovery actually dials. Probing an address the browser refuses would
+  // report NO HOST about a Mac that is answering on the address beside it.
+  const probeTarget =
+    endpoint && reachability(endpoint) !== 'blocked'
+      ? endpoint
+      : escape
+        ? tryEndpoint(escape, port)
+        : null
 
   // Discovery is worth a request every two seconds while someone is looking at
   // the address field. It is not worth one during the handshake, where the same
@@ -97,10 +117,10 @@ export function Pairing() {
     let cancelled = false
     const loop = async () => {
       while (!cancelled) {
-        if (!exchanging && endpoint && !blocked) {
-          const millis = await store.probe(endpoint)
+        if (!exchanging && probeTarget) {
+          const millis = await store.probe(probeTarget)
           if (!cancelled) setProbeMillis(millis)
-        } else if (!endpoint || blocked) {
+        } else if (!probeTarget) {
           setProbeMillis(null)
         }
         await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -110,7 +130,7 @@ export function Pairing() {
     return () => {
       cancelled = true
     }
-  }, [endpoint?.origin, exchanging, blocked])
+  }, [probeTarget?.origin, exchanging])
 
   useEffect(() => {
     field.current?.focus()
@@ -145,7 +165,7 @@ export function Pairing() {
     advance(0, 'done', `${Math.round(probeMillis ?? 0)} MS`)
     advance(1, 'running')
 
-    const failure = await store.completePairing(endpoint, code)
+    const failure = await store.completePairing(endpoint, code, alternates)
     submitting.current = false
 
     if (failure) {
@@ -174,12 +194,13 @@ export function Pairing() {
   const applyParsed = async (parsed: PairingLink) => {
     setAddress(parsed.host)
     if (parsed.port) setPort(parsed.port)
+    setAlternates(parsed.alternates)
     if (!parsed.code) return
     setDigits(parsed.code)
     const target = tryEndpoint(parsed.host, parsed.port ?? port)
     if (!target) return
     setErrorText(null)
-    await submitWith(target, parsed.code)
+    await submitWith(target, parsed.code, parsed.alternates)
   }
 
   /**
@@ -211,16 +232,20 @@ export function Pairing() {
 
   /** Same handshake as `submit`, against an endpoint the link supplied rather than
    *  the one the fields hold — which have not re-rendered yet. */
-  const submitWith = async (target: Endpoint, code: string) => {
+  const submitWith = async (target: Endpoint, code: string, offered: string[] = []) => {
     if (submitting.current) return
-    if (reachability(target) === 'blocked') {
+    // Blocked only counts against the address on the card when it is the only
+    // one there is. A link that also names an `https` tunnel is a link this page
+    // can act on, and refusing it because its *first* address is plain HTTP is
+    // how a browser on Pages ends up unable to pair with a Mac that is reachable.
+    if (reachability(target) === 'blocked' && !offered.some(dialable)) {
       setErrorText(describe(target))
       return
     }
     submitting.current = true
     setExchanging(true)
     setSteps(INITIAL_STEPS)
-    const failure = await store.completePairing(target, code)
+    const failure = await store.completePairing(target, code, offered)
     submitting.current = false
     if (failure) {
       setErrorText(failure)
@@ -1040,11 +1065,22 @@ function tryEndpoint(address: string, port: string): Endpoint | null {
   }
 }
 
-/** The three fields the Mac's QR carries, once one has been read out of it. */
+/** What the Mac's QR carries, once it has been read out of one. */
 interface PairingLink {
   host: string
   port: string | null
   code: string | null
+  /**
+   * The Mac's other addresses, when the link named any.
+   *
+   * A current host puts the tunnel in `origin` and leaves the rest out — every
+   * address in a QR costs modules, and a code nobody can scan is a worse defect
+   * than the one being fixed — so this is usually empty and the full list
+   * arrives over the socket a second after connecting. It is read here because
+   * a link that does carry `alt` is a link that says how to reach this Mac from
+   * somewhere other than where it was written.
+   */
+  alternates: string[]
 }
 
 function parseLink(text: string): PairingLink | null {
@@ -1056,19 +1092,38 @@ function parseLink(text: string): PairingLink | null {
   if (questionMark < 0) return null
   const parameters = new URLSearchParams(trimmed.slice(questionMark + 1))
   const code = parameters.get('code')
+  // `origin` is a full origin and outranks `host`, which is a bare address on a
+  // numbered port and cannot express the tunnel — `https` on 443 is the one
+  // address that answers from cellular, and it is the reason this parameter
+  // exists.
+  const origin = parameters.get('origin')
 
   // The Mac draws two QRs, and the one meant for a browser is an ordinary URL to
   // the host itself — `http://mac:8787/?code=482917`, with no `host` parameter,
   // because the address is the link. Refusing a payload with no `host` rejected
   // exactly the code this scanner was built to read, while the app's own
   // deep-link handler had always accepted it by falling back to the origin.
-  const host = parameters.get('host') ?? hostFromURL(trimmed)
+  const host = origin ?? parameters.get('host') ?? hostFromURL(trimmed)
   if (!host) return null
+
+  const offered = (parameters.get('alt') ?? '').split(',')
+  // When `origin` led, the `host`/`port` pair is a second address rather than a
+  // restatement of the first — usually the LAN or tailnet one, which is the
+  // fastest of the three where it answers at all.
+  const legacy = parameters.get('host')
+  const legacyPort = parameters.get('port') ?? '8787'
+  const alternates =
+    origin && legacy ? [...offered, `http://${legacy}:${legacyPort}`] : offered
+
+  // Compared canonically, not as written: `https://tunnel/` and `https://tunnel`
+  // are one address, and a list that keeps both dials the same place twice.
+  const [canonical] = normaliseOrigins([host])
 
   return {
     host,
-    port: parameters.get('port') ?? portFromURL(trimmed),
+    port: origin ? null : (parameters.get('port') ?? portFromURL(trimmed)),
     code: code && code.length === 6 ? code : null,
+    alternates: normaliseOrigins(alternates).filter((entry) => entry !== canonical),
   }
 }
 
