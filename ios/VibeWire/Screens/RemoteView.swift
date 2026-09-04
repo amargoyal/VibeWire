@@ -26,7 +26,6 @@ struct RemoteView: View {
     /// object rather than this view's state, so a ring following a dragging
     /// finger re-renders one small overlay and not the whole picture.
     @State private var ring = HoldRingModel()
-    @State private var showTeachingOverlay = true
     @State private var pinchStart: CGFloat = 1
     @State private var showZoomBadge = false
 
@@ -148,11 +147,6 @@ struct RemoteView: View {
         // range, and 33.33 on every screen that has no ceiling.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .task { await queueTicker() }
-        .onAppear {
-            // The teaching overlay retires after three sessions; the corner
-            // ticks stay forever.
-            showTeachingOverlay = model.sessionCount <= 3
-        }
     }
 
     // MARK: Portrait
@@ -178,23 +172,11 @@ struct RemoteView: View {
                 picture
             }
 
-            pictureCaptionRow
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-
             Spacer(minLength: 0)
 
-            VStack(spacing: 10) {
-                // Teaching gestures over a picture that has stopped updating is
-                // noise on top of a fault, and the card below wants the space.
-                if showTeachingOverlay && model.streamState == .live
-                    && !cannotDecode && !model.sideBySide && !model.showHub {
-                    teachingLegend
-                }
-                rail
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 12)
+            rail
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
         }
         // The pad is the whole glass, not just the picture.
         .contentShape(Rectangle())
@@ -406,14 +388,6 @@ struct RemoteView: View {
                 Spinner(size: 24, color: NS.Color.accent)
             }
         }
-        .overlay(alignment: .bottomLeading) {
-            VideoCaption(pictureCaption, color: frozenTint ?? NS.Color.textSecondary)
-                .padding(.leading, 10)
-                .padding(.bottom, 26)
-                // The hub's hint text sits on this exact line, and two 8pt
-                // captions on top of each other read as neither.
-                .opacity(model.showHub ? 0 : 1)
-        }
         .overlay(alignment: .bottomTrailing) {
             // Something is being carried, and the only way to put it down is to
             // lift the finger. Violet, because holding is the user's own state.
@@ -430,23 +404,6 @@ struct RemoteView: View {
             return 16.0 / 10.0
         }
         return CGFloat(config.width) / CGFloat(config.height)
-    }
-
-    private var pictureCaption: String {
-        // Not the same sentence as a stall's, and the difference is the point:
-        // in a stall the frame on the glass is the last one that *arrived*; here
-        // frames keep arriving and are thrown away, so it is the last one that
-        // *decoded*.
-        if cannotDecode { return "LAST DECODED FRAME" }
-        // A reconnect freezes the same frame a stall does, and this named only
-        // the stall — so while the socket was being redialled the caption over
-        // a frozen picture went on reading `… · LIVE`.
-        if picturePaused { return "LAST GOOD FRAME" }
-        guard let display = model.displays.first(where: \.selected) else { return "" }
-        let geometry = "\(display.name.uppercased()) · \(display.width) × \(display.height)"
-        // `LIVE` is a claim about arriving frames, so it is only appended where
-        // frames are arriving. Stopped, opening and lost all kept it before.
-        return model.streamState == .live ? "\(geometry) · LIVE" : geometry
     }
 
     /// The ticks and the caption take the colour of whatever froze the picture:
@@ -485,15 +442,6 @@ struct RemoteView: View {
                                 .videoChip()
                                 .overlay(Rectangle().stroke(NS.Color.accent.opacity(0.5), lineWidth: 1))
                         }
-                        VideoCaption(
-                            paneCaption(for: display, index: index),
-                            // The unfocused pane is dimmed by its own opacity
-                            // already; taking the text down as well stacked two
-                            // reductions on one caption.
-                            color: model.decodeFailure(forDisplay: display.id) == nil
-                                ? NS.Color.textSecondary
-                                : NS.Color.red
-                        )
                     }
                     .padding(.leading, 10)
                     .padding(.bottom, 20)
@@ -508,34 +456,7 @@ struct RemoteView: View {
         }
     }
 
-    /// Each pane owns a stream and therefore its own decoder, so one can be
-    /// undecodable while the other is fine. Naming it here is what keeps the
-    /// two-monitor case from reproducing exactly the fault this state was added
-    /// for: a frozen pane with the geometry caption still under it.
-    private func paneCaption(for display: DisplayEntry, index: Int) -> String {
-        let name = display.name.uppercased()
-        if model.decodeFailure(forDisplay: display.id) != nil {
-            return "\(name) · CANNOT DECODE"
-        }
-        if model.inputPane == index {
-            return "\(name) · \(display.width) × \(display.height)"
-        }
-        return "\(name) · TAP TO TAKE INPUT"
-    }
-
     // MARK: Overlays
-
-    private var teachingLegend: some View {
-        MonoCaps(
-            "MOVE ANYWHERE ON THE GLASS · HOLD TO DRAG\nDOUBLE-TAP CLICKS TWICE · HOLD THE SECOND TO DRAG IT\nTWO FINGERS SCROLL · PINCH ZOOMS · TWO-FINGER DOUBLE-TAP FITS",
-            size: 9,
-            tracking: 1.6
-        )
-        .multilineTextAlignment(.center)
-        .lineSpacing(6)
-        .frame(maxWidth: .infinity)
-        .allowsHitTesting(false)
-    }
 
     /// The scale reads out big in the middle, where the eye already is.
     private var zoomBadge: some View {
@@ -753,27 +674,6 @@ struct RemoteView: View {
         .accessibilityLabel(picturePaused ? "Stop trying to reconnect" : "Stop streaming")
     }
 
-    /// What is on screen and at what scale, stated in the band rather than over
-    /// the picture. This is where the zoom rail's reading went: a slider nobody
-    /// drags is not worth 128pt of the right-hand edge, but the number it
-    /// carried is.
-    private var pictureCaptionRow: some View {
-        HStack {
-            if !pictureCaption.isEmpty {
-                VideoCaption(pictureCaption, color: frozenTint ?? NS.Color.textSecondary)
-            }
-            Spacer(minLength: 8)
-            MonoCaps(
-                model.zoomScale > 1.02
-                    ? String(format: "%.1f×", model.zoomScale)
-                    : "1.0× FIT",
-                size: 9,
-                color: model.zoomScale > 1.02 ? NS.Color.accent : NS.Color.textTertiary,
-                tracking: 1
-            )
-        }
-    }
-
     /// The control layer, in the lower letterbox band.
     ///
     /// Four things, left to right: what one finger does, the keyboard, the
@@ -935,8 +835,6 @@ struct RemoteView: View {
                         MonoCaps(liveLabel, size: 9, color: streamCondition.color, tracking: 1.4)
                     }
                     .videoChip()
-
-                    VideoCaption(pictureCaption, size: 9, color: frozenTint ?? NS.Color.textSecondary)
                 }
                 .padding(.leading, 24)
                 .padding(.bottom, 22)

@@ -208,27 +208,6 @@ let turnSequence = 0
  *  over the picture. */
 const NOTE_MILLIS = 4200
 
-const STREAM_SESSIONS_KEY = 'vibewire.streamSessions'
-
-function readStreamSessions(): number {
-  try {
-    const stored = Number(localStorage.getItem(STREAM_SESSIONS_KEY))
-    return Number.isFinite(stored) && stored >= 0 ? stored : 0
-  } catch {
-    // A browser with storage disabled still gets a working client; it just sees
-    // the teaching legend every time, which is the behaviour everyone had before.
-    return 0
-  }
-}
-
-function writeStreamSessions(count: number): void {
-  try {
-    localStorage.setItem(STREAM_SESSIONS_KEY, String(count))
-  } catch {
-    /* storage refused; the count stays in memory for this tab */
-  }
-}
-
 /**
  * The first line of a clipboard payload, short enough for a banner.
  *
@@ -333,21 +312,6 @@ export class Store {
   private noteTimer: ReturnType<typeof setTimeout> | null = null
   private latchedModifiers: string[] = []
   private physicalModifiers: string[] = []
-  /**
-   * How many times a picture has gone live on this origin.
-   *
-   * Named for what it counts: it decides whether the remote view still shows its
-   * teaching legend, and it has nothing to do with Claude, which read it as a
-   * session count. Persisted, because it was in memory only — so every page load
-   * put it back to zero and a legend documented as retiring after three sessions
-   * was on screen for every session there had ever been.
-   *
-   * localStorage rather than the identity store: it is a count of sessions on
-   * this origin, which is exactly the scope localStorage has, and losing it costs
-   * nothing worse than reading a sentence again.
-   */
-  streamSessionCount = signal(readStreamSessions())
-
   // Clipboard
   /** Text the Mac sent that this browser refused to put on the clipboard. Held so
    *  it can be offered with a button, which is a gesture the browser accepts. */
@@ -940,11 +904,7 @@ export class Store {
         this.streamState.value = { kind: 'starting' }
         break
       case 'live':
-        batch(() => {
-          this.streamState.value = { kind: 'live' }
-          this.streamSessionCount.value += 1
-          writeStreamSessions(this.streamSessionCount.value)
-        })
+        this.streamState.value = { kind: 'live' }
         break
       case 'stalled':
         this.streamState.value = { kind: 'stalled', millis: num(payload['stalledMs']) ?? 0 }

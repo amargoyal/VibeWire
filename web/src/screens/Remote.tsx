@@ -102,7 +102,6 @@ export function Remote() {
   const [showZoomBadge, setShowZoomBadge] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [landscape, setLandscape] = useState(false)
-  const [showTeaching] = useState(() => store.streamSessionCount.value <= 3)
 
   const glass = useRef<HTMLDivElement | null>(null)
   const picture = useRef<HTMLDivElement | null>(null)
@@ -728,7 +727,6 @@ export function Remote() {
           padMode={padMode}
           setPadMode={setPadMode}
           pictureRef={picture}
-          showTeaching={showTeaching}
           captured={captured}
           onCapture={requestCapture}
           dragging={dragging}
@@ -763,7 +761,6 @@ function PortraitLayout({
   padMode,
   setPadMode,
   pictureRef,
-  showTeaching,
   captured,
   onCapture,
   dragging,
@@ -772,13 +769,11 @@ function PortraitLayout({
   padMode: PadMode
   setPadMode: (mode: PadMode) => void
   pictureRef: { current: HTMLDivElement | null }
-  showTeaching: boolean
   captured: boolean
   onCapture: () => void
   dragging: boolean
 }) {
   const displays = store.displays.value
-  const live = store.streamState.value.kind === 'live'
 
   return (
     <>
@@ -826,8 +821,6 @@ function PortraitLayout({
         <Picture pan={pan} pictureRef={pictureRef} captured={captured} dragging={dragging} />
       )}
 
-      <PictureCaption dragging={dragging} />
-
       {store.sideBySide.value ? null : <span class="spacer" />}
 
       <div
@@ -838,9 +831,6 @@ function PortraitLayout({
           flex: '0 0 auto',
         }}
       >
-        {showTeaching && live && !store.sideBySide.value && !store.showHub.value ? (
-          <TeachingLegend />
-        ) : null}
         <Rail padMode={padMode} setPadMode={setPadMode} captured={captured} onCapture={onCapture} />
       </div>
     </>
@@ -1097,50 +1087,6 @@ function Picture({
   )
 }
 
-/**
- * What is on screen and at what scale, stated in the band rather than over the
- * picture. This is where the zoom rail's reading went: a slider nobody drags is
- * not worth 128px of the right-hand edge, but the number it carried is.
- */
-function PictureCaption({ dragging }: { dragging: boolean }) {
-  const display = store.selectedDisplay.value
-  const state = store.streamState.value
-  const zoom = store.zoomScale.value
-  const tint = stallTint()
-
-  const left = (() => {
-    if (state.kind === 'stalled' || state.kind === 'reconnecting') return 'LAST GOOD FRAME'
-    if (dragging) return 'DRAGGING · LIFT TO DROP'
-    // Side by side, every pane names itself in its own corner. Naming one of them
-    // again down here says the band is about that display, which it is not — the
-    // scale on the right is the only reading that still belongs to both.
-    if (store.sideBySide.value) return ''
-    if (!display) return ''
-    return `${display.name.toUpperCase()} · ${display.width} × ${display.height}`
-  })()
-
-  return (
-    <div
-      class="row"
-      style={{
-        paddingInline: 'calc(14px + var(--safe-left)) calc(14px + var(--safe-right))',
-        paddingTop: '12px',
-        flex: '0 0 auto',
-      }}
-    >
-      {left ? <VideoCaption color={tint ?? 'var(--ns-text-secondary)'}>{left}</VideoCaption> : null}
-      <span class="spacer" />
-      <Caps
-        size="var(--fs-9)"
-        tracking="0.1em"
-        color={zoom > 1.02 ? 'var(--ns-accent)' : 'var(--ns-text-tertiary)'}
-      >
-        {zoom > 1.02 ? `${zoom.toFixed(1)}×` : '1.0× FIT'}
-      </Caps>
-    </div>
-  )
-}
-
 // MARK: — side by side
 
 function SideBySidePanes() {
@@ -1196,11 +1142,6 @@ function SideBySidePanes() {
                   INPUT HERE
                 </Caps>
               ) : null}
-              <VideoCaption>
-                {focused
-                  ? `${display.name.toUpperCase()} · ${display.width} × ${display.height}`
-                  : `${display.name.toUpperCase()} · ${tapVerb()} TO TAKE INPUT`}
-              </VideoCaption>
             </div>
           </div>
         )
@@ -1219,32 +1160,6 @@ function paneAspect(display: DisplayEntry): number {
 }
 
 // MARK: Overlays
-
-/**
- * What the glass does, said once, in the band under the picture.
- *
- * The breathing ring that used to sit above this text is gone with the arc: it
- * marked a place to touch, and now that the whole glass is the pad and the
- * controls are labelled, the sentence is the whole instruction.
- */
-function TeachingLegend() {
-  return (
-    <Caps
-      size="var(--fs-9)"
-      tracking="0.16em"
-      style={{
-        textAlign: 'center',
-        lineHeight: 1.8,
-        paddingInline: '14px',
-        pointerEvents: 'none',
-      }}
-    >
-      {matchMedia('(pointer: fine)').matches
-        ? 'DRAG ANYWHERE ON THE GLASS · HOLD TO PICK UP\nDOUBLE-CLICK REACHES THE MAC · ESC RELEASES A CAPTURE\nWHEEL SCROLLS · ⌃WHEEL ZOOMS · ? LISTS THE KEYS'
-        : 'MOVE ANYWHERE ON THE GLASS · HOLD TO DRAG\nDOUBLE-TAP CLICKS TWICE · HOLD THE SECOND TO DRAG IT\nTWO FINGERS SCROLL · PINCH ZOOMS · TWO-FINGER DOUBLE-TAP FITS'}
-    </Caps>
-  )
-}
 
 /**
  * The clock under a held press, drawn where the press is.
@@ -1629,7 +1544,6 @@ function LandscapeLayout({
   captured: boolean
   onCapture: () => void
 }) {
-  const display = store.selectedDisplay.value
   const tint = stallTint()
   const zoom = store.zoomScale.value
   const fine = matchMedia('(pointer: fine)').matches
@@ -1667,19 +1581,6 @@ function LandscapeLayout({
             transform={`translate(${pan.x}px, ${pan.y}px) scale(${zoom})`}
           />
           <CornerTicks color={tint ?? 'color-mix(in srgb, var(--ns-accent) 75%, transparent)'} />
-          <div
-            class="row"
-            style={{
-              position: 'absolute',
-              left: 'calc(36px + var(--safe-left))',
-              bottom: '14px',
-              gap: '10px',
-            }}
-          >
-            <VideoCaption color={tint ?? 'var(--ns-text-secondary)'}>
-              {display ? `${display.name.toUpperCase()} · ${display.width} × ${display.height}` : ''}
-            </VideoCaption>
-          </div>
           {captured ? (
             <div style={{ position: 'absolute', right: '36px', bottom: '14px' }}>
               <VideoCaption color="var(--ns-accent)">POINTER CAPTURED · ESC RELEASES</VideoCaption>
