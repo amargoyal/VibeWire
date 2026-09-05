@@ -46,6 +46,8 @@ struct DisplayInfo: Sendable, Equatable {
 actor DisplayCatalog {
     private(set) var displays: [DisplayInfo] = []
     private var lastRefresh: Date?
+    /// Once per spell of sleep, not once per 2 s poll.
+    private var warnedAsleep = false
 
     /// Refreshes at most every 2 s unless forced. The home screen polls this
     /// while visible and we do not want to hammer the window server.
@@ -84,6 +86,24 @@ actor DisplayCatalog {
                     isMain: CGDisplayIsMain(id) != 0
                 ))
             }
+            // An empty answer from ScreenCaptureKit means one of two very
+            // different things, and overwriting the list conflated them. With
+            // no display online it means the displays are gone, and an empty
+            // list is the truth. With displays online but asleep — a locked
+            // Mac, one second in — it means the panels are off, and wiping the
+            // list is what put "the Mac reports no displays, check Screen
+            // Recording permission" on the phone over a permission that was
+            // granted. Hold what was last seen; `displaysAsleep` on the status
+            // payload is what says the picture is off.
+            if result.isEmpty, !displays.isEmpty, SystemServices.displaysAreAsleep() {
+                if !warnedAsleep {
+                    warnedAsleep = true
+                    Log.info(.capture, "displays are asleep; holding the last known list")
+                }
+                lastRefresh = Date()
+                return displays
+            }
+            warnedAsleep = false
             displays = result
             lastRefresh = Date()
         } catch {

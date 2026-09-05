@@ -43,9 +43,10 @@ interface Command {
 }
 
 /**
- * Six commands and the modifier group, in the order they are reached for. KEYS and
- * SHOT lead because they are the two that get used in the first minute; LOCK is
- * last of the six because it ends the session.
+ * Seven commands and the modifier group, in the order they are reached for. KEYS
+ * and SHOT lead because they are the two that get used in the first minute; WAKE
+ * and LOCK are last and sit together, because they are the pair that turn the
+ * Mac's screen off and back on.
  */
 const COMMANDS: Command[] = [
   { action: 'keys', glyph: '⌨', caption: 'KEYS', spoken: 'Keyboard' },
@@ -53,6 +54,7 @@ const COMMANDS: Command[] = [
   { action: 'copy', glyph: '←', caption: 'COPY', spoken: 'Copy from the Mac', glyphSize: 'var(--fs-13)' },
   { action: 'paste', glyph: '→', caption: 'PASTE', spoken: 'Paste to the Mac', glyphSize: 'var(--fs-13)' },
   { action: 'enter', glyph: '⏎', caption: 'ENTER', spoken: 'Press Return on the Mac' },
+  { action: 'wake', glyph: '☀', caption: 'WAKE', spoken: 'Turn the Mac’s screen back on' },
   { action: 'lock', glyph: '⏻', caption: 'LOCK', spoken: 'Lock the Mac’s screen' },
 ]
 
@@ -71,6 +73,13 @@ export function CommandDrawer() {
         // render later — focuses a field and shows no keyboard.
         focusKeyboardField()
         store.showKeyboard.value = true
+        store.showHub.value = false
+        break
+      case 'wake':
+        // Not a `hubAction`: waking the panels is its own message, and the Mac
+        // answers it with a fresh display list rather than an ack. The drawer
+        // closes like every other command that leaves the picture.
+        store.wake()
         store.showHub.value = false
         break
       case 'enter':

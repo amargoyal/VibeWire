@@ -34,9 +34,10 @@ struct CommandDrawerView: View {
         var glyphSize: CGFloat = 16
     }
 
-    /// Six commands, in the order they are reached for. KEYS and SHOT lead
-    /// because they are the two that get used in the first minute; LOCK is last
-    /// because it ends the session.
+    /// Seven commands, in the order they are reached for. KEYS and SHOT lead
+    /// because they are the two that get used in the first minute; WAKE and
+    /// LOCK are last and sit together, because they are the pair that turn the
+    /// Mac's screen off and back on.
     private let commands: [Command] = [
         Command(action: "keys", glyph: "⌨", caption: "KEYS", spoken: "Keyboard"),
         Command(action: "shot", glyph: "⛶", caption: "SHOT", spoken: "Screenshot the Mac"),
@@ -55,6 +56,12 @@ struct CommandDrawerView: View {
             glyphSize: 13
         ),
         Command(action: "enter", glyph: "⏎", caption: "ENTER", spoken: "Press Return on the Mac"),
+        Command(
+            action: "wake",
+            glyph: "☀",
+            caption: "WAKE",
+            spoken: "Turn the Mac’s screen back on"
+        ),
         Command(action: "lock", glyph: "⏻", caption: "LOCK", spoken: "Lock the Mac’s screen"),
     ]
 
@@ -256,6 +263,12 @@ struct CommandDrawerView: View {
         switch action {
         case "keys":
             model.showKeyboard = true
+            withAnimation(NS.Motion.stateChange) { model.showHub = false }
+        case "wake":
+            // Not a `hubAction`: waking the panels is its own message, and the
+            // Mac answers it with a fresh display list rather than an ack. The
+            // drawer closes like every other command that leaves the picture.
+            model.wake()
             withAnimation(NS.Motion.stateChange) { model.showHub = false }
         case "enter":
             // The one key worth reaching without opening a keyboard: it is what
