@@ -696,6 +696,14 @@ final class AppModel {
                 withAnimation(NS.Motion.stateChange) { showScreenshot = true }
             }
 
+        case "wake":
+            // Silent on success: the picture coming back is the receipt. A
+            // failure has no other symptom at all — the screen simply stays
+            // dark — so that one is said out loud.
+            if payload["ok"] as? Bool == false {
+                banner = "The Mac’s screen did not come back on."
+            }
+
         case "lastFrame":
             lastFrameAgeSeconds = payload["ageSeconds"] as? Int
 

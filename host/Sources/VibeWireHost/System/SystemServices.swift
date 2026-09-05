@@ -108,17 +108,80 @@ final class SystemServices: @unchecked Sendable {
         var isOnPower: Bool
         var lidOpen: Bool
         var asleepFor: TimeInterval?
+        /// The panels are off while the machine itself is running. A locked Mac
+        /// is in this state within a second, and it is the state 02C's "Its
+        /// display is off" card was written for.
+        var displaysAsleep: Bool
     }
 
     private var sleepStartedAt: Date?
 
+    /// `isAwake` is a claim about the picture, not about the CPU.
+    ///
+    /// It used to read `sleepStartedAt == nil`, which is only ever false while
+    /// the whole machine is asleep — and a machine that is asleep is not
+    /// answering a socket, so no connected phone could ever see it false. A
+    /// locked Mac turns its displays off within a second, ScreenCaptureKit then
+    /// reports no capturable displays, and the phone drew the one card that
+    /// fits an empty display list: a Screen Recording permission diagnosis for
+    /// a permission that was granted. The display being off is the fact, so the
+    /// display being off is what this reports.
     func powerState() -> PowerState {
-        PowerState(
-            isAwake: sleepStartedAt == nil,
+        let displaysAsleep = Self.displaysAreAsleep()
+        return PowerState(
+            isAwake: sleepStartedAt == nil && !displaysAsleep,
             isOnPower: Self.isOnACPower(),
             lidOpen: Self.isLidOpen(),
-            asleepFor: sleepStartedAt.map { Date().timeIntervalSince($0) }
+            asleepFor: sleepStartedAt.map { Date().timeIntervalSince($0) },
+            displaysAsleep: displaysAsleep
         )
+    }
+
+    /// Whether the panels are dark while the displays are still attached.
+    ///
+    /// Measured as "online but not active", with the main display's own sleep
+    /// flag as the fast path. `CGGetActiveDisplayList` drops to zero when the
+    /// panels sleep and `CGGetOnlineDisplayList` does not, so the two together
+    /// separate "the screen is off" from "the screen is gone".
+    static func displaysAreAsleep() -> Bool {
+        var online: UInt32 = 0
+        var active: UInt32 = 0
+        guard CGGetOnlineDisplayList(0, nil, &online) == .success,
+              CGGetActiveDisplayList(0, nil, &active) == .success
+        else { return false }
+        guard online > 0 else { return false }
+        return active == 0 || CGDisplayIsAsleep(CGMainDisplayID()) != 0
+    }
+
+    /// Turns the panels back on, without unlocking anything.
+    ///
+    /// `IOPMAssertionDeclareUserActivity` is the only thing measured to do it:
+    /// posting a synthetic mouse move — which is what WAKE used to do — leaves
+    /// a slept display asleep, so the phone's "Wake it" reported success and
+    /// nothing came on. The lock screen stays up; this is a nudge to the
+    /// backlight, not a login.
+    @discardableResult
+    func wakeDisplays() -> Bool {
+        var assertion: IOPMAssertionID = 0
+        let result = IOPMAssertionDeclareUserActivity(
+            "VibeWire wake" as CFString,
+            kIOPMUserActiveLocal,
+            &assertion
+        )
+        Log.info(.app, "wake displays: \(result == kIOReturnSuccess ? "ok" : "failed (\(result))")")
+        return result == kIOReturnSuccess
+    }
+
+    /// Waits for the window server to hand the panels back, so a caller can
+    /// wake and then capture in one breath rather than racing the backlight.
+    /// Returns whether a capturable display arrived before the deadline.
+    func waitForDisplaysAwake(timeout: TimeInterval = 6) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if !Self.displaysAreAsleep() { return true }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return !Self.displaysAreAsleep()
     }
 
     func noteWillSleep() { sleepStartedAt = Date() }
@@ -141,8 +204,12 @@ final class SystemServices: @unchecked Sendable {
     }
 
     private static func isLidOpen() -> Bool {
-        // A closed lid with no external display means no active displays.
-        CGGetActiveDisplayList(0, nil, nil) == .success && CGDisplayIsActive(CGMainDisplayID()) != 0
+        // A closed lid with no external display means no *online* displays.
+        // Active was the wrong list: it empties whenever the panels sleep, so a
+        // locked laptop sitting open reported its lid shut.
+        var online: UInt32 = 0
+        guard CGGetOnlineDisplayList(0, nil, &online) == .success else { return true }
+        return online > 0
     }
 
     /// 02C says wake fails on battery. Rather than promise and disappoint, the

@@ -506,9 +506,22 @@ final class HostRouter: Router, @unchecked Sendable {
 
         case .wake:
             // The Mac is by definition awake if it answered, so this nudges the
-            // display awake rather than the machine.
-            injector.movePointer(dx: 0, dy: 0, display: nil)
-            socket.sendJSON(["t": "wake", "ok": true])
+            // display awake rather than the machine. A synthetic mouse move was
+            // measured not to do that — a slept panel stays slept through it —
+            // so the nudge is a declared user activity, which does.
+            let woke = system.wakeDisplays()
+            let onScreen = await system.waitForDisplaysAwake()
+            // The phone asked for a picture, so the answer carries a fresh
+            // display list and a fresh status rather than making it wait for
+            // the next heartbeat to find out it can now open the screen.
+            _ = await catalog.refresh(force: true)
+            await pushDisplays(to: socket)
+            await pushStatus(to: socket)
+            // A stream that ran through the sleep has been sending nothing
+            // since the panels went dark, and the phone is holding the frame
+            // from just before that. An IDR is what replaces it.
+            for stream in currentStreams() { stream.requestKeyframe() }
+            socket.sendJSON(["t": "wake", "ok": woke && onScreen])
 
         case .retry:
             await retuneStreams()
@@ -1117,10 +1130,18 @@ final class HostRouter: Router, @unchecked Sendable {
         var payload = snapshot.wire
         payload["t"] = "status"
         payload["awake"] = power.isAwake
+        payload["displaysAsleep"] = power.displaysAsleep
         payload["onPower"] = power.isOnPower
         payload["lidOpen"] = power.lidOpen
         payload["frontmostApp"] = frontmost.name
-        payload["canWake"] = system.canWakeOverNetwork()
+        // This payload only ever travels down a live socket, so the Mac is
+        // running and its panels are one local assertion away from coming back
+        // on. `canWakeOverNetwork` answers a different question — whether a
+        // *sleeping machine* could be reached by Wake-on-LAN — and answering it
+        // here put "MAC IS ON BATTERY — MAY NOT ANSWER" under a button that
+        // works perfectly well on battery. The Wake-on-LAN claim still travels,
+        // on `hello`, as `wakeOnLan`.
+        payload["canWake"] = true
         socket.sendJSON(payload)
     }
 

@@ -155,7 +155,7 @@ Requests carrying `id` get exactly one reply with the same `id`.
 | `t` | Meaning | Feeds screen |
 |---|---|---|
 | `hello` | host name, version, capabilities, permission status | 02A header |
-| `status` | awake/asleep, rtt, loss, downMbps, jitter, 60 s rtt history | 02A–02D condition card |
+| `status` | awake/asleep, `displaysAsleep`, rtt, loss, downMbps, jitter, 60 s rtt history | 02A–02D condition card |
 | `displays` | id, name, width, height, hz, isBuiltIn, selected | 02A–02D display list, 03A tabs |
 | `transport` | `direct`/`relay`, path detail, peer latency, relay name | 02A, 02D, 07A toggle |
 | `streamState` | `starting`/`live`/`stalled`/`reconnecting`/`stopped`, attempt, nextRetryMs, queuedInput, stalledMs | 03D |
