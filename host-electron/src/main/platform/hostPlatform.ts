@@ -1,7 +1,6 @@
 /**
  * The seam between the router and the operating system. One implementation
- * per platform; the router never sees which. Grows a section per phase — this
- * is the part that phase 1 needs.
+ * per platform; the router never sees which.
  */
 export type PlatformName = 'macos' | 'windows'
 
@@ -12,6 +11,13 @@ export interface PlatformPaths {
   channelToken: string
   /** `~/.claude/projects` on both platforms. */
   claudeProjects: string
+  /** Where the `claude` CLI is looked for, in order, before the PATH. */
+  claudeCandidates: string[]
+  tailscaleCandidates: string[]
+  cloudflaredCandidates: string[]
+  /** Where to put a fetched cloudflared when none is installed, or null where
+   *  the host never fetches one. */
+  cloudflaredDownload: string | null
 }
 
 export interface MachineInfo {
@@ -25,10 +31,32 @@ export interface MachineInfo {
   osBuild(): string | null
 }
 
+export interface DesktopInfo {
+  /** The lock screen or a UAC prompt owns input; nothing this host sends lands. */
+  secureDesktopActive(): boolean
+  foregroundWindow(): { app: string; title: string; path: string; elevated: boolean }
+}
+
+export interface PowerControl {
+  lock(): boolean
+  wakeDisplays(): boolean
+  displaysAsleep(): boolean
+}
+
+export interface NetworkInfo {
+  /** Whether the inbound rule for the host exists; null where not applicable. */
+  firewallRulePresent(): Promise<boolean | null>
+  /** 'Private' | 'Public' | 'Domain' on Windows; null elsewhere or unknown. */
+  networkProfile(): Promise<string | null>
+}
+
 export interface HostPlatform {
   readonly name: PlatformName
   readonly paths: PlatformPaths
   readonly machine: MachineInfo
+  readonly desktop: DesktopInfo
+  readonly power: PowerControl
+  readonly network: NetworkInfo
   /** Measured facts the client names as conditions. Empty where none apply. */
   conditions(): Record<string, boolean>
 }

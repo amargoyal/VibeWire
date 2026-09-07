@@ -8,7 +8,8 @@ const run = promisify(execFile)
 
 /**
  * The Mac, for development only. The Swift host is the Mac product; this just
- * has to be enough for the server, capture and Claude paths to run here.
+ * has to be enough for the server, capture, transport and Claude paths to run
+ * here. Input, lock and wake are deliberately absent.
  *
  * Its config directory is deliberately not the Swift host's: sharing
  * `config.json` would make each host clobber the other's settings, and the
@@ -34,6 +35,10 @@ export function createDarwinPlatform(env: NodeJS.ProcessEnv): HostPlatform {
       configDir,
       channelToken: join(home, '.config', 'vibewire', 'channel.token'),
       claudeProjects: join(home, '.claude', 'projects'),
+      claudeCandidates: [join(home, '.local', 'bin', 'claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'],
+      tailscaleCandidates: ['/Applications/Tailscale.app/Contents/MacOS/Tailscale', '/usr/local/bin/tailscale', '/opt/homebrew/bin/tailscale'],
+      cloudflaredCandidates: ['/opt/homebrew/bin/cloudflared', '/usr/local/bin/cloudflared'],
+      cloudflaredDownload: null,
     },
     machine: {
       hostName() {
@@ -61,6 +66,33 @@ export function createDarwinPlatform(env: NodeJS.ProcessEnv): HostPlatform {
         return systemVersion()
       },
       osBuild() {
+        return null
+      },
+    },
+    desktop: {
+      secureDesktopActive() {
+        return false
+      },
+      foregroundWindow() {
+        return { app: 'Unknown', title: '', path: '', elevated: false }
+      },
+    },
+    power: {
+      lock() {
+        return false
+      },
+      wakeDisplays() {
+        return false
+      },
+      displaysAsleep() {
+        return false
+      },
+    },
+    network: {
+      async firewallRulePresent() {
+        return null
+      },
+      async networkProfile() {
         return null
       },
     },

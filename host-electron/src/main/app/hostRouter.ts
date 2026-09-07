@@ -10,6 +10,7 @@ import { WebAssets } from '../net/webAssets'
 import {
   decodeInbound,
   Outbound,
+  type ClaudeInbound,
   type HubAction,
   type Inbound,
   type Payload,
@@ -123,6 +124,19 @@ export class HostRouter implements Router {
 
   get expensiveLink(): boolean {
     return this.phoneOnExpensiveLink
+  }
+
+  get hostModel(): string {
+    return this.model
+  }
+
+  get inputAvailable(): boolean {
+    return this.input.available
+  }
+
+  /** Claude, driven from the dashboard. Identical to the phone's path. */
+  async dashboardClaude(inbound: ClaudeInbound): Promise<void> {
+    await this.claude.handle(inbound)
   }
 
   /** One message to both surfaces: the attached phone, and the dashboard's next poll. */
@@ -490,7 +504,7 @@ export class HostRouter implements Router {
         socket.sendJSON({ t: 'clipboard', direction: 'toMac', ok: true })
         break
       case 'shot': {
-        const png = this.system.screenshot(this.selectedDisplays[0] ?? null)
+        const png = await this.system.screenshot(this.selectedDisplays[0] ?? null)
         if (png) socket.sendJSON({ t: 'screenshot', png: png.toString('base64'), bytes: png.length })
         else socket.sendJSON(Outbound.error('screenshot_failed', 'could not capture display'))
         break
@@ -686,7 +700,7 @@ export class HostRouter implements Router {
 
     // Refresh the "TYPING INTO" banner while keyboard mode is open.
     const frontmost = this.system.frontmostApplication()
-    socket.sendJSON({ t: 'frontmost', app: frontmost.name, bundleId: frontmost.bundleId ?? '' })
+    socket.sendJSON({ t: 'frontmost', app: frontmost.name, bundleId: frontmost.bundleId ?? '', title: frontmost.title, elevated: frontmost.elevated })
 
     // Nothing has answered a ping in a while: tell the phone before it notices
     // on its own, so 03D can start counting.

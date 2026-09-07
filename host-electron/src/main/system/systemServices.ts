@@ -1,10 +1,11 @@
-import { clipboard, powerMonitor } from 'electron'
+import { clipboard, desktopCapturer, powerMonitor, powerSaveBlocker, screen } from 'electron'
 import { Log } from '../core/log'
+import type { HostPlatform } from '../platform/hostPlatform'
 
 /**
  * Clipboard, screenshot, lock, wake, power and the frontmost app: what the hub
  * actions and the status heartbeat read. Electron answers the cross-platform
- * half; the rest comes through the platform seam as it is built.
+ * half; the platform seam answers the rest.
  */
 export interface PowerState {
   isAwake: boolean
@@ -17,13 +18,16 @@ export interface PowerState {
 export interface Frontmost {
   name: string
   bundleId: string | null
+  title: string
+  elevated: boolean
 }
 
 export class SystemServices {
   private lastClipboard: string | null = null
   private sleepStartedAt: number | null = null
+  private blocker: number | null = null
 
-  constructor() {
+  constructor(private readonly platform: HostPlatform) {
     powerMonitor.on('suspend', () => {
       this.sleepStartedAt = Date.now()
       Log.info('app', 'system going to sleep')
@@ -63,30 +67,59 @@ export class SystemServices {
     return text
   }
 
-  // MARK: Screen, power, lock
+  // MARK: Screen
 
-  screenshot(_displayId: number | null): Buffer | null {
-    return null
+  /** One frame of a display as a PNG. A screenshot, taken on request, at up
+   *  to `maxWidth` pixels wide; null when the platform will not hand one over. */
+  async screenshot(displayId: number | null, maxWidth = 1600): Promise<Buffer | null> {
+    const displays = screen.getAllDisplays()
+    const display = displays.find((entry) => entry.id === displayId) ?? screen.getPrimaryDisplay()
+    const physicalWidth = Math.round(display.size.width * display.scaleFactor)
+    const physicalHeight = Math.round(display.size.height * display.scaleFactor)
+    const scale = Math.min(1, maxWidth / physicalWidth)
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: Math.round(physicalWidth * scale), height: Math.round(physicalHeight * scale) },
+      })
+      const source =
+        sources.find((entry) => entry.display_id === String(display.id)) ??
+        sources[displays.findIndex((entry) => entry.id === display.id)] ??
+        sources[0]
+      if (!source || source.thumbnail.isEmpty()) return null
+      return source.thumbnail.toPNG()
+    } catch (error) {
+      Log.warn('app', `screenshot failed: ${String(error)}`)
+      return null
+    }
   }
 
+  // MARK: Power, lock
+
   lockScreen(): boolean {
-    return false
+    return this.platform.power.lock()
   }
 
   wakeDisplays(): boolean {
-    return false
+    return this.platform.power.wakeDisplays()
   }
 
+  /** Polls for up to 6 s for the panels to come back. */
   async waitForDisplaysAwake(): Promise<boolean> {
-    return true
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      if (!this.platform.power.displaysAsleep()) return true
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    return !this.platform.power.displaysAsleep()
   }
 
   powerState(): PowerState {
+    const displaysAsleep = this.platform.power.displaysAsleep()
     return {
-      isAwake: this.sleepStartedAt === null,
+      isAwake: this.sleepStartedAt === null && !displaysAsleep,
       isOnPower: !powerMonitor.isOnBatteryPower(),
       lidOpen: true,
-      displaysAsleep: false,
+      displaysAsleep,
     }
   }
 
@@ -96,9 +129,18 @@ export class SystemServices {
     return false
   }
 
-  preventSleep(_on: boolean): void {}
+  /** Keeps the panels on while a phone is attached, the way the Mac host
+   *  holds a power assertion. */
+  preventSleep(on: boolean): void {
+    if (on && this.blocker === null) this.blocker = powerSaveBlocker.start('prevent-display-sleep')
+    if (!on && this.blocker !== null) {
+      powerSaveBlocker.stop(this.blocker)
+      this.blocker = null
+    }
+  }
 
   frontmostApplication(): Frontmost {
-    return { name: 'Unknown', bundleId: null }
+    const front = this.platform.desktop.foregroundWindow()
+    return { name: front.app || 'Unknown', bundleId: front.path || null, title: front.title, elevated: front.elevated }
   }
 }

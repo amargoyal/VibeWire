@@ -61,3 +61,7 @@ devices.secret
 .agents/
 .codex/
 .relay/
+
+# The Electron host keeps its installer resources in build/, which the
+# unanchored pattern above would otherwise swallow.
+!host-electron/build/

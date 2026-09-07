@@ -4,7 +4,10 @@ import { dirname, join, resolve } from 'node:path'
 import { Config } from './core/config'
 import { Log, describeError } from './core/log'
 import { RendererCaptureHost } from './capture/rendererCaptureHost'
-import { NoClaude } from './claude/claudeService'
+import { LiveClaudeService } from './claude/liveClaudeService'
+import { DashboardService } from './net/dashboardService'
+import { DashboardWindow } from './app/dashboardWindow'
+import { TrayController } from './app/tray'
 import { NoInput } from './input/inputRouter'
 import { HTTPServer } from './net/httpServer'
 import { PairingService } from './pairing/pairingService'
@@ -23,6 +26,8 @@ import { TransportManager } from './transport/transportManager'
  *   --port <n>      serve somewhere other than the stored port (not written back)
  *   --pair          open the pairing window at launch
  *   --print-code    print the pairing code to stdout as it rotates
+ *   --dashboard     open the window at launch
+ *   --dashboard-url print the window's address, key and all, for a browser
  *   --no-tray       headless: no tray, no windows; a fatal error goes to stderr
  */
 const argv = process.argv.slice(1)
@@ -82,9 +87,14 @@ async function main(): Promise<void> {
 
   const pairing = new PairingService(trust, { hostName: () => platform.machine.hostName() })
   const telemetry = new Telemetry()
-  const transport = new TransportManager(settings.port)
-  const system = new SystemServices()
+  const transport = new TransportManager(settings.port, platform)
+  const system = new SystemServices(platform)
   const capture = new RendererCaptureHost(telemetry, join(__dirname, 'capture'))
+  const claude = new LiveClaudeService({
+    claudeCandidates: platform.paths.claudeCandidates,
+    channelTokenPath: platform.paths.channelToken,
+    projectsDirectory: platform.paths.claudeProjects,
+  })
   const router = new HostRouter({
     platform,
     trust,
@@ -93,12 +103,13 @@ async function main(): Promise<void> {
     input: new NoInput(),
     system,
     telemetry,
-    claude: new NoClaude(),
+    claude,
     transport,
     settings,
   })
-
   capture.bindLadder(() => router.ladder)
+  transport.bindRelaySetting(() => router.currentSettings.relayOverInternet)
+  router.dashboard = new DashboardService(router, trust, pairing, capture, transport, telemetry, system, platform)
 
   const server = new HTTPServer(settings.port, router)
   router.server = server
@@ -112,6 +123,25 @@ async function main(): Promise<void> {
     )
   }
   await transport.refresh()
+  if (settings.relayOverInternet) await transport.startCloudflareTunnel()
+  logStartupSummary(platform, transport, settings.port)
+
+  const dashboardWindow = new DashboardWindow(settings.port)
+  let tray: TrayController | null = null
+  if (!headless) {
+    // A menu-bar / tray app: no Dock icon, no window until asked for one.
+    if (process.platform === 'darwin') app.dock?.hide()
+    tray = new TrayController({
+      router,
+      pairing,
+      transport,
+      telemetry,
+      platform,
+      dashboard: dashboardWindow,
+      resourcesDir: app.isPackaged ? join(process.resourcesPath, 'build') : join(dirname(__dirname), 'build'),
+    })
+    tray.install()
+  }
 
   if (flags.has('--print-code')) {
     pairing.onCodeChange = (code) => {
@@ -119,18 +149,41 @@ async function main(): Promise<void> {
       else process.stdout.write('pairing window closed\n')
     }
   }
-  if (flags.has('--pair')) pairing.beginPairing()
+  // `--pair` opens the window on the pairing pane and prints the code. Not a
+  // bypass: the code still rotates and still needs someone at the machine.
+  if (flags.has('--pair')) {
+    pairing.beginPairing()
+    if (!headless) dashboardWindow.show('pair')
+  }
+  if (flags.has('--dashboard') && !headless) dashboardWindow.show()
+  // Opt-in and nothing else: the key is the whole control surface.
+  if (flags.has('--dashboard-url')) {
+    process.stdout.write(`http://127.0.0.1:${settings.port}/dashboard/${Config.dashboardKey}/\n`)
+  }
 
   setInterval(() => {
     void router.tick()
     pairing.rotateIfNeeded()
     void transport.refreshIfStale()
+    tray?.refresh()
   }, 1000)
 
   app.on('before-quit', () => {
     server.stop()
     transport.terminateTunnelNow()
   })
+}
+
+function logStartupSummary(platform: ReturnType<typeof createPlatform>, transport: TransportManager, port: number): void {
+  const status = transport.status()
+  Log.info('app', `VibeWire host ${Config.hostVersion} on ${platform.machine.hostName()} (${platform.name})`)
+  Log.info('app', `  port          ${port}`)
+  Log.info('app', `  lan           ${status.lanAddress ?? 'unavailable'}`)
+  Log.info('app', `  tailscale     ${status.tailscaleRunning ? status.tailscaleDNSName ?? status.tailscaleAddress ?? 'up' : transport.tailscaleInstalled ? 'not running' : 'not installed'}`)
+  Log.info('app', `  relay         ${status.cloudflareRunning ? status.cloudflareHostname ?? 'starting' : 'off'}`)
+  Log.info('app', `  web client    ${Config.webRoot ?? 'NO BUNDLE'}`)
+  Log.info('app', `  dashboard     ${Config.dashboardRoot ?? 'NO BUNDLE'}`)
+  if (!transport.tailscaleInstalled) Log.warn('app', 'tailscale not found — remote access will fall back to the relay')
 }
 
 // No windows by design: closing the last one must not quit the host.
