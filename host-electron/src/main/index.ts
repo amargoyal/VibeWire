@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { Config } from './core/config'
 import { Log, describeError } from './core/log'
-import { NoCaptureHost } from './capture/captureHost'
+import { RendererCaptureHost } from './capture/rendererCaptureHost'
 import { NoClaude } from './claude/claudeService'
 import { NoInput } from './input/inputRouter'
 import { HTTPServer } from './net/httpServer'
@@ -63,6 +63,8 @@ async function main(): Promise<void> {
     version: app.getVersion(),
   })
   Log.info('app', `VibeWire host ${Config.hostVersion} on ${platform.name}, config in ${Config.configDir}`)
+  const conditions = platform.conditions()
+  if (Object.keys(conditions).length) Log.warn('app', `conditions at launch: ${Object.keys(conditions).join(', ')}`)
 
   const settings = Config.loadSettings()
 
@@ -82,11 +84,12 @@ async function main(): Promise<void> {
   const telemetry = new Telemetry()
   const transport = new TransportManager(settings.port)
   const system = new SystemServices()
+  const capture = new RendererCaptureHost(telemetry, join(__dirname, 'capture'))
   const router = new HostRouter({
     platform,
     trust,
     pairing,
-    capture: new NoCaptureHost(),
+    capture,
     input: new NoInput(),
     system,
     telemetry,
@@ -94,6 +97,8 @@ async function main(): Promise<void> {
     transport,
     settings,
   })
+
+  capture.bindLadder(() => router.ladder)
 
   const server = new HTTPServer(settings.port, router)
   router.server = server

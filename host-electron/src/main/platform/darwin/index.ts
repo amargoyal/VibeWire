@@ -65,8 +65,24 @@ export function createDarwinPlatform(env: NodeJS.ProcessEnv): HostPlatform {
       },
     },
     conditions() {
-      return {}
+      // macOS gates capture on a per-binary grant. Absent, `getDisplayMedia`
+      // yields nothing, so it is named rather than left to look like a black
+      // screen. `systemPreferences` is Electron's; under plain Node it is absent.
+      const status = screenRecordingStatus()
+      const conditions: Record<string, boolean> = {}
+      if (status !== null && status !== 'granted') conditions.screenRecordingDenied = true
+      return conditions
     },
+  }
+}
+
+export function screenRecordingStatus(): string | null {
+  try {
+    // Required lazily so this module stays importable from a test without Electron.
+    const { systemPreferences } = require('electron') as typeof import('electron')
+    return systemPreferences.getMediaAccessStatus('screen')
+  } catch {
+    return null
   }
 }
 

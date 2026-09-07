@@ -26,6 +26,7 @@ export interface StreamFacts {
   ladder: number
   measuredMbps: number
   framesEncoded: number
+  hardware: boolean
 }
 
 export interface CaptureHost {
