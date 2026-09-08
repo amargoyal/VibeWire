@@ -55,7 +55,7 @@ enum Config {
     /// Read once at launch. Never mutated, so it needs no isolation.
     static let verbose: Bool = ProcessInfo.processInfo.environment["VIBEWIRE_VERBOSE"] == "1"
 
-    static let hostVersion = "0.9.4"
+    static let hostVersion = "0.10.0"
 
     /// Bumped when the wire protocol changes incompatibly. The phone refuses to
     /// connect on mismatch rather than half-working.

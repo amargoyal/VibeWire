@@ -41,7 +41,7 @@ The general remote-desktop category treats the Mac as a picture to poke at. Vibe
 
 ## Capabilities and Constraints
 
-**Shipping today (host `0.9.4`, phone `0.9.4`, web `0.9.4`)**
+**Shipping today (Mac host `0.10.0`, Windows host `0.10.0`, phone `0.9.4`, web `0.10.0`)**
 
 - Screen: up to two displays, single or side-by-side; H.264 with a 1080/720/540 ladder plus `auto`; 60 fps target; per-display renderer.
 - Input: relative trackpad with 8 sensitivity ticks, click, double click, scroll with natural-scroll toggle, hold-to-drag behind a ring that fills beside the press, double-tap-and-hold for the drag that stretches a selection, pinch zoom, modifier keys (held and latched), key rows, combos, and batched text from the system keyboard.
