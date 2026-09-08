@@ -120,32 +120,33 @@ export function loadUser32(): User32 {
   const user32 = koffi.load('user32.dll')
   const kernel32 = koffi.load('kernel32.dll')
   const advapi32 = koffi.load('advapi32.dll')
-  const HANDLE = koffi.pointer(koffi.opaque('HANDLE'))
+  // Win32 handles are opaque; koffi will only pass and return them as
+  // pointers to the opaque type, hence `HANDLE *` in every prototype below.
+  koffi.opaque('HANDLE')
 
   const SendInput = user32.func('unsigned int __stdcall SendInput(unsigned int cInputs, INPUT *pInputs, int cbSize)')
   const GetSystemMetrics = user32.func('int __stdcall GetSystemMetrics(int nIndex)')
   const MapVirtualKeyW = user32.func('unsigned int __stdcall MapVirtualKeyW(unsigned int uCode, unsigned int uMapType)')
   const LockWorkStation = user32.func('int __stdcall LockWorkStation()')
-  const GetForegroundWindow = user32.func('HANDLE __stdcall GetForegroundWindow()')
-  const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(HANDLE hWnd, _Out_ uint16_t *lpString, int nMaxCount)')
-  const GetWindowThreadProcessId = user32.func('uint32_t __stdcall GetWindowThreadProcessId(HANDLE hWnd, _Out_ uint32_t *lpdwProcessId)')
-  const OpenInputDesktop = user32.func('HANDLE __stdcall OpenInputDesktop(uint32_t dwFlags, int fInherit, uint32_t dwDesiredAccess)')
-  const CloseDesktop = user32.func('int __stdcall CloseDesktop(HANDLE hDesktop)')
+  const GetForegroundWindow = user32.func('HANDLE * __stdcall GetForegroundWindow()')
+  const GetWindowTextW = user32.func('int __stdcall GetWindowTextW(HANDLE *hWnd, _Out_ uint16_t *lpString, int nMaxCount)')
+  const GetWindowThreadProcessId = user32.func('uint32_t __stdcall GetWindowThreadProcessId(HANDLE *hWnd, _Out_ uint32_t *lpdwProcessId)')
+  const OpenInputDesktop = user32.func('HANDLE * __stdcall OpenInputDesktop(uint32_t dwFlags, int fInherit, uint32_t dwDesiredAccess)')
+  const CloseDesktop = user32.func('int __stdcall CloseDesktop(HANDLE *hDesktop)')
   const GetUserObjectInformationW = user32.func(
-    'int __stdcall GetUserObjectInformationW(HANDLE hObj, int nIndex, _Out_ uint16_t *pvInfo, uint32_t nLength, _Out_ uint32_t *lpnLengthNeeded)',
+    'int __stdcall GetUserObjectInformationW(HANDLE *hObj, int nIndex, _Out_ uint16_t *pvInfo, uint32_t nLength, _Out_ uint32_t *lpnLengthNeeded)',
   )
   const GetDoubleClickTime = user32.func('unsigned int __stdcall GetDoubleClickTime()')
   const SetThreadExecutionState = kernel32.func('uint32_t __stdcall SetThreadExecutionState(uint32_t esFlags)')
-  const OpenProcess = kernel32.func('HANDLE __stdcall OpenProcess(uint32_t dwDesiredAccess, int bInheritHandle, uint32_t dwProcessId)')
-  const CloseHandle = kernel32.func('int __stdcall CloseHandle(HANDLE hObject)')
+  const OpenProcess = kernel32.func('HANDLE * __stdcall OpenProcess(uint32_t dwDesiredAccess, int bInheritHandle, uint32_t dwProcessId)')
+  const CloseHandle = kernel32.func('int __stdcall CloseHandle(HANDLE *hObject)')
   const QueryFullProcessImageNameW = kernel32.func(
-    'int __stdcall QueryFullProcessImageNameW(HANDLE hProcess, uint32_t dwFlags, _Out_ uint16_t *lpExeName, _Inout_ uint32_t *lpdwSize)',
+    'int __stdcall QueryFullProcessImageNameW(HANDLE *hProcess, uint32_t dwFlags, _Out_ uint16_t *lpExeName, _Inout_ uint32_t *lpdwSize)',
   )
-  const OpenProcessToken = advapi32.func('int __stdcall OpenProcessToken(HANDLE ProcessHandle, uint32_t DesiredAccess, _Out_ HANDLE *TokenHandle)')
+  const OpenProcessToken = advapi32.func('int __stdcall OpenProcessToken(HANDLE *ProcessHandle, uint32_t DesiredAccess, _Out_ HANDLE **TokenHandle)')
   const GetTokenInformation = advapi32.func(
-    'int __stdcall GetTokenInformation(HANDLE TokenHandle, int TokenInformationClass, _Out_ uint32_t *TokenInformation, uint32_t TokenInformationLength, _Out_ uint32_t *ReturnLength)',
+    'int __stdcall GetTokenInformation(HANDLE *TokenHandle, int TokenInformationClass, _Out_ uint32_t *TokenInformation, uint32_t TokenInformationLength, _Out_ uint32_t *ReturnLength)',
   )
-  void HANDLE
 
   const utf16 = (buffer: Uint16Array, length: number) => Buffer.from(buffer.buffer, 0, length * 2).toString('utf16le')
 
