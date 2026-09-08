@@ -18,12 +18,13 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { store } from '../app/store'
+import type { HostPlatform } from '../net/identity'
 import { BROWSER_RESERVED, keyboardLocked } from '../app/keymap'
 import {
   Caps,
   Caret,
   KeyCap,
-  MODIFIERS,
+  modifierSpecs,
   PrimaryAction,
   ScreenBody,
   SectionLabel,
@@ -31,7 +32,11 @@ import {
   useSheet,
 } from '../design/components'
 
-const COMBOS_KEY = 'vibewire.combos'
+/** One row per platform: the chord key means Ctrl on a PC and ⌘ on a Mac, and
+ *  a combo saved against one must not overwrite the other's. */
+function combosKey(platform: HostPlatform): string {
+  return platform === 'windows' ? 'vibewire.combos.windows' : 'vibewire.combos'
+}
 
 /**
  * The combos this origin has, remembered.
@@ -42,37 +47,38 @@ const COMBOS_KEY = 'vibewire.combos'
  * the row is a property of this browser, not of the Mac, and the Mac is told
  * nothing about it.
  */
-function readCombos(): string[][] {
+function readCombos(platform: HostPlatform): string[][] {
+  const defaults = defaultCombos(platform)
   try {
-    const stored = JSON.parse(localStorage.getItem(COMBOS_KEY) ?? 'null') as unknown
-    if (!Array.isArray(stored)) return DEFAULT_COMBOS
+    const stored = JSON.parse(localStorage.getItem(combosKey(platform)) ?? 'null') as unknown
+    if (!Array.isArray(stored)) return defaults
     const combos = stored.filter(
       (combo): combo is string[] =>
         Array.isArray(combo) && combo.length > 0 && combo.every((key) => typeof key === 'string'),
     )
-    return combos.length ? combos : DEFAULT_COMBOS
+    return combos.length ? combos : defaults
   } catch {
     // Storage refused, or something else wrote nonsense to this key. The row is
     // more useful with its defaults than absent.
-    return DEFAULT_COMBOS
+    return defaults
   }
 }
 
-function writeCombos(combos: string[][]): void {
+function writeCombos(combos: string[][], platform: HostPlatform): void {
   try {
-    localStorage.setItem(COMBOS_KEY, JSON.stringify(combos))
+    localStorage.setItem(combosKey(platform), JSON.stringify(combos))
   } catch {
     /* storage refused; the row still works for this tab */
   }
 }
 
-const DEFAULT_COMBOS: string[][] = [
-  ['cmd', 's'],
-  ['cmd', 'z'],
-  ['cmd', 'shift', 'z'],
-  ['cmd', 'k'],
-  ['control', 'c'],
-]
+/** ⌘S ⌘Z ⌘⇧Z ⌘K ⌃C on a Mac. On a PC the chord key is Ctrl, so the interrupt
+ *  is `cmd`+C too: Ctrl+C is what the terminal there wants. */
+function defaultCombos(platform: HostPlatform): string[][] {
+  return platform === 'windows'
+    ? [['cmd', 's'], ['cmd', 'z'], ['cmd', 'shift', 'z'], ['cmd', 'k'], ['cmd', 'c']]
+    : [['cmd', 's'], ['cmd', 'z'], ['cmd', 'shift', 'z'], ['cmd', 'k'], ['control', 'c']]
+}
 
 export function isTouchPrimary(): boolean {
   return matchMedia('(pointer: coarse)').matches
@@ -139,7 +145,7 @@ export function KeyboardField() {
       ref={(node) => {
         fieldElement = node
       }}
-      aria-label="Type into the Mac"
+      aria-label={`Type into ${store.hostNoun}`}
       // The one field on the page whose keystrokes are the Mac's. `Remote`'s
       // physical-keyboard handler reads this to tell it from a field the browser
       // owns, and leaves every other one alone.
@@ -173,7 +179,7 @@ export function KeyboardField() {
 }
 
 export function KeyboardBar() {
-  const [combos, setCombos] = useState(readCombos)
+  const [combos, setCombos] = useState(() => readCombos(store.platform.value))
   const [showEditor, setShowEditor] = useState(false)
   const touch = isTouchPrimary()
 
@@ -220,7 +226,7 @@ export function KeyboardBar() {
         <div class="row" style={{ gap: '5px', flexWrap: 'wrap' }}>
           <TextKey label="esc" code="escape" />
           <TextKey label="tab" code="tab" />
-          {MODIFIERS.map((spec) => (
+          {modifierSpecs(store.platform.value).map((spec) => (
             <KeyCap
               key={spec.name}
               glyph={spec.glyph}
@@ -314,7 +320,7 @@ export function KeyboardBar() {
           onAdd={(combo) => {
             setCombos((current) => {
               const next = [...current, combo]
-              writeCombos(next)
+              writeCombos(next, store.platform.value)
               return next
             })
             setShowEditor(false)
@@ -482,19 +488,17 @@ function ArrowKey({
 
 function comboLabel(combo: string[]): string {
   return combo
-    .map((part) => MODIFIERS.find((spec) => spec.name === part)?.glyph ?? part.toUpperCase())
+    .map((part) => modifierSpecs(store.platform.value).find((spec) => spec.name === part)?.glyph ?? part.toUpperCase())
     .join('')
 }
 
 /** "⌘⇧Z" is four symbols run together with no spaces — a screen reader reads it as
  *  a stream of punctuation names. Spoken, it is "Command Shift Z". */
 function spokenCombo(combo: string[]): string {
-  const names: Record<string, string> = {
-    cmd: 'Command',
-    shift: 'Shift',
-    option: 'Option',
-    control: 'Control',
-  }
+  const names: Record<string, string> =
+    store.platform.value === 'windows'
+      ? { cmd: 'Control', shift: 'Shift', option: 'Alt', control: 'Windows' }
+      : { cmd: 'Command', shift: 'Shift', option: 'Option', control: 'Control' }
   return combo.map((part) => names[part] ?? part.toUpperCase()).join(' ')
 }
 
@@ -520,7 +524,7 @@ function ComboEditor({
         </div>
 
         <div class="row" style={{ gap: '8px', marginTop: '20px' }}>
-          {MODIFIERS.map((spec) => (
+          {modifierSpecs(store.platform.value).map((spec) => (
             <KeyCap
               key={spec.name}
               glyph={spec.glyph}

@@ -32,9 +32,14 @@ const HOST_RECORD = 'paired-host'
 /** The domain separator the host's verifier expects. */
 const AUTH_CONTEXT = 'vibewire-auth-v1'
 
+/** Which host is on the other end. Older hosts send nothing and are Macs. */
+export type HostPlatform = 'macos' | 'windows'
+
 export interface PairedHost {
   hostId: string
   hostName: string
+  /** Learned from `hello`, kept so the noun is right before the socket opens. */
+  platform?: HostPlatform
   hostKey: string
   deviceId: string
   /** Canonical origin, e.g. `http://192.168.1.24:8787`. The one that answered
@@ -273,7 +278,8 @@ export const Identity = {
         : `http://${stored.host ?? '127.0.0.1'}:${stored.port ?? 8787}`
     return {
       hostId: stored.hostId,
-      hostName: stored.hostName ?? 'Mac',
+      hostName: stored.hostName ?? (stored.platform === 'windows' ? 'PC' : 'Mac'),
+      platform: stored.platform === 'windows' ? 'windows' : 'macos',
       hostKey: stored.hostKey ?? '',
       deviceId: stored.deviceId,
       origin,

@@ -139,7 +139,7 @@ export function Pairing() {
   const submit = async (code: string) => {
     if (submitting.current) return
     if (!endpoint) {
-      setErrorText('Enter the Mac’s address first.')
+      setErrorText('Enter the host’s address first.')
       setEditingTarget(true)
       return
     }
@@ -282,11 +282,11 @@ export function Pairing() {
         <Display style={{ marginTop: '44px', flex: '0 0 auto' }}>
           Six digits
           <br />
-          from the menu bar.
+          {store.platform.value === 'windows' ? 'from the tray.' : 'from the menu bar.'}
         </Display>
 
         <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '14px', flex: '0 0 auto' }}>
-          MENU BAR → VIBEWIRE → PAIR
+          {store.platform.value === 'windows' ? 'TRAY → VIBEWIRE → PAIR' : 'MENU BAR → VIBEWIRE → PAIR'}
         </Caps>
 
         {/* A single field owns the keyboard; the six boxes are only a rendering of
@@ -401,7 +401,7 @@ export function Pairing() {
         {noScan ? null : (
           <WayIn
             glyph={<QrGlyph />}
-            title="Scan the QR on the Mac"
+            title={`Scan the QR on ${store.hostNoun}`}
             caption="OPENS CAMERA · SAME HANDSHAKE"
             onClick={() => setScanning(true)}
             label="Scan the QR code"
@@ -649,13 +649,13 @@ function ScanSheet({
       class="sheet"
       role="dialog"
       aria-modal="true"
-      aria-label="Scan the Mac’s QR code"
+      aria-label={`Scan ${store.hostNoun}’s QR code`}
     >
       <ScreenBody scrolls>
         <Announce>
           {failure ??
             foreign ??
-            (live ? 'Camera live. Point it at the QR on the Mac.' : 'Asking for the camera.')}
+            (live ? `Camera live. Point it at the QR on ${store.hostNoun}.` : 'Asking for the camera.')}
         </Announce>
 
         <div class="row" style={{ minHeight: '40px', marginTop: '12px', flex: '0 0 auto' }}>
@@ -667,7 +667,7 @@ function ScanSheet({
         </div>
 
         <Caps size="var(--fs-10)" tracking="0.16em" style={{ marginTop: '10px', flex: '0 0 auto' }}>
-          MENU BAR → VIBEWIRE → PAIR
+          {store.platform.value === 'windows' ? 'TRAY → VIBEWIRE → PAIR' : 'MENU BAR → VIBEWIRE → PAIR'}
         </Caps>
 
         {/* `contain`, not `cover`. The detector reads the whole frame, and a
@@ -826,7 +826,7 @@ function TargetCard({
         <button
           onClick={onEdit}
           aria-expanded={editing}
-          aria-label="Edit the Mac’s address"
+          aria-label={`Edit ${store.hostNoun}’s address`}
           style={{
             minHeight: 'var(--target)',
             paddingInline: '10px',
@@ -852,7 +852,7 @@ function TargetCard({
             autocapitalize="none"
             autocorrect="off"
             inputMode="url"
-            aria-label="The Mac’s address"
+            aria-label={`${store.HostNoun}’s address`}
             onInput={(event) => onAddress(event.currentTarget.value)}
             class="mono"
             style={fieldStyle}

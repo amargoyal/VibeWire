@@ -1,0 +1,61 @@
+# electron-builder. `npm run dist` on a Windows machine (or the CI runner)
+# produces one NSIS installer per architecture in release/.
+appId: com.vibewire.host
+productName: VibeWire
+copyright: VibeWire
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - package.json
+  - "!dist/test/**"
+extraResources:
+  # The two web bundles the host serves, and the MCP channel, so an installed
+  # copy keeps working without a checkout.
+  - from: ../web/dist
+    to: web
+  - from: ../web/dist-dashboard
+    to: dashboard
+  - from: ../channel
+    to: channel
+    filter:
+      - vibewire-channel.mjs
+      - package.json
+  - from: build
+    to: build
+    filter:
+      - "*.png"
+asar: true
+asarUnpack:
+  # koffi loads its native library by path; it cannot be read out of an asar.
+  - node_modules/koffi/**
+electronLanguages:
+  - en-US
+compression: maximum
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  icon: build/icon.png
+  requestedExecutionLevel: asInvoker
+nsis:
+  # One installer per architecture and no combined one: the combined build is
+  # both architectures in one file, twice the download for no gain.
+  buildUniversalInstaller: false
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  include: build/installer.nsh
+  runAfterFinish: true
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  shortcutName: VibeWire
+mac:
+  # For running the packaged shape on the dev Mac only; the Mac product is the
+  # Swift host.
+  target:
+    - dir
+  category: public.apple-category.utilities

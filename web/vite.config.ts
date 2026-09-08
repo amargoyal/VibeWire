@@ -28,6 +28,10 @@ export default defineConfig({
   server: {
     port: 5273,
     host: true,
+    // The frame codec lives in `../shared`, outside this build's root. Rollup
+    // follows the relative import without being told; the dev server has to be
+    // given permission to serve from there.
+    fs: { allow: ['..'] },
   },
   esbuild: {
     jsx: 'automatic',

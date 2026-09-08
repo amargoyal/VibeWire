@@ -1,0 +1,28 @@
+{
+  "name": "vibewire-host-electron",
+  "version": "0.10.0",
+  "private": true,
+  "description": "VibeWire host for Windows, in Electron. Runs on a Mac for development.",
+  "main": "dist/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "npm run typecheck && node build.mjs",
+    "start": "npm run build && electron .",
+    "test": "node build.mjs --tests && node --test \"dist/test/*.test.js\"",
+    "dist": "npm run build && electron-builder --publish never"
+  },
+  "dependencies": {
+    "koffi": "^3.2.1",
+    "qrcode": "^1.5.4",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/ws": "^8.18.1",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.3"
+  }
+}

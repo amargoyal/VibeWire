@@ -1,6 +1,6 @@
 {
   "name": "vibewire-web",
-  "version": "0.9.4",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "description": "VibeWire web client \u2014 the same instrument as the iPhone app, in a browser.",

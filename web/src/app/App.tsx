@@ -261,7 +261,7 @@ function ScreenshotSheet() {
       class="sheet"
       role="dialog"
       aria-modal="true"
-      aria-label="Screenshot of the Mac"
+      aria-label={`Screenshot of ${store.hostNoun}`}
       style={{ zIndex: 65 }}
     >
       <ScreenBody>
@@ -272,7 +272,7 @@ function ScreenshotSheet() {
         </div>
 
         <Display level={26} rank={2} style={{ marginTop: '14px', flex: '0 0 auto' }}>
-          The Mac’s screen,
+          {store.HostNoun}’s screen,
           <br />
           a moment ago.
         </Display>
@@ -296,7 +296,7 @@ function ScreenshotSheet() {
         >
           <img
             src={source}
-            alt="The Mac’s screen at the moment the shot was taken"
+            alt={`${store.HostNoun}’s screen at the moment the shot was taken`}
             style={{
               maxWidth: '100%',
               maxHeight: '100%',
@@ -363,7 +363,7 @@ function ClipboardSheet() {
       class="sheet sheet--half"
       role="dialog"
       aria-modal="true"
-      aria-label="Text copied from the Mac"
+      aria-label={`Text copied from ${store.hostNoun}`}
       style={{ zIndex: 65 }}
     >
       <ScreenBody>
@@ -446,7 +446,7 @@ function UnsupportedNotice() {
   return (
     <BannerView
       banner={{
-        text: "This browser has no WebCodecs H.264 decoder, so the Mac's picture will not appear. Pointer, keyboard, clipboard and Claude all still work. Chrome, Edge and Safari 17+ can show the picture.",
+        text: `This browser has no WebCodecs H.264 decoder, so ${store.hostNoun}’s picture will not appear. Pointer, keyboard, clipboard and Claude all still work. Chrome, Edge and Safari 17+ can show the picture.`,
       }}
       onDismiss={() => setDismissed(true)}
     />

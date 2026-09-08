@@ -332,6 +332,9 @@ enum Outbound {
             "version": Config.hostVersion,
             "protocol": Config.protocolVersion,
             "capabilities": capabilities,
+            // Additive, still protocol 1. A client that never reads it assumes
+            // a Mac, which is what every host was until the Windows one.
+            "platform": "macos",
         ]
     }
 

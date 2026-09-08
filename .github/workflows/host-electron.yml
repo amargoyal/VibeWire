@@ -1,0 +1,109 @@
+# Builds and checks the Electron host, and on a tag packages the Windows
+# installers and attaches them to a GitHub Release.
+#
+# Tags are `electron-v<version>` and must equal host-electron/package.json's
+# version; the job fails otherwise, so a release can never carry a number the
+# app does not report about itself.
+
+name: Electron host
+
+on:
+  push:
+    tags: ['electron-v*']
+  pull_request:
+    paths:
+      - 'host-electron/**'
+      - 'shared/**'
+      - 'web/**'
+      - '.github/workflows/host-electron.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            host-electron/package-lock.json
+
+      # The host serves both web bundles; they are built here so the installer
+      # carries the client and the dashboard from this same commit.
+      - name: Build web client and dashboard
+        run: npm ci && npm run build:all
+        working-directory: web
+
+      - name: Build host
+        run: npm ci && npm run build
+        working-directory: host-electron
+
+      - name: Unit tests
+        run: npm test
+        working-directory: host-electron
+
+      # The browser e2e harness, against the host started headless with a
+      # file-backed trust store. Capture is not exercised on a runner with no
+      # screen; everything else the phone does is.
+      - name: Protocol e2e
+        shell: pwsh
+        working-directory: host-electron
+        env:
+          VIBEWIRE_SECRET_STORE: file
+          VIBEWIRE_ORIGIN: http://127.0.0.1:8787
+          # The host mirrors its log to stderr only on a TTY or when verbose;
+          # the runner is neither, and the startup lines are the evidence.
+          VIBEWIRE_VERBOSE: '1'
+        run: |
+          $log = "$env:RUNNER_TEMP\host.log"
+          $proc = Start-Process -FilePath "node_modules\.bin\electron.cmd" -ArgumentList ". --no-tray --pair --print-code --port 8787" -RedirectStandardOutput $log -RedirectStandardError "$env:RUNNER_TEMP\host.err" -PassThru
+          $code = $null
+          for ($i = 0; $i -lt 60 -and -not $code; $i++) {
+            Start-Sleep -Milliseconds 500
+            if (Test-Path $log) { $m = Select-String -Path $log -Pattern 'pairing code: (\d{6})' | Select-Object -First 1; if ($m) { $code = $m.Matches[0].Groups[1].Value } }
+          }
+          if (-not $code) { Get-Content $log, "$env:RUNNER_TEMP\host.err"; throw "host printed no pairing code" }
+          node ..\web\e2e.mjs $code
+          $ok = $LASTEXITCODE
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          Get-Content "$env:RUNNER_TEMP\host.err" -ErrorAction SilentlyContinue
+          exit $ok
+
+      - name: Check tag matches version
+        if: startsWith(github.ref, 'refs/tags/electron-v')
+        shell: pwsh
+        working-directory: host-electron
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}".Substring("electron-v".Length)
+          if ($tag -ne $version) { throw "tag $tag does not match package.json version $version" }
+
+      - name: Package installers
+        if: startsWith(github.ref, 'refs/tags/electron-v') || github.event_name == 'workflow_dispatch'
+        run: npx electron-builder --win nsis --x64 --arm64 --publish never
+        working-directory: host-electron
+
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/electron-v') || github.event_name == 'workflow_dispatch'
+        with:
+          name: VibeWire-windows-installers
+          path: |
+            host-electron/release/*.exe
+            host-electron/release/*.blockmap
+            host-electron/release/latest.yml
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/electron-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            host-electron/release/*.exe
+          body: |
+            VibeWire host for Windows. Download `VibeWire-Setup-*-x64.exe` (or `-arm64` on an ARM PC), run it, and open the tray icon → **Pair a device…**.
+
+            The installer is not code-signed yet, so SmartScreen will say "Windows protected your PC". Click **More info → Run anyway**.

@@ -9,7 +9,7 @@
 import { batch, computed, signal } from '@preact/signals'
 
 import { HostClient, type ConnectionState, type ControlMessage } from '../net/hostClient'
-import { Identity, type KeyStorage, type PairedHost } from '../net/identity'
+import { Identity, type HostPlatform, type KeyStorage, type PairedHost } from '../net/identity'
 import { LinkMonitor } from '../net/linkMonitor'
 import {
   describe,
@@ -237,7 +237,26 @@ export class Store {
   hostName = signal('Mac')
   hostModel = signal('')
   hostOS = signal('')
+  /** The OS build where the host has a useful one: Windows sends "22631". */
+  hostBuild = signal('')
+  /** Which host is on the other end. Older hosts send nothing and are Macs. */
+  platform = signal<HostPlatform>('macos')
+  /** Measured facts the host names, keyed by code. Empty for a Mac. */
+  conditions = signal<Record<string, boolean>>({})
   capabilities = signal<Record<string, boolean>>({})
+
+  /** "the Mac" or "the PC", for copy that names the host. */
+  get hostNoun(): string {
+    return this.platform.value === 'windows' ? 'the PC' : 'the Mac'
+  }
+
+  get HostNoun(): string {
+    return this.platform.value === 'windows' ? 'The PC' : 'The Mac'
+  }
+
+  get platformLabel(): string {
+    return this.platform.value === 'windows' ? 'WINDOWS' : 'MACOS'
+  }
   keyStorage = signal<KeyStorage | null>(null)
 
   // Condition
@@ -439,6 +458,9 @@ export class Store {
       this.pairedHost.value = paired
       this.route.value = paired ? 'home' : 'pairing'
       if (paired) this.hostName.value = paired.hostName
+      // The noun has to be right before the socket opens, and the record is
+      // the only place it can come from until `hello` says so again.
+      if (paired?.platform) this.platform.value = paired.platform
     })
     await this.connectIfPaired()
   }
@@ -704,19 +726,64 @@ export class Store {
         break
       case 'failed':
         this.streamState.value = { kind: 'failed', reason: state.reason }
-        this.banner.value = { text: `Lost the Mac. ${state.reason}` }
+        this.banner.value = { text: `Lost ${this.hostNoun}. ${state.reason}` }
         this.claudeWentQuiet()
         break
       case 'unauthorized':
         // Retrying cannot help: the Mac no longer holds this device's key.
         this.streamState.value = { kind: 'failed', reason: 'device revoked' }
-        this.banner.value = { text: 'This Mac no longer recognises this browser. Pair again.' }
+        this.banner.value = { text: `${this.HostNoun} no longer recognises this browser. Pair again.` }
         this.claudeWentQuiet()
         this.unpairLocally()
         break
       default:
         break
     }
+  }
+
+  // MARK: Conditions
+
+  /**
+   * What a Windows host names instead of a permission: the lock screen owning
+   * input, an administrator window refusing it, a firewall with no rule, an
+   * encoder with no hardware. First true one wins; a banner these put up is
+   * taken down when none is true, and no other banner is touched.
+   */
+  private static readonly CONDITION_TEXT: [string, string][] = [
+    ['inputBlockedBySecureDesktop', 'The PC is on its lock screen. Input and the picture resume when it is unlocked at the keyboard.'],
+    ['inputBlockedByElevatedWindow', 'The PC is showing an administrator window. VibeWire cannot type into it.'],
+    ['inputUnavailable', 'The PC cannot inject input. Its host log names why.'],
+    ['firewallRuleMissing', 'Windows Firewall has no rule for VibeWire. Phones on this network cannot reach it.'],
+    ['softwareEncoder', 'The PC has no hardware H.264 encoder. The picture is capped at 720p30.'],
+    ['screenRecordingDenied', 'Screen Recording is off on the Mac. Grant it in System Settings.'],
+  ]
+
+  private applyConditions(raw: unknown): void {
+    const conditions: Record<string, boolean> = {}
+    if (raw && typeof raw === 'object') {
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof value === 'boolean') conditions[key] = value
+      }
+    }
+    this.conditions.value = conditions
+    const named = Store.CONDITION_TEXT.find(([code]) => conditions[code])
+    const current = this.banner.value?.text ?? null
+    const isConditionBanner = current !== null && Store.CONDITION_TEXT.some(([, text]) => text === current)
+    if (named) {
+      if (current !== named[1]) this.banner.value = { text: named[1] }
+    } else if (isConditionBanner) {
+      this.banner.value = null
+    }
+  }
+
+  /** Writes the platform onto the paired record, once, so the next launch
+   *  knows the noun before the socket opens. */
+  private rememberPlatform(platform: HostPlatform): void {
+    const record = this.pairedHost.value
+    if (!record || record.platform === platform) return
+    const updated = { ...record, platform }
+    this.pairedHost.value = updated
+    void Identity.savePairedHost(updated).catch(() => undefined)
   }
 
   // MARK: Inbound
@@ -728,21 +795,29 @@ export class Store {
     switch (type) {
       case 'hello':
         batch(() => {
-          this.hostName.value = str(payload['hostName']) ?? 'Mac'
+          const platform: HostPlatform = payload['platform'] === 'windows' ? 'windows' : 'macos'
+          this.platform.value = platform
+          this.hostName.value = str(payload['hostName']) ?? (platform === 'windows' ? 'PC' : 'Mac')
           this.hostModel.value = str(payload['model']) ?? ''
           this.hostOS.value = str(payload['os']) ?? ''
+          this.hostBuild.value = str(payload['osBuild']) ?? ''
           this.capabilities.value = (payload['capabilities'] as Record<string, boolean>) ?? {}
-          if (this.capabilities.value['screenRecording'] === false) {
+          if (platform === 'macos' && this.capabilities.value['screenRecording'] === false) {
             this.banner.value = {
                 text: 'Screen Recording is off on the Mac. Grant it in System Settings.',
               }
-          } else if (this.capabilities.value['accessibility'] === false) {
+          } else if (platform === 'macos' && this.capabilities.value['accessibility'] === false) {
             this.banner.value = { text: 'Accessibility is off on the Mac. Input will not reach it.' }
           }
+          this.applyConditions(payload['conditions'])
+          this.rememberPlatform(platform)
         })
         break
 
       case 'status':
+        if (payload['conditions'] && typeof payload['conditions'] === 'object') {
+          this.applyConditions(payload['conditions'])
+        }
         this.link.value = {
           awake: bool(payload['awake'], true),
           onPower: bool(payload['onPower'], true),
@@ -884,7 +959,7 @@ export class Store {
           void navigator.clipboard
             .writeText(text)
             .then(() => {
-              this.note(`Copied from the Mac: ${firstLine(text)}`)
+              this.note(`Copied from ${this.hostNoun}: ${firstLine(text)}`)
             })
             .catch(() => {
               this.clipboardOffer.value = text
@@ -906,7 +981,7 @@ export class Store {
         // has no other symptom at all — the screen simply stays dark — so that
         // one is said out loud.
         if (payload['ok'] === false) {
-          this.banner.value = { text: 'The Mac’s screen did not come back on.' }
+          this.banner.value = { text: `${this.HostNoun}’s screen did not come back on.` }
         }
         break
 
@@ -922,13 +997,14 @@ export class Store {
         }
         break
 
+
       case 'claude':
         this.receiveClaude(payload)
         break
 
       case 'error':
         this.banner.value = {
-          text: str(payload['message']) ?? 'The Mac reported an error.',
+          text: str(payload['message']) ?? `${this.HostNoun} reported an error.`,
           // The host marks its own errors: a capture that failed is worth trying
           // again, a refused request is not. Both used to read identically and
           // offer nothing.
@@ -1430,7 +1506,7 @@ export class Store {
         if (text) this.send({ t: 'clipboardPush', text })
       } catch {
         this.banner.value = {
-            text: 'The browser would not let this page read the clipboard, so nothing was pushed to the Mac.',
+            text: `The browser would not let this page read the clipboard, so nothing was pushed to ${this.hostNoun}.`,
           }
         return
       }
@@ -1474,7 +1550,7 @@ export class Store {
   revoke(device: PairedDeviceEntry): void {
     this.revokeTarget.value = null
     if (!this.client.sendUnqueued({ t: 'revoke', deviceId: device.id })) {
-      this.banner.value = { text: 'Not connected to the Mac, so nothing was revoked.' }
+      this.banner.value = { text: `Not connected to ${this.hostNoun}, so nothing was revoked.` }
       return
     }
     if (device.isThisDevice) this.unpairLocally()
@@ -1483,7 +1559,7 @@ export class Store {
   revokeAll(): void {
     this.revokeTarget.value = null
     if (!this.client.sendUnqueued({ t: 'revoke', all: true })) {
-      this.banner.value = { text: 'Not connected to the Mac, so nothing was revoked.' }
+      this.banner.value = { text: `Not connected to ${this.hostNoun}, so nothing was revoked.` }
       return
     }
     this.unpairLocally()

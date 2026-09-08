@@ -98,7 +98,7 @@ const BINDINGS: Binding[] = [
   },
   {
     key: 'k',
-    label: 'Keys to the Mac',
+    label: 'Keys to {host}',
     where: 'picture',
     run: () => (store.showKeyboard.value = true),
   },
@@ -118,7 +118,7 @@ const BINDINGS: Binding[] = [
   },
   {
     key: 's',
-    label: 'Screenshot the Mac',
+    label: 'Screenshot {host}',
     where: 'picture',
     run: () => void store.hub('shot'),
   },
@@ -289,7 +289,7 @@ export function ShortcutsSheet() {
                       {binding.key}
                     </span>
                   </span>
-                  <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500 }}>{binding.label}</span>
+                  <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500 }}>{binding.label.replace('{host}', store.hostNoun)}</span>
                 </div>
               ))}
             </div>
