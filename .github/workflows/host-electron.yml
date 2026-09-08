@@ -55,6 +55,9 @@ jobs:
         env:
           VIBEWIRE_SECRET_STORE: file
           VIBEWIRE_ORIGIN: http://127.0.0.1:8787
+          # The host mirrors its log to stderr only on a TTY or when verbose;
+          # the runner is neither, and the startup lines are the evidence.
+          VIBEWIRE_VERBOSE: '1'
         run: |
           $log = "$env:RUNNER_TEMP\host.log"
           $proc = Start-Process -FilePath "node_modules\.bin\electron.cmd" -ArgumentList ". --no-tray --pair --print-code --port 8787" -RedirectStandardOutput $log -RedirectStandardError "$env:RUNNER_TEMP\host.err" -PassThru
