@@ -43,6 +43,9 @@ win:
   icon: build/icon.png
   requestedExecutionLevel: asInvoker
 nsis:
+  # One installer per architecture and no combined one: the combined build is
+  # both architectures in one file, twice the download for no gain.
+  buildUniversalInstaller: false
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
