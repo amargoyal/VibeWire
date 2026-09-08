@@ -7,6 +7,7 @@
  */
 
 import type { ComponentChildren, JSX, RefObject } from 'preact'
+import type { HostPlatform } from '../net/identity'
 import { useEffect, useRef } from 'preact/hooks'
 
 // MARK: - Condition
@@ -1139,6 +1140,23 @@ export const MODIFIERS: ModifierSpec[] = [
   { name: 'cmd', glyph: '⌘', caption: 'CMD' },
 ]
 
-export function modifierGlyph(name: string): string {
-  return MODIFIERS.find((spec) => spec.name === name)?.glyph ?? ''
+/**
+ * The same four names in the same slots when the host is a PC. `cmd` is the
+ * primary chord key there too — every stored combo means "the chord key and
+ * S" — so it reads as Ctrl; `control` is the one Windows modifier with no
+ * other home, the Win key.
+ */
+const WINDOWS_MODIFIERS: ModifierSpec[] = [
+  { name: 'control', glyph: '⊞', caption: 'WIN' },
+  { name: 'option', glyph: 'Alt', caption: 'ALT' },
+  { name: 'shift', glyph: '⇧', caption: 'SHIFT' },
+  { name: 'cmd', glyph: 'Ctrl', caption: 'CTRL' },
+]
+
+export function modifierSpecs(platform: HostPlatform): ModifierSpec[] {
+  return platform === 'windows' ? WINDOWS_MODIFIERS : MODIFIERS
+}
+
+export function modifierGlyph(name: string, platform: HostPlatform = 'macos'): string {
+  return modifierSpecs(platform).find((spec) => spec.name === name)?.glyph ?? ''
 }

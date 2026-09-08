@@ -175,7 +175,7 @@ export class HostClient {
     const responding = await HostClient.reachable(candidates)
     const ordered = responding.length > 0 ? responding : candidates
 
-    let last: Error = new PairFailure('No answer from the Mac.', false)
+    let last: Error = new PairFailure('No answer from the host.', false)
     for (const candidate of ordered) {
       try {
         return await this.pairOnce(candidate, code, offered)
@@ -257,11 +257,11 @@ export class HostClient {
         case 'code_expired':
           throw new PairFailure('The code rotated. Read the new one.')
         case 'not_pairing':
-          throw new PairFailure('The Mac is not showing a code right now.')
+          throw new PairFailure('The host is not showing a code right now.')
         case 'too_many_attempts':
           throw new PairFailure(`Too many tries. Wait ${failure.retryAfter ?? 60}s.`)
         case 'bad_public_key':
-          throw new PairFailure('The Mac refused this browser’s key.')
+          throw new PairFailure('The host refused this browser’s key.')
         default:
           throw new PairFailure('That code did not match.')
       }
@@ -276,7 +276,7 @@ export class HostClient {
     }
 
     if (decoded.protocol != null && decoded.protocol !== 1) {
-      throw new PairFailure('The Mac is running a different VibeWire version.')
+      throw new PairFailure('The host is running a different VibeWire version.')
     }
 
     // A new pairing is a new identity. Nothing queued against the old one may be
@@ -704,7 +704,7 @@ export class HostClient {
       performance.now() - this.lastPongAt > PONG_TIMEOUT_MS
     ) {
       this.addressSuspect = true
-      void this.scheduleReconnect('nothing came back from the Mac', null)
+      void this.scheduleReconnect('nothing came back from the host', null)
       return
     }
 

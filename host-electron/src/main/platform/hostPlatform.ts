@@ -1,3 +1,5 @@
+import type { InputSink } from '../input/inputRouter'
+
 /**
  * The seam between the router and the operating system. One implementation
  * per platform; the router never sees which.
@@ -54,6 +56,8 @@ export interface HostPlatform {
   readonly name: PlatformName
   readonly paths: PlatformPaths
   readonly machine: MachineInfo
+  /** The injector, or null where this platform has none (the dev Mac). */
+  readonly input: InputSink | null
   readonly desktop: DesktopInfo
   readonly power: PowerControl
   readonly network: NetworkInfo

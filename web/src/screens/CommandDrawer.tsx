@@ -26,7 +26,7 @@ import {
   Caps,
   Grabber,
   KeyCap,
-  MODIFIERS,
+  modifierSpecs,
   modifierGlyph,
   tapVerb,
   Tile,
@@ -50,17 +50,17 @@ interface Command {
  */
 const COMMANDS: Command[] = [
   { action: 'keys', glyph: '⌨', caption: 'KEYS', spoken: 'Keyboard' },
-  { action: 'shot', glyph: '⛶', caption: 'SHOT', spoken: 'Screenshot the Mac' },
-  { action: 'copy', glyph: '←', caption: 'COPY', spoken: 'Copy from the Mac', glyphSize: 'var(--fs-13)' },
-  { action: 'paste', glyph: '→', caption: 'PASTE', spoken: 'Paste to the Mac', glyphSize: 'var(--fs-13)' },
-  { action: 'enter', glyph: '⏎', caption: 'ENTER', spoken: 'Press Return on the Mac' },
-  { action: 'wake', glyph: '☀', caption: 'WAKE', spoken: 'Turn the Mac’s screen back on' },
-  { action: 'lock', glyph: '⏻', caption: 'LOCK', spoken: 'Lock the Mac’s screen' },
+  { action: 'shot', glyph: '⛶', caption: 'SHOT', spoken: 'Screenshot {host}' },
+  { action: 'copy', glyph: '←', caption: 'COPY', spoken: 'Copy from {host}', glyphSize: 'var(--fs-13)' },
+  { action: 'paste', glyph: '→', caption: 'PASTE', spoken: 'Paste to {host}', glyphSize: 'var(--fs-13)' },
+  { action: 'enter', glyph: '⏎', caption: 'ENTER', spoken: 'Press Return on {host}' },
+  { action: 'wake', glyph: '☀', caption: 'WAKE', spoken: 'Turn {host}’s screen back on' },
+  { action: 'lock', glyph: '⏻', caption: 'LOCK', spoken: 'Lock {host}’s screen' },
 ]
 
 export function CommandDrawer() {
   const held = store.heldModifiers.value
-  const sent = [...held].sort().map(modifierGlyph).join('')
+  const sent = [...held].sort().map((name) => modifierGlyph(name, store.platform.value)).join('')
 
   const sheet = useSheet<HTMLDivElement>(() => (store.showHub.value = false))
 
@@ -158,7 +158,7 @@ export function CommandDrawer() {
               glyph={command.glyph}
               caption={command.caption}
               glyphSize={command.glyphSize}
-              spoken={command.spoken}
+              spoken={command.spoken.replace('{host}', store.hostNoun)}
               onClick={() => run(command.action)}
             />
           ))}
@@ -199,7 +199,7 @@ export function CommandDrawer() {
               different kind of act from pressing a key, so it is a wider target
               with a word on it rather than a fifth identical cap. */}
           <div class="row" style={{ gap: '6px' }}>
-            {MODIFIERS.map((spec) => (
+            {modifierSpecs(store.platform.value).map((spec) => (
               <KeyCap
                 key={spec.name}
                 glyph={spec.glyph}

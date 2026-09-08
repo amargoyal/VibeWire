@@ -8,7 +8,7 @@ import { LiveClaudeService } from './claude/liveClaudeService'
 import { DashboardService } from './net/dashboardService'
 import { DashboardWindow } from './app/dashboardWindow'
 import { TrayController } from './app/tray'
-import { NoInput } from './input/inputRouter'
+import { LiveInputRouter, NoInput } from './input/inputRouter'
 import { HTTPServer } from './net/httpServer'
 import { PairingService } from './pairing/pairingService'
 import { FileStore, type SecretStore } from './pairing/secretStore'
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
     trust,
     pairing,
     capture,
-    input: new NoInput(),
+    input: platform.input ? new LiveInputRouter(platform.input) : new NoInput(),
     system,
     telemetry,
     claude,

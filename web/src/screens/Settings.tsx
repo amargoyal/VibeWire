@@ -77,9 +77,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
               make the two columns the same height — they are not the same height,
               and the one about this browser is the shorter.
 
-              Left: the Mac at the other end. The keys it holds, the picture it
+              Left: {store.hostNoun} at the other end. The keys it holds, the picture it
               sends, the pointer it moves, the paths it will answer on. Every value
-              in this column is stored on the Mac or spent by it.
+              in this column is stored on {store.hostNoun} or spent by it.
 
               Right: this end. Where this browser's signing key actually lives,
               whether this engine can decode video at all, which origin the pairing
@@ -173,7 +173,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
               </button>
 
               {/* Quieter than the revoke above it, and below it, because it is the
-                  smaller act: this browser forgets the Mac and the Mac forgets
+                  smaller act: this browser forgets {store.hostNoun} and {store.hostNoun} forgets
                   nothing. Outlined rather than clay — nothing is destroyed on the
                   other end, and colour in this system reports a condition. */}
               <button
@@ -599,6 +599,15 @@ function BrowserSection() {
         )}
 
         <FactRow label="PAIRED FROM" value={location.origin} tone="var(--ns-text)" />
+        <FactRow
+          label="HOST"
+          value={
+            store.hostOS.value
+              ? `${store.platformLabel} ${store.hostOS.value}${store.hostBuild.value ? ` · ${store.hostBuild.value}` : ''}`
+              : '—'
+          }
+          tone="var(--ns-text)"
+        />
         <p
           class="wrap"
           style={{
@@ -609,7 +618,7 @@ function BrowserSection() {
           }}
         >
           Browser storage is per-origin, so each address you open this client from pairs once and
-          appears as its own device on the Mac.
+          appears as its own device on {store.hostNoun}.
           {paired ? ` This one talks to ${paired.origin}.` : ''}
         </p>
 
@@ -668,9 +677,9 @@ function FallbackAddresses() {
         }}
       >
         {usable.length === 0 && blocked.length === 0
-          ? 'The Mac has named only one address so far. It reports the rest over the socket, so this fills in a second after connecting — and until it does, leaving this network ends the session.'
+          ? `${store.HostNoun} has named only one address so far. It reports the rest over the socket, so this fills in a second after connecting — and until it does, leaving this network ends the session.`
           : blocked.length > 0
-            ? `${blocked.length === 1 ? 'One further address is' : `${blocked.length} further addresses are`} plain HTTP, which this page cannot open because it is served over HTTPS. Turn on Relay over internet on the Mac for an https:// address that works from anywhere.`
+            ? `${blocked.length === 1 ? 'One further address is' : `${blocked.length} further addresses are`} plain HTTP, which this page cannot open because it is served over HTTPS. Turn on Relay over internet on ${store.hostNoun} for an https:// address that works from anywhere.`
             : 'When the address in use stops answering, these are tried in turn. Changing network costs a reconnect rather than a re-pair.'}
       </p>
     </div>
@@ -741,8 +750,8 @@ function RevokeConfirm({ target }: { target: RevokeTarget }) {
     : `REVOKE ${target.device.name.toUpperCase()}`
 
   const headline = isEverything
-    ? 'Every key is deleted on the Mac. There is no undo.'
-    : 'Its key is deleted on the Mac. There is no undo.'
+    ? `Every key is deleted on ${store.hostNoun}. There is no undo.`
+    : `Its key is deleted on ${store.hostNoun}. There is no undo.`
 
   /** The third line is the one that makes the tap safe to judge: for a single
    *  device it says what keeps working, and for all of them it says plainly that
@@ -751,11 +760,11 @@ function RevokeConfirm({ target }: { target: RevokeTarget }) {
     ? [
         ['Every live session ends inside 1s.', true],
         ['This browser is included. You will be signed out.', true],
-        ['Pairing again needs physical access to the Mac.', true],
+        [`Pairing again needs physical access to ${store.hostNoun}.`, true],
       ]
     : [
         ['Any live session from that device ends inside 1s.', true],
-        ['Pairing again needs physical access to the Mac.', true],
+        [`Pairing again needs physical access to ${store.hostNoun}.`, true],
         ['This browser keeps working. Nothing else changes.', false],
       ]
 

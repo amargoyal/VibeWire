@@ -54,7 +54,7 @@ import {
   type Condition,
   CornerTicks,
   KeyCap,
-  MODIFIERS,
+  modifierSpecs,
   Segmented,
   Spinner,
   tapVerb,
@@ -653,7 +653,7 @@ export function Remote() {
       }
       if (browsersOwn(event)) return
       const name = hostKeyName(event.code)
-      store.setModifiers(modifiersFrom(event))
+      store.setModifiers(modifiersFrom(event, store.platform.value))
       if (!name) return
       event.preventDefault()
       store.keyDown(name, event.key.length === 1 ? event.key : undefined)
@@ -661,7 +661,7 @@ export function Remote() {
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code === 'Escape' || browsersOwn(event)) return
       const name = hostKeyName(event.code)
-      store.setModifiers(modifiersFrom(event))
+      store.setModifiers(modifiersFrom(event, store.platform.value))
       if (!name) return
       event.preventDefault()
       store.keyUp(name, event.key.length === 1 ? event.key : undefined)
@@ -923,9 +923,9 @@ function StatusStrip() {
     live: 'The picture is live.',
     starting: 'Opening the picture.',
     stalled: 'The picture has stalled.',
-    reconnecting: 'Reconnecting to the Mac.',
+    reconnecting: `Reconnecting to ${store.hostNoun}.`,
     stopped: 'The picture is stopped.',
-    failed: 'The connection to the Mac was lost.',
+    failed: `The connection to ${store.hostNoun} was lost.`,
   }[state.kind]
 
   return (
@@ -1067,7 +1067,7 @@ function Picture({
               boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ns-amber) 34%, transparent)',
             }}
           >
-            The Mac is sending video this browser cannot decode: {renderer.failure}
+            {store.HostNoun} is sending video this browser cannot decode: {renderer.failure}
           </p>
         </div>
       ) : null}
@@ -1411,7 +1411,7 @@ function Rail({
           onSelect={setPadMode}
           glyph="⌖"
           label="POINTER"
-          hint="One finger moves the Mac’s pointer"
+          hint={`One finger moves ${store.hostNoun}’s pointer`}
         />
         <PadModeTab
           mode="pan"
@@ -1428,7 +1428,7 @@ function Rail({
           class="rail-button"
           onClick={onCapture}
           aria-label="Capture the pointer"
-          title="Locks this machine’s pointer to the Mac’s. Escape releases it."
+          title={`Locks this machine’s pointer to ${store.hostNoun}’s. Escape releases it.`}
         >
           <span class="mono" style={{ fontSize: 'var(--fs-15)', color: 'var(--ns-accent)' }}>
             ⌖
@@ -1611,7 +1611,7 @@ function LandscapeLayout({
               onSelect={setPadMode}
               glyph="⌖"
               label="POINTER"
-              hint="Drag moves the Mac’s pointer"
+              hint={`Drag moves ${store.hostNoun}’s pointer`}
             />
             <PadModeTab
               mode="pan"
@@ -1626,7 +1626,7 @@ function LandscapeLayout({
             <button
               class="outlined"
               onClick={onCapture}
-              title="Locks this machine’s pointer to the Mac’s. Escape releases it."
+              title={`Locks this machine’s pointer to ${store.hostNoun}’s. Escape releases it.`}
               style={
                 {
                   width: 'auto',
@@ -1695,21 +1695,21 @@ function Dock() {
         <Tile
           glyph="⛶"
           caption="SHOT"
-          spoken="Screenshot the Mac"
+          spoken={`Screenshot ${store.hostNoun}`}
           onClick={() => void store.hub('shot')}
         />
         <Tile
           glyph="←"
           caption="COPY"
           glyphSize="var(--fs-13)"
-          spoken="Copy from the Mac"
+          spoken={`Copy from ${store.hostNoun}`}
           onClick={() => void store.hub('copy')}
         />
         <Tile
           glyph="→"
           caption="PASTE"
           glyphSize="var(--fs-13)"
-          spoken="Paste to the Mac"
+          spoken={`Paste to ${store.hostNoun}`}
           onClick={() => void store.hub('paste')}
         />
         {/* The two the drawer has always had and this dock did not, which made the
@@ -1717,13 +1717,13 @@ function Dock() {
         <Tile
           glyph="⏎"
           caption="ENTER"
-          spoken="Press Return on the Mac"
+          spoken={`Press Return on ${store.hostNoun}`}
           onClick={() => store.key('return')}
         />
         <Tile
           glyph="⏻"
           caption="LOCK"
-          spoken="Lock the Mac’s screen"
+          spoken={`Lock ${store.hostNoun}’s screen`}
           onClick={() => void store.hub('lock')}
         />
       </div>
@@ -1740,7 +1740,7 @@ function Dock() {
       ) : null}
 
       <div class="row" style={{ gap: '6px' }}>
-        {MODIFIERS.map((spec) => (
+        {modifierSpecs(store.platform.value).map((spec) => (
           <KeyCap
             key={spec.name}
             glyph={spec.glyph}

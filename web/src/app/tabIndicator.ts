@@ -60,7 +60,7 @@ function paint(color: string, lost: boolean): string | null {
 
 /** What the tab strip should say, from what has actually been measured. */
 function describe(): { title: string; color: string; lost: boolean } {
-  const host = store.hostName.value || 'the Mac'
+  const host = store.hostName.value || store.hostNoun
   const route = store.route.value
 
   if (route === 'pairing') {

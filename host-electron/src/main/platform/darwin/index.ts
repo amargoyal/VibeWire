@@ -69,6 +69,7 @@ export function createDarwinPlatform(env: NodeJS.ProcessEnv): HostPlatform {
         return null
       },
     },
+    input: null,
     desktop: {
       secureDesktopActive() {
         return false

@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals'
+import type { HostPlatform } from '../net/identity'
 
 /**
  * Browser `KeyboardEvent.code` → the stable key names the host understands.
@@ -73,14 +74,34 @@ export function hostKeyName(code: string): string | null {
   return null
 }
 
-/** The modifier set a keyboard event is carrying, in the host's spelling. */
-export function modifiersFrom(event: KeyboardEvent): string[] {
+/**
+ * The modifier set a keyboard event is carrying, in the host's spelling.
+ *
+ * When the host is a PC, Ctrl and ⌘ both mean the chord key (`cmd`, which the
+ * Windows host presses as Ctrl), and no physical key produces `control` — the
+ * Win key is reached only through the chip, because a local OS eats Win and ⌘
+ * chords before this page ever sees them.
+ */
+export function modifiersFrom(event: KeyboardEvent, platform: HostPlatform = 'macos'): string[] {
   const held: string[] = []
+  if (platform === 'windows') {
+    if (event.ctrlKey || event.metaKey) held.push('cmd')
+    if (event.shiftKey) held.push('shift')
+    if (event.altKey) held.push('option')
+    return held
+  }
   if (event.metaKey) held.push('cmd')
   if (event.shiftKey) held.push('shift')
   if (event.altKey) held.push('option')
   if (event.ctrlKey) held.push('control')
   return held
+}
+
+/** The host's name for a bare modifier key going down or up, per platform. */
+export function modifierCodeName(code: string, platform: HostPlatform = 'macos'): string | null {
+  const name = MODIFIER_CODES[code] ?? null
+  if (platform === 'windows' && name === 'control') return 'cmd'
+  return name
 }
 
 /**

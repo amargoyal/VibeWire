@@ -157,7 +157,7 @@ function machineLine(
       return {
         text: [
           store.hostModel.value,
-          `MACOS ${store.hostOS.value}`,
+          `${store.platformLabel} ${store.hostOS.value}`,
           withTransport ? transportLabel() : '',
         ]
           .filter(Boolean)
@@ -350,8 +350,8 @@ function Hero({ posture }: { posture: Posture }) {
       }}
       aria-label={
         openable
-          ? `View ${display?.name ?? 'the Mac'}’s screen`
-          : 'Ask the Mac for its last frame'
+          ? `View ${display?.name ?? store.hostNoun}’s screen`
+          : `Ask ${store.hostNoun} for its last frame`
       }
     >
       {painted ? (
@@ -484,7 +484,7 @@ function AsleepStrip() {
           </Caps>
         </div>
         <p class="prose wrap">
-          The Mac is reachable but its display is off. Waking it takes a few seconds.
+          {store.HostNoun} is reachable but its display is off. Waking it takes a few seconds.
         </p>
         <DashedRule />
         <Caps size="var(--fs-9)" tracking="0.12em">
@@ -622,7 +622,7 @@ function NoDisplays() {
   return (
     <Card tint="var(--ns-amber)" style={{ padding: '16px' }}>
       <div class="stack" style={{ gap: '10px' }}>
-        <p class="prose wrap">The Mac answered, but reports no displays.</p>
+        <p class="prose wrap">{store.HostNoun} answered, but reports no displays.</p>
         <p
           class="wrap"
           style={{
@@ -632,8 +632,9 @@ function NoDisplays() {
             lineHeight: 1.45,
           }}
         >
-          Screen Recording permission is the usual cause. On the Mac: System Settings → Privacy &
-          Security → Screen Recording → VibeWire.
+          {store.platform.value === 'windows'
+            ? 'Windows reported no displays. If the PC is locked, unlock it at the keyboard.'
+            : 'Screen Recording permission is the usual cause. On the Mac: System Settings → Privacy & Security → Screen Recording → VibeWire.'}
         </p>
       </div>
     </Card>
@@ -1022,15 +1023,15 @@ function shortDisplayName(display: DisplayEntry): string {
 function Causes() {
   const transport = store.transport.value
   const rows: [string, string, string][] = [
-    ['01', 'The Mac is asleep, or VibeWire is not running on it.', 'var(--ns-red)'],
+    ['01', `${store.HostNoun} is asleep, or VibeWire is not running on it.`, 'var(--ns-red)'],
     [
       '02',
       transport.tailscaleRunning
-        ? 'You are off the tailnet, or the Mac dropped off it.'
-        : 'Tailscale is not running on the Mac.',
+        ? `You are off the tailnet, or ${store.hostNoun} dropped off it.`
+        : `Tailscale is not running on ${store.hostNoun}.`,
       'var(--ns-amber)',
     ],
-    ['03', 'A VPN on the Mac is eating the route.', 'var(--ns-text-tertiary)'],
+    ['03', `A VPN on ${store.hostNoun} is eating the route.`, 'var(--ns-text-tertiary)'],
   ]
 
   return (
@@ -1154,7 +1155,7 @@ function Footer({
             lineHeight: 1.45,
           }}
         >
-          Waiting on the Mac to answer. Nothing is being retried in a loop — the battery is not the
+          Waiting on {store.hostNoun} to answer. Nothing is being retried in a loop — the battery is not the
           price of an unanswered question.
         </p>
       )
@@ -1280,13 +1281,13 @@ function MovedAddress() {
             color: 'var(--ns-text-secondary)',
           }}
         >
-          The key stays. This is the same Mac at a different address, so there is nothing to pair
+          The key stays. This is the same {store.platform.value === 'windows' ? 'PC' : 'Mac'} at a different address, so there is nothing to pair
           again — no code, no trip to the menu bar.
         </p>
         <input
           value={address}
           placeholder="https://…trycloudflare.com, or 192.168.1.24"
-          aria-label="The Mac’s new address"
+          aria-label={`${store.HostNoun}’s new address`}
           spellcheck={false}
           autocapitalize="none"
           autocorrect="off"

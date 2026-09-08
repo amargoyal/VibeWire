@@ -168,6 +168,50 @@ Requests carrying `id` get exactly one reply with the same `id`.
 | `devices` | paired devices with lastSeen | 07A |
 | `error` | code, message, retriable | any |
 
+### 3.1 Host platforms
+
+Two hosts speak this protocol: the Swift menu-bar app on a Mac, and the
+Electron app on Windows (`host-electron/`). They are interchangeable on the
+wire, and the fields below are how a client tells them apart. All additive,
+all optional, still `protocolVersion = 1` — a client that never reads them
+sees a Mac, which is what every host was until the Windows one.
+
+| Field | Where | Meaning |
+|---|---|---|
+| `platform` | `hello` | `"macos"` or `"windows"`. Absent means `macos`. |
+| `osBuild` | `hello` | The build where the platform has a useful one — Windows sends `"22631"`. |
+| `conditions` | `hello`, `status` | An object of booleans, one per measured fact that stops something working and has no permission to grant. Sent every tick on `status`. |
+| `title`, `elevated` | `frontmost` | The foreground window's title, and whether it is an administrator window. |
+| `reason` | `streamState` | `"captureStalled"` on a `stalled` state the capture side noticed, as opposed to the socket. |
+| `hardware` | `videoConfig` | Whether the encoder is a hardware one. |
+
+Conditions a Windows host names:
+
+| Code | Fact |
+|---|---|
+| `inputBlockedBySecureDesktop` | The lock screen or a UAC prompt owns input. Nothing this host sends lands, and the phone cannot unlock the PC. |
+| `inputBlockedByElevatedWindow` | The foreground window is elevated and refuses input from a non-elevated process. |
+| `inputUnavailable` | The injector failed to load; the host log says why. |
+| `firewallRuleMissing` | Windows Firewall has no inbound rule for the host. Phones on the LAN cannot reach it. |
+| `softwareEncoder` | No hardware H.264 encoder; the ladder is capped at 720p30. |
+
+On Windows `capabilities.screenRecording` and `capabilities.accessibility` are
+always `true`: there is no grant to ask for, and what can actually stop capture
+or input is a condition instead.
+
+The modifier vocabulary (`cmd`, `shift`, `option`, `control`) is the same on
+both. A Windows host presses `cmd` as **Ctrl** — every stored combo means "the
+chord key and S" — `option` as **Alt**, and `control` as the **Win** key, the one
+Windows modifier with no other home. The client relabels the chips to match.
+
+How a phone reaches a Windows host, with nothing installed on the phone:
+
+| Situation | Path |
+|---|---|
+| Same Wi-Fi | `http://<lan-ip>:8787/?code=…` served by the host. A plain-http page, so `ws://` is allowed. |
+| Away, Tailscale on both | `http://100.x.y.z:8787/` first in `transport.candidates`. |
+| Away, no Tailscale | Relay over internet: the host fetches `cloudflared`, runs a quick tunnel, and serves its own bundle at `https://<random>.trycloudflare.com`. The hostname rotates on each host launch, which the client's re-point screen already handles. |
+
 ## 4. Phone → host
 
 | `t` | Payload | Origin |

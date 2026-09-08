@@ -40,7 +40,7 @@ export class EndpointError extends Error {}
  */
 export function parseEndpoint(input: string, fallbackPort = 8787): Endpoint {
   const trimmed = input.trim().replace(/\/+$/, '')
-  if (!trimmed) throw new EndpointError('Enter the Mac’s address first.')
+  if (!trimmed) throw new EndpointError('Enter the host’s address first.')
 
   const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
   // A bare `host:port` is not a URL, and `new URL('mac:8787')` parses `mac:` as
@@ -117,8 +117,8 @@ export function describe(endpoint: Endpoint): string | null {
       return (
         `This page is served over HTTPS, so the browser will not open a plain ` +
         `http:// connection to ${endpoint.host}. Two ways round it: turn on ` +
-        `Settings → Relay over internet on the Mac and use the https:// tunnel ` +
-        `address it prints, or open this client from the Mac itself at ` +
+        `Settings → Relay over internet on the host and use the https:// tunnel ` +
+        `address it prints, or open this client from the host itself at ` +
         `http://${endpoint.host}:${endpoint.port}/.`
       )
     case 'warn':

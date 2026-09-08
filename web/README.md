@@ -7,6 +7,11 @@ and this client speaks version 1 of it unchanged.
 Preact + TypeScript, built by Vite, no runtime dependency on anything it does not
 ship: 50 KB gzipped, one script, one stylesheet, nothing fetched from a CDN.
 
+**Two hosts serve this client.** The Mac host and the Windows host
+(`host-electron/`) both serve the same `dist/`, and the client tells them apart
+by `hello.platform` — the chip labels, the host noun and the named conditions
+follow it, and nothing else changes. `PROTOCOL.md` §3.1 lists the fields.
+
 **There are two builds in this directory.** `npm run build` is this client, the one
 the phone and any browser use. `npm run build:dashboard` is the Mac app's window —
 same `node_modules`, same design system, its own `dist-dashboard`. It is not a
