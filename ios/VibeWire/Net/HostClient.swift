@@ -364,11 +364,7 @@ actor HostClient {
     /// up does not invalidate a path that is working, and the silence watchdog
     /// is what catches one that has quietly stopped.
     func networkChanged() async {
-        guard host != nil, state != .unauthorized else { return }
-        if case .connected = state, let last = lastPongAt,
-           Double(MonotonicClock.micros() - last) / 1000 <= pongTimeoutMillis {
-            return
-        }
+        guard host != nil, state != .unauthorized, !socketIsAnswering else { return }
 
         print("[VibeWire] network changed, dialing again")
         retryTask?.cancel()
@@ -680,8 +676,7 @@ actor HostClient {
     /// difference between walking out of the house costing a few seconds and
     /// costing the session.
     private func noteSilenceIfDead() async -> Bool {
-        guard case .connected = state, let last = lastPongAt else { return false }
-        guard Double(MonotonicClock.micros() - last) / 1000 > pongTimeoutMillis else {
+        guard case .connected = state, lastPongAt != nil, !socketIsAnswering else {
             return false
         }
 
@@ -808,6 +803,13 @@ actor HostClient {
     /// for each address the Mac gave it.
     var giveUpSeconds: TimeInterval {
         30 * Double(max(1, host?.candidates.count ?? 1))
+    }
+
+    /// Whether the live socket is still carrying pongs, which is the only
+    /// evidence that the address under it still reaches the Mac.
+    private var socketIsAnswering: Bool {
+        guard case .connected = state, let last = lastPongAt else { return false }
+        return Double(MonotonicClock.micros() - last) / 1000 <= pongTimeoutMillis
     }
 
     /// How long a connected socket may go without a pong before it is treated
