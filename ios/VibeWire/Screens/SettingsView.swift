@@ -20,6 +20,7 @@ struct SettingsView: View {
                         group("VIDEO") { videoSection }
                         group("TRACKPAD") { trackpadSection }
                         group("ACCESS") { accessSection }
+                        group("REACHING IT") { addressSection }
 
                         revokeEverything.padding(.top, 12)
                         logOut.padding(.top, 9)
@@ -310,6 +311,44 @@ struct SettingsView: View {
         return model.transport.tailscaleRunning
             ? "OFF · TAILSCALE COVERS REMOTE ACCESS"
             : "OFF · NO REMOTE PATH CONFIGURED"
+    }
+
+    // MARK: Reaching it
+
+    /// Every address this phone will try, and what holding more than one buys.
+    ///
+    /// The browser client has shown this since it learned to fail over. The
+    /// phone held the same list and said nothing about it, so "the Mac cannot
+    /// be reached from here" and "this phone only knows the Wi-Fi address"
+    /// looked identical from the one screen that can tell them apart.
+    private var addressSection: some View {
+        let addresses = model.pairedHost?.candidates ?? []
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                MonoCaps("ADDRESSES", size: 9, tracking: 1.2)
+                Spacer(minLength: 8)
+                MonoCaps(
+                    addresses.isEmpty ? "NONE" : "\(addresses.count)",
+                    size: 9,
+                    color: addresses.isEmpty ? NS.Color.textTertiary : NS.Color.green,
+                    tracking: 1.2
+                )
+            }
+
+            ForEach(addresses, id: \.self) { origin in
+                Text(origin)
+                    .nsMono(12)
+                    .foregroundStyle(NS.Color.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text(addresses.count > 1
+                ? "When the address in use stops answering, these are tried in turn. Changing network costs a reconnect rather than a re-pair."
+                : "The Mac has named only one address so far. It reports the rest over the socket, so this fills in a second after connecting — and until it does, leaving this network ends the session.")
+                .nsSans(13)
+                .foregroundStyle(NS.Color.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var revokeEverything: some View {
