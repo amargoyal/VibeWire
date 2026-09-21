@@ -61,6 +61,15 @@ actor HostClient {
     private var reconnectStartedAt: Date?
     private var shouldReconnect = true
     private var pingTask: Task<Void, Never>?
+    /// When the last pong came back, on the monotonic clock.
+    ///
+    /// A network that changes under a live socket does not always close it: the
+    /// radio switches, the old route stops carrying anything, and the socket
+    /// waits on a TCP timeout that can outlast anyone's patience. The phone
+    /// reads "connected" the whole time, with nothing coming back and the
+    /// rotation held on an address that is already dead. Pongs arrive every
+    /// second, so their absence is the proof.
+    private var lastPongAt: UInt64?
     /// Whether the current socket has delivered a frame. Until it has, the
     /// upgrade may still be refused.
     private var handshakeConfirmed = false
@@ -697,6 +706,13 @@ actor HostClient {
     var giveUpSeconds: TimeInterval {
         30 * Double(max(1, host?.candidates.count ?? 1))
     }
+
+    /// How long a connected socket may go without a pong before it is treated
+    /// as dead. Pings go out every second, so this is eight missed round trips:
+    /// long enough that a slow relay hop is not mistaken for a lost network,
+    /// short enough that walking out of Wi-Fi range costs seconds rather than a
+    /// TCP timeout nobody waits through.
+    private let pongTimeoutMillis: Double = 8000
 
     /// 0.5 s doubling to a 8 s ceiling.
     private func backoffMillis() -> Int {
