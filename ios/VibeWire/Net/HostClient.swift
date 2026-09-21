@@ -351,6 +351,35 @@ actor HostClient {
         await openSocket()
     }
 
+    /// The phone moved to a different network.
+    ///
+    /// Whatever this client believes about which of the Mac's addresses answers
+    /// was measured on a network that no longer exists, so the backoff it is
+    /// sitting out and the verdict it has already reached are both worthless.
+    /// It dials now, from the top of the list, and the give-up clock starts
+    /// again — a phone that gave up in the lift is not a phone that should stay
+    /// given up in the street.
+    ///
+    /// A socket still carrying pongs is left alone. A second interface coming
+    /// up does not invalidate a path that is working, and the silence watchdog
+    /// is what catches one that has quietly stopped.
+    func networkChanged() async {
+        guard host != nil, state != .unauthorized else { return }
+        if case .connected = state, let last = lastPongAt,
+           Double(MonotonicClock.micros() - last) / 1000 <= pongTimeoutMillis {
+            return
+        }
+
+        print("[VibeWire] network changed, dialing again")
+        retryTask?.cancel()
+        retryTask = nil
+        shouldReconnect = true
+        reconnectAttempt = 0
+        reconnectStartedAt = nil
+        dialIndex = 0
+        await openSocket()
+    }
+
     /// Records addresses the Mac has told us about over the socket.
     ///
     /// The host reports its own transport once a second, and that report is the
