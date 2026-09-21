@@ -381,6 +381,10 @@ actor HostClient {
         shouldReconnect = false
         pingTask?.cancel()
         pingTask = nil
+        retryTask?.cancel()
+        retryTask = nil
+        lastPongAt = nil
+        addressSuspect = false
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         // The queue exists to cover a brief reconnect inside one session, not
@@ -667,6 +671,7 @@ actor HostClient {
         pingTask?.cancel()
         pingTask = nil
         task = nil
+        lastPongAt = nil
 
         guard shouldReconnect else {
             transition(to: .idle)
