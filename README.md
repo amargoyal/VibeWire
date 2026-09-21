@@ -14,6 +14,19 @@ then behave as one machine — a host on the computer and a client on the phone.
 `PROTOCOL.md` is the wire protocol both hosts speak. `PRODUCT.md` is what the
 product is and is not.
 
+## Download
+
+Get the installers from the [latest GitHub release](https://github.com/amargoyal/VibeWire/releases/latest).
+
+- **Mac (Apple silicon or Intel, macOS 14+):** download the universal `.dmg`, open it,
+  and drag **VibeWire** onto **Applications**. Eject the image and open the installed app.
+- **Windows:** download the `x64.exe` installer, or `arm64.exe` for an ARM PC.
+
+The current Mac release is not notarized and the Windows installers are not
+code-signed. First-launch security prompts and setup instructions are documented
+on the release page. The iPhone app is a development target, not a release download;
+use the browser on your phone.
+
 ## Windows
 
 1. Download `VibeWire-Setup-<version>-x64.exe` from the latest release
@@ -50,7 +63,7 @@ capture and the H.264 encoding; that is what it costs.
 cd host && swift build && ./package-app.sh      # installs /Applications/VibeWire.app
 ```
 
-Grant Screen Recording and Accessibility when asked. The iPhone app builds from
+Follow Setup guide to grant Screen Recording and Accessibility. The iPhone app builds from
 `ios/VibeWire.xcodeproj`. Details: `HANDOFF.md`, `web/README.md`.
 
 ## Building the Windows host
@@ -101,3 +114,12 @@ a display, for a machine with no screen to capture.
 Configuration lives in `~/.config/vibewire/` on both platforms
 (`C:\Users\<you>\.config\vibewire\` on Windows): `config.json`, the paired
 devices, and the host's own key — sealed with DPAPI on Windows.
+
+## Packaging a Mac release
+
+Run `host/package-dmg.sh` on a Mac with Xcode, Node/npm and Python 3.9+. It builds
+both web surfaces, compiles the host for Apple silicon and Intel, verifies the
+bundle and produces `host/build/VibeWire-<version>-mac-universal.dmg`. The DMG
+opens in icon view with VibeWire beside an Applications shortcut. Packaging does
+not install or launch the app. Developer ID signing and notarization are required
+separately for a distribution that passes Gatekeeper by default.

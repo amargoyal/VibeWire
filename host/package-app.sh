@@ -17,6 +17,7 @@
 #   ./package-app.sh                 build, sign, install to /Applications
 #   ./package-app.sh --no-install    leave the bundle in host/build/
 #   ./package-app.sh --debug         package the debug build (faster to make)
+#   ./package-app.sh --universal     build for Apple silicon and Intel
 #
 # VIBEWIRE_SIGN_IDENTITY overrides the certificate; if no certificate is found
 # the script falls back to an ad-hoc signature and says what that costs.
@@ -28,12 +29,14 @@ root="$(cd "$here/.." && pwd)"
 
 configuration=release
 install=1
+universal=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --debug)      configuration=debug ;;
     --release)    configuration=release ;;
     --no-install) install=0 ;;
+    --universal) universal=1 ;;
     -h|--help)    sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -56,8 +59,12 @@ fi
 # ---------------------------------------------------------------- build
 
 echo "building ${configuration}…"
-swift build --package-path "$here" -c "$configuration"
-binary="$(swift build --package-path "$here" -c "$configuration" --show-bin-path)/VibeWireHost"
+build_args=(--package-path "$here" -c "$configuration")
+if [ "$universal" -eq 1 ]; then
+  build_args+=(--arch arm64 --arch x86_64)
+fi
+swift build "${build_args[@]}"
+binary="$(swift build "${build_args[@]}" --show-bin-path)/VibeWireHost"
 if [ ! -x "$binary" ]; then
   echo "no binary at $binary" >&2
   exit 1
@@ -170,7 +177,7 @@ echo
 echo "installed $installed ($version)"
 echo "open it from Spotlight or Finder — it runs in the menu bar, with no Dock icon."
 if [ -n "$identity" ]; then
-  echo "the first launch will ask for Screen Recording and Accessibility once; the grants stick from then on."
+  echo "the first launch opens Setup guide; grant Screen Recording and Accessibility there."
 else
   echo "grant Screen Recording and Accessibility to VibeWire.app in System Settings › Privacy & Security."
 fi
