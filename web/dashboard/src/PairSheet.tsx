@@ -436,6 +436,12 @@ function Reach({ state }: { state: Facts }) {
         </div>
       )}
 
+      {state.transport.relayProblem && (
+        <Caps size="var(--fs-9)" color="var(--ns-amber)" style={{ lineHeight: 1.6 }}>
+          RELAY · {state.transport.relayProblem.toUpperCase()}
+        </Caps>
+      )}
+
       {!remote && (
         <div class="card" style={{ padding: 16 }}>
           <div class="stack" style={{ gap: 10 }}>

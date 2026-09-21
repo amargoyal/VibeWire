@@ -138,6 +138,9 @@ export interface TransportFact {
   cloudflareRunning: boolean
   cloudflareHostname?: string
   lanAddress?: string
+  lanAddresses?: string[]
+  /** What stopped the relay coming up, when it was asked for and did not. */
+  relayProblem?: string
   relayName?: string
   peerLatencyMillis?: number
   lastContact?: string
