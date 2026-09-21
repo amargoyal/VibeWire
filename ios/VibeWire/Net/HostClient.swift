@@ -629,9 +629,43 @@ actor HostClient {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self else { return }
-                await self.sendPing()
+                await self.tick()
             }
         }
+    }
+
+    /// One second of keepalive: notice a socket that has gone quiet, or ping.
+    private func tick() async {
+        if await noteSilenceIfDead() { return }
+        sendPing()
+    }
+
+    /// Whether the live socket has stopped answering, and the reconnect that
+    /// follows from it.
+    ///
+    /// The radio switches, the old route stops carrying anything, and the
+    /// socket sits open on a TCP timeout that can outlast anyone's patience.
+    /// Until this existed the phone read "connected" throughout, held the
+    /// rotation on an address that was already dead, and never reached the Mac
+    /// on the tunnel address that was answering the whole time. It is the
+    /// difference between walking out of the house costing a few seconds and
+    /// costing the session.
+    private func noteSilenceIfDead() async -> Bool {
+        guard case .connected = state, let last = lastPongAt else { return false }
+        guard Double(MonotonicClock.micros() - last) / 1000 > pongTimeoutMillis else {
+            return false
+        }
+
+        // The handshake succeeded on this address, so the identity is not in
+        // question, but the address is: the next attempt moves along the list.
+        addressSuspect = true
+        // Retired on purpose, and the generation bump says so — otherwise the
+        // receive loop reads the cancellation as a failure of its own and
+        // schedules a second reconnect beside this one.
+        socketGeneration &+= 1
+        task?.cancel(with: .goingAway, reason: nil)
+        await scheduleReconnect(reason: "nothing came back from the host", task: nil)
+        return true
     }
 
     private func sendPing() {
