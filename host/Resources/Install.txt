@@ -1,0 +1,17 @@
+INSTALL VIBEWIRE
+
+1. Drag VibeWire onto Applications in this window.
+2. Eject this disk image.
+3. Open VibeWire from Applications. Look for its icon in the menu bar.
+4. Follow Setup guide to allow Screen Recording and Accessibility, then pair
+   your phone. Your computer shares its screen; your phone is the viewer.
+
+Requires macOS 14 or later. Supports Apple silicon and Intel Macs.
+
+This release is not notarized by Apple. macOS may block the first launch.
+If you trust this download, use System Settings > Privacy & Security >
+Open Anyway after attempting to open the app. Do not disable Gatekeeper.
+More information: https://support.apple.com/102445
+
+Download updates and report problems:
+https://github.com/amargoyal/VibeWire
