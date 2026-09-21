@@ -61,6 +61,13 @@ actor HostClient {
     private var reconnectStartedAt: Date?
     private var shouldReconnect = true
     private var pingTask: Task<Void, Never>?
+    /// The next dial, waiting out its backoff.
+    ///
+    /// The wait used to run inside whichever task noticed the failure, which
+    /// left no handle on it: the one moment worth dialling immediately, a phone
+    /// that has just changed network, was the one moment nothing could cut the
+    /// wait short.
+    private var retryTask: Task<Void, Never>?
     /// When the last pong came back, on the monotonic clock.
     ///
     /// A network that changes under a live socket does not always close it: the
@@ -704,8 +711,20 @@ actor HostClient {
         reconnectAttempt += 1
         let delay = backoffMillis()
         transition(to: .reconnecting(attempt: reconnectAttempt, nextRetryMs: delay))
+        scheduleDial(afterMillis: delay)
+    }
 
-        try? await Task.sleep(for: .milliseconds(delay))
+    /// Dials again once the backoff has run, unless something cancels it first.
+    private func scheduleDial(afterMillis delay: Int) {
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            await self.dialIfWanted()
+        }
+    }
+
+    private func dialIfWanted() async {
         guard shouldReconnect else { return }
         await openSocket()
     }
