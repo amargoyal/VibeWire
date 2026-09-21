@@ -47,8 +47,49 @@ struct HostSettings: Codable, Sendable {
     /// all and cannot go stale. Pointing at the public site is for when the address
     /// bar matters — showing someone the thing, or a bookmark you want to keep.
     var webClientURL: String?
+    /// Whether this host asks GitHub, at launch and every six hours, if a
+    /// newer VibeWire has been published. One request, no identifiers beyond
+    /// the version in the user agent, and nothing is ever installed by it.
+    var checkForUpdates: Bool = true
 
     static let `default` = HostSettings()
+
+    init() {}
+
+    /// Every field optional on the way in, because a settings file written by
+    /// an older build is missing whatever the newer one added.
+    ///
+    /// Synthesised decoding does not fall back to a property's default: one
+    /// absent key throws, `loadSettings` catches that and uses the defaults
+    /// for *everything*, and a reader who had changed the port and turned the
+    /// relay on finds both quietly undone by an upgrade. Each key is read on
+    /// its own here so adding the next one costs nobody their settings.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = HostSettings()
+        quality = try container.decodeIfPresent(QualityLadder.self, forKey: .quality)
+            ?? fallback.quality
+        capOnCellular = try container.decodeIfPresent(Bool.self, forKey: .capOnCellular)
+            ?? fallback.capOnCellular
+        cellularCeilingMbps = try container.decodeIfPresent(
+            Double.self, forKey: .cellularCeilingMbps
+        ) ?? fallback.cellularCeilingMbps
+        sensitivity = try container.decodeIfPresent(Int.self, forKey: .sensitivity)
+            ?? fallback.sensitivity
+        naturalScrolling = try container.decodeIfPresent(Bool.self, forKey: .naturalScrolling)
+            ?? fallback.naturalScrolling
+        requireBiometricEachSession = try container.decodeIfPresent(
+            Bool.self, forKey: .requireBiometricEachSession
+        ) ?? fallback.requireBiometricEachSession
+        relayOverInternet = try container.decodeIfPresent(Bool.self, forKey: .relayOverInternet)
+            ?? fallback.relayOverInternet
+        targetFps = try container.decodeIfPresent(Int.self, forKey: .targetFps)
+            ?? fallback.targetFps
+        port = try container.decodeIfPresent(UInt16.self, forKey: .port) ?? fallback.port
+        webClientURL = try container.decodeIfPresent(String.self, forKey: .webClientURL)
+        checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates)
+            ?? fallback.checkForUpdates
+    }
 }
 
 enum Config {
