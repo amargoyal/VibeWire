@@ -78,6 +78,19 @@ export interface Facts {
     listening: string
     publishedSite: string
     webBundlePresent: boolean
+    /** Every origin a client could dial, in the order the host prefers. */
+    candidates: string[]
+    /** This Mac's own network addresses, the routed one first. */
+    lanAddresses: string[]
+    tunnelRunning: boolean
+    /** Whether the machine's own firewall would refuse the phone. `known`
+     *  false means it could not be asked, which is not the same as fine. */
+    firewall: {
+      known: boolean
+      enabled: boolean
+      blocksIncoming: boolean
+      detail?: string
+    }
   }
   pairing: PairingFact
   settings?: SettingsFact

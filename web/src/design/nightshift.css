@@ -1596,6 +1596,11 @@ textarea {
 .setup__button:disabled { opacity: .5; cursor: default; }
 .setup__button--quiet { color: var(--ns-text-secondary); background: transparent; }
 .setup__done { color: var(--ns-green); font-size: var(--fs-13); }
+/* A condition on this machine that stops the phone reaching it: stated where
+   the pairing step is, since that is where it is discovered. */
+.setup__blocked { background: var(--ns-raised); border-left: 2px solid var(--ns-red); padding: 18px; margin-block: 12px; }
+.setup__blocked h3 { color: var(--ns-red); margin-bottom: 8px; }
+.setup__blocked p { margin: 0 0 12px; }
 .setup p.setup__hint { font-size: var(--fs-13); }
 .setup summary, .client-setup summary { cursor: pointer; min-height: 44px; padding-block: 12px; font-size: var(--fs-13); color: var(--ns-text); }
 .client-setup { margin-block: 12px 24px; padding-block: 20px; border-bottom: 1px solid var(--ns-hairline); }
