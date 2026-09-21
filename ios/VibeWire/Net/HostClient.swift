@@ -389,6 +389,11 @@ actor HostClient {
     /// moment ago. The backoff it was sitting out and the verdict it had
     /// reached were both measured against circumstances that have changed.
     private func redial(reason: String) async {
+        // A dial already in flight is the dial this would start. Networks that
+        // come up in stages report themselves several times in a second, and
+        // each report must not throw away the attempt the last one began.
+        guard !isOpening else { return }
+
         print("[VibeWire] \(reason), dialing again")
         retryTask?.cancel()
         retryTask = nil
