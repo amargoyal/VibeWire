@@ -18,4 +18,5 @@ icon_locations = {
     "Applications": (440, 140),
     "Start here.txt": (300, 300),
 }
-hide_extensions = ["VibeWire.app"]
+# Do not add FinderInfo to the signed app: that invalidates strict verification.
+hide_extensions = []
