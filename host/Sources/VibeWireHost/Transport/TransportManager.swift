@@ -32,6 +32,10 @@ actor TransportManager {
         /// A Mac on Wi-Fi and a dock at once has two, and which of them the
         /// phone is on is not something this end can know.
         var lanAddresses: [String] = []
+        /// What stopped the relay coming up, when it was asked for and did
+        /// not. The switch reading on while nothing happens is the failure
+        /// this carries out of the log.
+        var relayProblem: String?
         /// Whether macOS itself would refuse the phone's connection. Not a
         /// property of the network, and the one fact that makes a correct
         /// address behave exactly like a wrong one.
@@ -98,6 +102,7 @@ actor TransportManager {
             payload["cloudflareHostname"] = cloudflareHostname
             payload["lanAddress"] = lanAddress
             payload["lanAddresses"] = lanAddresses
+            payload["relayProblem"] = relayProblem
             if firewall.blocksIncoming {
                 payload["conditions"] = ["firewallBlocksIncoming": true]
             }
@@ -334,13 +339,9 @@ actor TransportManager {
 
     // MARK: Cloudflare Tunnel
 
-    static func cloudflaredBinary() -> String? {
-        let candidates = [
-            "/opt/homebrew/bin/cloudflared",
-            "/usr/local/bin/cloudflared",
-        ]
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
-    }
+    /// Where cloudflared is, if it is anywhere. One list, in `Cloudflared`,
+    /// so the copy this host fetches counts as installed like any other.
+    static func cloudflaredBinary() -> String? { Cloudflared.installed() }
 
     /// Starts a quick tunnel and captures the hostname cloudflared prints.
     ///
@@ -349,10 +350,24 @@ actor TransportManager {
     /// device handshake is what defends it.
     func startCloudflareTunnel() async {
         guard cloudflared == nil else { return }
-        guard let binary = Self.cloudflaredBinary() else {
-            Log.warn(.transport, "cloudflared not installed; relay unavailable")
-            return
+
+        // Nothing installed is not the end of it any more: the pinned build is
+        // fetched here, once, and the failure is carried back to the window
+        // that offered the switch rather than left in the log.
+        var located = Cloudflared.installed()
+        if located == nil {
+            cached.relayProblem = "Downloading cloudflared \(Cloudflared.version)…"
+            do {
+                located = try await Cloudflared.install()
+                cached.relayProblem = nil
+            } catch {
+                let detail = error.localizedDescription
+                Log.warn(.transport, "relay unavailable: \(detail)")
+                cached.relayProblem = detail
+                return
+            }
         }
+        guard let binary = located else { return }
 
         // Whoever is already on that port is not ours, and the hostname it would
         // report is not ours either. cloudflared is left to pick its own port in
