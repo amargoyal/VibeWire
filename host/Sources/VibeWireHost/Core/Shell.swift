@@ -46,7 +46,10 @@ enum Shell {
             timer.resume()
 
             process.terminationHandler = { _ in
-                finish(try? pipe.fileHandleForReading.readToEnd() ?? Data())
+                // Nothing printed is nothing learned, and every caller here
+                // reads the output rather than the exit status.
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                finish(data.isEmpty ? nil : data)
             }
 
             do {

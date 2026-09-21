@@ -28,7 +28,10 @@ actor TransportManager {
         var peerLatencyMillis: Double?
         var cloudflareRunning: Bool
         var cloudflareHostname: String?
-        var lanAddress: String?
+        /// Every address on this Mac's own networks, the routed one first.
+        /// A Mac on Wi-Fi and a dock at once has two, and which of them the
+        /// phone is on is not something this end can know.
+        var lanAddresses: [String] = []
         var lastContact: Date?
         /// The port the host is serving on, so a client can build an origin out
         /// of the addresses below without being told separately.
@@ -46,10 +49,14 @@ actor TransportManager {
         ///
         /// A client stores the whole list. One address is what made the phone
         /// work on exactly the network it was paired on.
+        /// The first of this Mac's own addresses, which is the one to print
+        /// where only one fits.
+        var lanAddress: String? { lanAddresses.first }
+
         var candidates: [String] {
             var origins: [String] = []
             if let tailscale = tailscaleAddress { origins.append("http://\(tailscale):\(port)") }
-            if let lan = lanAddress { origins.append("http://\(lan):\(port)") }
+            for lan in lanAddresses { origins.append("http://\(lan):\(port)") }
             if cloudflareRunning, let tunnel = cloudflareHostname {
                 origins.append(tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel)
             }
@@ -86,6 +93,7 @@ actor TransportManager {
             payload["peerLatencyMillis"] = peerLatencyMillis.map { ($0 * 10).rounded() / 10 }
             payload["cloudflareHostname"] = cloudflareHostname
             payload["lanAddress"] = lanAddress
+            payload["lanAddresses"] = lanAddresses
             payload["lastContact"] = lastContact.map(ISO8601DateFormatter().string(from:))
             return payload
         }
@@ -100,7 +108,6 @@ actor TransportManager {
         peerLatencyMillis: nil,
         cloudflareRunning: false,
         cloudflareHostname: nil,
-        lanAddress: nil,
         lastContact: nil
     )
 
@@ -155,7 +162,7 @@ actor TransportManager {
     func refresh() async {
         var next = cached
         next.port = port
-        next.lanAddress = Self.primaryLANAddress()
+        next.lanAddresses = NetworkAddresses.lan()
 
         if let tailscale = await Self.tailscaleStatus() {
             next.tailscaleRunning = tailscale.running
@@ -254,7 +261,7 @@ actor TransportManager {
 
     private static func tailscaleStatus() async -> TailscaleInfo? {
         guard let binary = tailscaleBinary() else { return nil }
-        guard let output = await runCapturing(binary, ["status", "--json"], timeout: 3) else {
+        guard let output = await Shell.capture(binary, ["status", "--json"], timeout: 3) else {
             return nil
         }
         guard let root = try? JSONSerialization.jsonObject(with: output) as? [String: Any]
@@ -433,81 +440,5 @@ actor TransportManager {
         cached.cloudflareRunning = false
         cached.cloudflareHostname = nil
         Log.info(.transport, "cloudflare tunnel stopped")
-    }
-
-    // MARK: Helpers
-
-    /// The address to show in the menu bar for a plain LAN connection.
-    private static func primaryLANAddress() -> String? {
-        var addresses: [String] = []
-        var pointer: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&pointer) == 0, let first = pointer else { return nil }
-        defer { freeifaddrs(pointer) }
-
-        var current: UnsafeMutablePointer<ifaddrs>? = first
-        while let interface = current {
-            defer { current = interface.pointee.ifa_next }
-            let flags = Int32(interface.pointee.ifa_flags)
-            guard flags & IFF_UP == IFF_UP, flags & IFF_LOOPBACK == 0 else { continue }
-            guard let addr = interface.pointee.ifa_addr,
-                  addr.pointee.sa_family == UInt8(AF_INET) else { continue }
-
-            let name = String(cString: interface.pointee.ifa_name)
-            // en0/en1 are Wi-Fi and Ethernet; skip utun (Tailscale) and bridges.
-            guard name.hasPrefix("en") else { continue }
-
-            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            guard getnameinfo(
-                addr, socklen_t(addr.pointee.sa_len),
-                &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST
-            ) == 0 else { continue }
-            addresses.append(String(cString: host))
-        }
-        return addresses.first
-    }
-
-    private static func runCapturing(_ path: String, _ arguments: [String], timeout: TimeInterval) async -> Data? {
-        await withCheckedContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: path)
-            process.arguments = arguments
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
-
-            // A hung `tailscale status` must not wedge the status poller.
-            let timer = DispatchSource.makeTimerSource(queue: .global())
-            timer.schedule(deadline: .now() + timeout)
-
-            // Both the timeout and the termination handler race to finish this
-            // continuation; resuming twice would trap, so the first one wins.
-            let resumed = Guarded(false)
-            let finish: @Sendable (Data?) -> Void = { data in
-                let alreadyResumed = resumed.withLock { state -> Bool in
-                    defer { state = true }
-                    return state
-                }
-                guard !alreadyResumed else { return }
-                timer.cancel()
-                continuation.resume(returning: data)
-            }
-
-            timer.setEventHandler {
-                if process.isRunning { process.terminate() }
-                finish(nil)
-            }
-            timer.resume()
-
-            process.terminationHandler = { _ in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                finish(data.isEmpty ? nil : data)
-            }
-
-            do {
-                try process.run()
-            } catch {
-                finish(nil)
-            }
-        }
     }
 }
