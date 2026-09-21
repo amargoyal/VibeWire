@@ -18,6 +18,7 @@
  * flat run of sections it always has.
  */
 
+import { SetupGuide } from './SetupGuide'
 import type { ComponentChildren } from 'preact'
 import { useEffect } from 'preact/hooks'
 
@@ -72,6 +73,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
               <SheetDismiss onClick={onClose} id="dismissSettings" />
             </div>
 
+            <SetupGuide initiallyClosed />
             {/*
               The split is which end of the wire the group is about, not what would
               make the two columns the same height — they are not the same height,

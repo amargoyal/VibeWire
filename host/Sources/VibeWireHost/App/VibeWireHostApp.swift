@@ -229,12 +229,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func warnAboutMissingPermissions() {
         let screen = DisplayCatalog.hasScreenRecordingPermission()
         let accessibility = InputInjector.hasAccessibilityPermission()
-        guard !screen || !accessibility else { return }
+        let firstSetup = !UserDefaults.standard.bool(forKey: "vibewire.setup.presented.v1")
+        guard firstSetup || !screen || !accessibility else { return }
+        UserDefaults.standard.set(true, forKey: "vibewire.setup.presented.v1")
 
-        // Ask once at launch rather than failing silently when the phone
-        // connects and finds a black picture with dead input.
-        if !accessibility { InputInjector.requestAccessibilityPermission() }
-        if !screen { DisplayCatalog.requestScreenRecordingPermission() }
+        // Explain each permission before its user-initiated system request.
+        dashboard?.show(pane: "setup")
     }
 
     /// The headline is a parameter because the two ways this app dies are not

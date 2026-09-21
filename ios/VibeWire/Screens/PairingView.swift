@@ -26,6 +26,7 @@ struct PairingView: View {
     @State private var steps: [ExchangeStep] = ExchangeStep.initial
     @State private var errorText: String?
     @State private var showScanner = false
+    @State private var cameraDenied = false
     @State private var editingTarget = false
     /// The Mac's other addresses, as the scanned QR listed them. Kept with the
     /// pairing so this phone can find the same Mac from a different network.
@@ -53,6 +54,14 @@ struct PairingView: View {
                 apply(scanned: payload)
             }
         }
+        .alert("Camera access is off", isPresented: $cameraDenied) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            }
+            Button("Use a code instead", role: .cancel) { editingTarget = true }
+        } message: {
+            Text("Camera access is only needed to scan a pairing QR. Enable it in Settings, or enter your Mac’s address and six-digit code.")
+        }
         .task { await probeLoop() }
     }
 
@@ -60,6 +69,8 @@ struct PairingView: View {
 
     private var waitingBody: some View {
         VStack(alignment: .leading, spacing: 0) {
+            PhoneSetupGuide()
+                .padding(.bottom, 20)
             MonoCaps(
                 "VibeWire",
                 size: 11,
@@ -157,7 +168,7 @@ struct PairingView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { codeFieldFocused = true }
-        .onAppear { codeFieldFocused = true }
+
     }
 
     private func codeBox(index: Int) -> some View {
@@ -305,7 +316,15 @@ struct PairingView: View {
 
     private var scanRow: some View {
         Button {
-            showScanner = true
+            Task { @MainActor in
+                switch AVCaptureDevice.authorizationStatus(for: .video) {
+                case .authorized: showScanner = true
+                case .notDetermined:
+                    if await AVCaptureDevice.requestAccess(for: .video) { showScanner = true }
+                    else { cameraDenied = true }
+                default: cameraDenied = true
+                }
+            }
         } label: {
             HStack(spacing: 14) {
                 RoundedRectangle(cornerRadius: NS.Metric.radiusInner)
@@ -630,5 +649,63 @@ final class QRScannerController: UIViewController, AVCaptureMetadataOutputObject
         else { return }
         session.stopRunning()
         onScan?(value)
+    }
+}
+
+
+/// A short, replayable guide. Pairing and permission requests remain real actions.
+struct PhoneSetupGuide: View {
+    @AppStorage("vibewire.phone-setup.v1") private var dismissed = false
+    @State private var replay = false
+    var initiallyClosed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if replay || (!dismissed && !initiallyClosed) {
+                HStack {
+                    MonoCaps("ON YOUR IPHONE", size: 10)
+                    Spacer()
+                    Button("Skip") { close() }
+                        .frame(minHeight: NS.Metric.minimumTarget).contentShape(Rectangle())
+                        .foregroundStyle(NS.Color.textSecondary)
+                }
+                DisplayTitle("Your Mac.\nNow in your hand.", size: 32)
+                Text("Your Mac runs the work. This phone gives you its screen, pointer, and keyboard.")
+                    .nsSans(15).foregroundStyle(NS.Color.textSecondary)
+                instruction("1", "Start on your Mac", "Open VibeWire in the menu bar. Follow Setup guide to allow Screen Recording and Accessibility on the Mac, then open Pair a device.")
+                instruction("2", "Connect this phone", "Start on the same Wi-Fi. Scan the app QR below, or enter the Mac’s address and six-digit code. Allow Local Network access if iOS asks so this phone can reach your Mac.")
+                instruction("3", "Try your first connection", "After pairing, open View. Slide a finger to move the pointer and tap to click. Use Keyboard to type. Check the picture and controls before leaving your Mac.")
+                DisclosureGroup("Permissions and connection help") {
+                    Text("Camera access is only for scanning; typing a code works without it. If Local Network access was denied, open iPhone Settings → Apps → VibeWire and enable Local Network.\n\nFor access away from home, set up Tailscale on both devices or enable Relay over the internet on your Mac. Test on cellular before leaving. Keep your Mac awake and VibeWire running.\n\nOnly pair with a Mac you trust. You can revoke this phone from Devices on the Mac.")
+                        .nsSans(15).foregroundStyle(NS.Color.textSecondary).padding(.top, 12)
+                }
+                .tint(NS.Color.accent)
+                Button { close() } label: {
+                    Text("Continue to pairing").nsSans(15, weight: .semibold)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .foregroundStyle(NS.Color.deepGround)
+                        .background(NS.Color.accent, in: RoundedRectangle(cornerRadius: NS.Metric.radiusInner))
+                }.buttonStyle(.plain)
+                Button("Skip guide") { close() }
+                    .frame(minHeight: NS.Metric.minimumTarget).contentShape(Rectangle())
+                    .foregroundStyle(NS.Color.textSecondary)
+            } else {
+                Button("How to connect") { replay = true }
+                    .frame(minHeight: NS.Metric.minimumTarget).contentShape(Rectangle())
+                    .foregroundStyle(NS.Color.accent)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func close() { dismissed = true; replay = false }
+    private func instruction(_ number: String, _ title: String, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(number).nsMono(15).foregroundStyle(NS.Color.textSecondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).nsSans(17, weight: .semibold).foregroundStyle(NS.Color.text)
+                Text(detail).nsSans(15).foregroundStyle(NS.Color.textSecondary)
+            }
+        }
     }
 }

@@ -21,6 +21,7 @@ import { fetchEvents, fetchState, command, ApiError } from './api'
 export interface Facts {
   at: string
   host: {
+    platform?: string
     name: string
     model: string
     os: string
@@ -227,6 +228,7 @@ const emptyClaude: ClaudeView = {
 // MARK: - Signals
 
 export type PaneId =
+  | 'setup'
   | 'overview'
   | 'devices'
   | 'displays'

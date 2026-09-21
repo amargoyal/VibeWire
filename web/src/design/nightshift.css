@@ -1576,3 +1576,31 @@ textarea {
     grid-area: browser;
   }
 }
+
+/* Setup is part of the working surface, not a blocking tour. */
+.setup { max-width: 920px; margin-inline: auto; }
+.setup__header { padding-block: 16px 28px; }
+.setup__eyebrow { font: 500 var(--fs-10) var(--ns-mono); letter-spacing: .12em; color: var(--ns-text-secondary); }
+.setup h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; letter-spacing: -.03em; margin: 18px 0; }
+.setup p, .client-setup p, .client-setup li { color: var(--ns-text-secondary); font-size: var(--fs-15); line-height: 1.6; max-width: 68ch; }
+.setup__route { display: flex; flex-wrap: wrap; gap: 24px; align-items: center; padding: 20px 0 0; font-size: var(--fs-15); }
+.setup__steps { list-style: none; padding: 0; margin: 0; }
+.setup__steps > li { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 18px; padding-block: 26px; border-top: 1px solid var(--ns-hairline); }
+.setup__number { font: 500 var(--fs-15) var(--ns-mono); color: var(--ns-text-secondary); padding-top: 4px; }
+.setup h2, .client-setup h2 { font-size: var(--fs-22); line-height: 1.25; letter-spacing: -.02em; margin: 0 0 12px; }
+.setup h3 { font-size: var(--fs-15); margin: 0; }
+.setup__permission { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: var(--ns-raised); padding: 18px; margin-block: 4px; }
+.setup__permission p { margin: 4px 0 0; }
+.setup__button { min-height: 44px; padding: 12px 18px; background: var(--ns-accent); color: var(--ns-deep); border-radius: var(--radius-inner); font-size: var(--fs-13); font-weight: 600; }
+.setup__button:hover { filter: brightness(1.12); }
+.setup__button:disabled { opacity: .5; cursor: default; }
+.setup__button--quiet { color: var(--ns-text-secondary); background: transparent; }
+.setup__done { color: var(--ns-green); font-size: var(--fs-13); }
+.setup p.setup__hint { font-size: var(--fs-13); }
+.setup summary, .client-setup summary { cursor: pointer; min-height: 44px; padding-block: 12px; font-size: var(--fs-13); color: var(--ns-text); }
+.client-setup { margin-block: 12px 24px; padding-block: 20px; border-bottom: 1px solid var(--ns-hairline); }
+.client-setup h2 { margin-top: 16px; }
+.client-setup ol { padding-left: 22px; }
+.client-setup li { padding: 0 0 14px 6px; }
+.client-setup strong { color: var(--ns-text); }
+.client-setup > .setup__button { margin-top: 12px; }
