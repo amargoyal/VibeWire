@@ -70,6 +70,10 @@ actor HostClient {
     /// rotation held on an address that is already dead. Pongs arrive every
     /// second, so their absence is the proof.
     private var lastPongAt: UInt64?
+    /// Set when a socket that *had* worked went quiet. The address is suspect
+    /// even though the handshake succeeded on it, so the next attempt moves
+    /// along the list rather than dialling the dead one again.
+    private var addressSuspect = false
     /// Whether the current socket has delivered a frame. Until it has, the
     /// upgrade may still be refused.
     private var handshakeConfirmed = false
