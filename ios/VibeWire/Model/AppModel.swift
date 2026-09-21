@@ -1175,7 +1175,13 @@ final class AppModel {
 
     func retry() {
         send(["t": "retry"])
-        Task { await connectIfPaired() }
+        Task {
+            // Not `connect`, which does nothing when the client already reads
+            // connected: a socket that stopped answering reads exactly that,
+            // and it is the state the reader is tapping about.
+            await client.retryNow()
+            await connectIfPaired()
+        }
     }
 
     func wake() {
