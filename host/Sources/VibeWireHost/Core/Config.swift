@@ -169,9 +169,26 @@ enum Config {
            !override.isEmpty {
             return override
         }
-        guard let stored = loadSettings().webClientURL, !stored.isEmpty else { return nil }
-        return stored
+        if let stored = loadSettings().webClientURL, !stored.isEmpty { return stored }
+        return publishedWebClient
     }
+
+    /// The project's own copy of the client, and the address a phone sees when
+    /// the relay is what carries the connection.
+    ///
+    /// Without this the QR handed out the quick tunnel's own hostname, so
+    /// scanning the code on a fresh install took the phone to
+    /// `https://<four-random-words>.trycloudflare.com`. That address is not
+    /// wrong — it is this host, and the tunnel is how the phone reaches it from
+    /// anywhere — but it is a stranger's domain on the screen of someone who
+    /// has just been asked to trust it, and it changes on every launch. The
+    /// page comes from here instead, and the tunnel address rides in the query
+    /// string where it belongs: an address, not an identity.
+    ///
+    /// Only used when this host has an `https` address of its own, because a
+    /// page served over `https` may not open a plain `http` origin. On the LAN
+    /// the QR still points at the copy this host serves.
+    static let publishedWebClient = "https://amargoyal.github.io/VibeWire"
 
     /// Where the built web client lives, or nil if it was never built.
     ///
