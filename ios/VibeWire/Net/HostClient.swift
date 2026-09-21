@@ -365,8 +365,24 @@ actor HostClient {
     /// is what catches one that has quietly stopped.
     func networkChanged() async {
         guard host != nil, state != .unauthorized, !socketIsAnswering else { return }
+        await redial(reason: "network changed")
+    }
 
-        print("[VibeWire] network changed, dialing again")
+    /// The reader tapped "Try again".
+    ///
+    /// Unlike a path change this does not spare a socket that looks healthy:
+    /// they are reading a screen that says the Mac is lost, and the one outcome
+    /// a tap must not produce is nothing at all.
+    func retryNow() async {
+        guard host != nil, state != .unauthorized else { return }
+        await redial(reason: "asked to try again")
+    }
+
+    /// Dial now, from the top of the list, whatever this client believed a
+    /// moment ago. The backoff it was sitting out and the verdict it had
+    /// reached were both measured against circumstances that have changed.
+    private func redial(reason: String) async {
+        print("[VibeWire] \(reason), dialing again")
         retryTask?.cancel()
         retryTask = nil
         shouldReconnect = true
