@@ -317,6 +317,21 @@ final class AppModel {
                 "constrained": constrained,
             ])
         }
+
+        // A path change is the one event that says "everything you knew about
+        // how to reach the Mac may have just become wrong", and it is the
+        // moment this app used to sit out: the socket had already given up on
+        // an address that stopped answering, and nothing asked it to try again
+        // until the app was backgrounded and opened. Walking out of the house
+        // and back in is this event, twice, and it is what the browser client
+        // has answered since it learned to fail over.
+        linkMonitor.onPathChange = { [weak self] satisfied in
+            guard satisfied else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.isForeground, self.pairedHost != nil else { return }
+                await self.client.networkChanged()
+            }
+        }
         linkMonitor.start()
     }
 
@@ -340,6 +355,17 @@ final class AppModel {
     }
 
     // MARK: Lifecycle
+
+    /// Whether the app is in front.
+    ///
+    /// A path change that lands while the phone is in a pocket must not open a
+    /// socket: going away is what closed the last one, and the Mac releases
+    /// every stream when it closes.
+    private(set) var isForeground = true
+
+    func noteForeground(_ active: Bool) {
+        isForeground = active
+    }
 
     func connectIfPaired() async {
         guard let pairedHost else { return }
