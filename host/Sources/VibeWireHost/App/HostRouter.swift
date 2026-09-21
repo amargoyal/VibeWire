@@ -913,6 +913,8 @@ final class HostRouter: Router, @unchecked Sendable {
                 current.settings.requireBiometricEachSession = on
             case ("relayOverInternet", .bool(let on)):
                 current.settings.relayOverInternet = on
+            case ("checkForUpdates", .bool(let on)):
+                current.settings.checkForUpdates = on
             case ("quality", .string(let raw)):
                 current.settings.quality = HostSettings.QualityLadder(rawValue: raw) ?? .auto
             default:
@@ -948,6 +950,7 @@ final class HostRouter: Router, @unchecked Sendable {
                 "naturalScrolling": current.settings.naturalScrolling,
                 "requireBiometricEachSession": current.settings.requireBiometricEachSession,
                 "relayOverInternet": current.settings.relayOverInternet,
+                "checkForUpdates": current.settings.checkForUpdates,
                 "hostVersion": Config.hostVersion,
             ]
         }
