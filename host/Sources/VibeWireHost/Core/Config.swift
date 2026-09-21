@@ -47,15 +47,56 @@ struct HostSettings: Codable, Sendable {
     /// all and cannot go stale. Pointing at the public site is for when the address
     /// bar matters — showing someone the thing, or a bookmark you want to keep.
     var webClientURL: String?
+    /// Whether this host asks GitHub, at launch and every six hours, if a
+    /// newer VibeWire has been published. One request, no identifiers beyond
+    /// the version in the user agent, and nothing is ever installed by it.
+    var checkForUpdates: Bool = true
 
     static let `default` = HostSettings()
+
+    init() {}
+
+    /// Every field optional on the way in, because a settings file written by
+    /// an older build is missing whatever the newer one added.
+    ///
+    /// Synthesised decoding does not fall back to a property's default: one
+    /// absent key throws, `loadSettings` catches that and uses the defaults
+    /// for *everything*, and a reader who had changed the port and turned the
+    /// relay on finds both quietly undone by an upgrade. Each key is read on
+    /// its own here so adding the next one costs nobody their settings.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = HostSettings()
+        quality = try container.decodeIfPresent(QualityLadder.self, forKey: .quality)
+            ?? fallback.quality
+        capOnCellular = try container.decodeIfPresent(Bool.self, forKey: .capOnCellular)
+            ?? fallback.capOnCellular
+        cellularCeilingMbps = try container.decodeIfPresent(
+            Double.self, forKey: .cellularCeilingMbps
+        ) ?? fallback.cellularCeilingMbps
+        sensitivity = try container.decodeIfPresent(Int.self, forKey: .sensitivity)
+            ?? fallback.sensitivity
+        naturalScrolling = try container.decodeIfPresent(Bool.self, forKey: .naturalScrolling)
+            ?? fallback.naturalScrolling
+        requireBiometricEachSession = try container.decodeIfPresent(
+            Bool.self, forKey: .requireBiometricEachSession
+        ) ?? fallback.requireBiometricEachSession
+        relayOverInternet = try container.decodeIfPresent(Bool.self, forKey: .relayOverInternet)
+            ?? fallback.relayOverInternet
+        targetFps = try container.decodeIfPresent(Int.self, forKey: .targetFps)
+            ?? fallback.targetFps
+        port = try container.decodeIfPresent(UInt16.self, forKey: .port) ?? fallback.port
+        webClientURL = try container.decodeIfPresent(String.self, forKey: .webClientURL)
+        checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates)
+            ?? fallback.checkForUpdates
+    }
 }
 
 enum Config {
     /// Read once at launch. Never mutated, so it needs no isolation.
     static let verbose: Bool = ProcessInfo.processInfo.environment["VIBEWIRE_VERBOSE"] == "1"
 
-    static let hostVersion = "0.12.0"
+    static let hostVersion = "0.13.0"
 
     /// Bumped when the wire protocol changes incompatibly. The phone refuses to
     /// connect on mismatch rather than half-working.
@@ -169,9 +210,26 @@ enum Config {
            !override.isEmpty {
             return override
         }
-        guard let stored = loadSettings().webClientURL, !stored.isEmpty else { return nil }
-        return stored
+        if let stored = loadSettings().webClientURL, !stored.isEmpty { return stored }
+        return publishedWebClient
     }
+
+    /// The project's own copy of the client, and the address a phone sees when
+    /// the relay is what carries the connection.
+    ///
+    /// Without this the QR handed out the quick tunnel's own hostname, so
+    /// scanning the code on a fresh install took the phone to
+    /// `https://<four-random-words>.trycloudflare.com`. That address is not
+    /// wrong — it is this host, and the tunnel is how the phone reaches it from
+    /// anywhere — but it is a stranger's domain on the screen of someone who
+    /// has just been asked to trust it, and it changes on every launch. The
+    /// page comes from here instead, and the tunnel address rides in the query
+    /// string where it belongs: an address, not an identity.
+    ///
+    /// Only used when this host has an `https` address of its own, because a
+    /// page served over `https` may not open a plain `http` origin. On the LAN
+    /// the QR still points at the copy this host serves.
+    static let publishedWebClient = "https://amargoyal.github.io/VibeWire"
 
     /// Where the built web client lives, or nil if it was never built.
     ///

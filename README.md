@@ -74,6 +74,36 @@ Where the phone has to be, same as on Windows:
 | Away, Tailscale on both | The host lists its tailnet address first. | [Tailscale](https://tailscale.com) on the Mac and the phone. |
 | Away, or a network that isolates its clients | Setup guide → **Turn on relay over internet**, or Settings → **Relay over internet**. The host fetches `cloudflared`, opens a quick tunnel, and the QR points at an `https://…trycloudflare.com` address. The address changes each time the host starts; re-scan the QR. | Nothing on the phone. |
 
+## Which address the QR carries
+
+The browser QR points at whichever of these the phone can actually use:
+
+- **Relay or tailnet up:** the published client at
+  `https://amargoyal.github.io/VibeWire`, carrying the host's `https` address in
+  the query string. The domain on the phone is this project's, not the quick
+  tunnel's four random words, and the page survives the tunnel being reissued.
+- **LAN only:** the copy the host serves itself, at `http://<host-ip>:8787/`. A
+  page on `https` may not open a plain `http` origin, so the published client
+  cannot be used here.
+
+`webClientURL` in `config.json` overrides the published address, and
+`VIBEWIRE_WEB_CLIENT` overrides that for one launch.
+
+## Updates
+
+The host asks GitHub whether a newer release exists, at launch and every six
+hours, and says so in its window. **Download** opens the release page.
+
+It never installs anything. The Mac build is signed with a development
+certificate and is not notarized, and the Windows installers are not
+code-signed, so nothing here can verify what a self-updater would be about to
+run. Replacing the app is the same act you already performed once: drag the new
+copy over the old one, or run the new installer. Quit VibeWire first.
+
+Settings → **Check for a newer VibeWire** turns the check off. It is one
+request to `api.github.com`, carrying nothing but the version in the user
+agent.
+
 ## Scanned the QR and nothing loaded
 
 The address on the QR is a private one, and a phone that cannot reach it shows
@@ -83,11 +113,16 @@ causes, in the order they happen:
 1. **The phone is on another network.** School, hotel, office and guest Wi-Fi
    also stop devices on the same network from reaching each other, which looks
    identical. Turn on the relay and scan the new code.
-2. **The firewall on the computer is refusing incoming connections.** macOS:
+2. **A VPN on the phone is routing past the network.** Cloudflare WARP and most
+   always-on VPNs send the phone's traffic out through their own tunnel, so a
+   private address on the Wi-Fi it is sitting on is never reached. Pause it,
+   set it to allow local addresses, or turn on the relay, which works with WARP
+   on because the address is then a public one.
+3. **The firewall on the computer is refusing incoming connections.** macOS:
    the pairing window and Setup guide say so and open System Settings → Network
    → Firewall → Options, where VibeWire has to be allowed. Windows: the
    installer adds the inbound rule, and the tray says when it is missing.
-3. **The Mac has more than one network and the QR named the other one.** The
+4. **The Mac has more than one network and the QR named the other one.** The
    pairing window lists every address this machine is on; the phone has to be
    on one of them.
 

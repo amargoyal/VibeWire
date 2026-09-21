@@ -368,6 +368,12 @@ actor DashboardService {
             ? "asking"
             : (devices != nil ? "yes" : "no")
 
+        // Asked of GitHub at most every six hours, and served from the cache
+        // here: a window that polls once a second must not turn into a client
+        // of someone else's API.
+        payload["update"] = await UpdateCheck.shared.verdict().wire
+        Task { await UpdateCheck.shared.refreshIfStale() }
+
         payload["transport"] = status.wire
         payload["addresses"] = Self.addresses(
             status: status,
@@ -396,6 +402,7 @@ actor DashboardService {
                 "naturalScrolling": settings.naturalScrolling,
                 "requireBiometricEachSession": settings.requireBiometricEachSession,
                 "relayOverInternet": settings.relayOverInternet,
+                "checkForUpdates": settings.checkForUpdates,
                 "targetFps": settings.targetFps,
                 "port": Int(settings.port),
                 "webClientURL": settings.webClientURL ?? "",
@@ -806,6 +813,17 @@ actor DashboardService {
 
         case "transport.refresh":
             await transport.refresh()
+            return .json(200, ["ok": true])
+
+        case "update.open":
+            // The URL comes from the cached verdict rather than from the
+            // caller: this window may only open a page this host decided on.
+            let verdict = await UpdateCheck.shared.verdict()
+            await UpdateCheck.openReleasePage(verdict.url)
+            return .json(200, ["ok": true])
+
+        case "update.check":
+            await UpdateCheck.shared.refresh()
             return .json(200, ["ok": true])
 
         case "settings.open":

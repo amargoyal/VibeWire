@@ -190,6 +190,41 @@ export function normaliseOrigins(origins: readonly string[]): string[] {
 }
 
 /**
+ * Addresses that exist only on some network the phone has to be standing on:
+ * RFC1918, loopback, link-local, `.local`, and the 100.64/10 range a tailnet
+ * hands out.
+ */
+const PRIVATE_HOST =
+  /^(?:localhost|[^.]+\.local|10\.\d+\.\d+\.\d+|127\.\d+\.\d+\.\d+|169\.254\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+)$/i
+
+export function isPrivateAddress(host: string): boolean {
+  return PRIVATE_HOST.test(host)
+}
+
+/**
+ * Why a private address answered nothing, in the order it happens.
+ *
+ * Three causes produce one symptom, and the phone can tell them apart from
+ * none of them: it is on another network, something on the phone is routing
+ * past that network, or the network stops its own clients reaching each other.
+ * The third is normal on guest, school and hotel Wi-Fi. The second is normal
+ * on a phone with Cloudflare WARP or any always-on VPN turned on, which sends
+ * traffic out through the tunnel and never looks at the Wi-Fi it is sitting
+ * on. The host's relay answers all three, and is the only one of the four
+ * sentences here that is an action.
+ */
+export function unreachableHint(endpoint: Endpoint): string | null {
+  if (!isPrivateAddress(endpoint.host)) return null
+  return (
+    `${endpoint.host} only exists on the host's own network. Check the phone is on that ` +
+    `network, and that nothing on the phone is routing past it: Cloudflare WARP and most ` +
+    `always-on VPNs do, and have to be paused or set to allow local addresses. Guest, ` +
+    `school and hotel Wi-Fi often stop devices reaching each other at all. Turning on ` +
+    `Relay over internet on the host answers all three.`
+  )
+}
+
+/**
  * Whether this page is allowed to open this origin at all.
  *
  * The one place the browser differs from the phone in a way that cannot be

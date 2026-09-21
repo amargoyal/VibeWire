@@ -93,6 +93,7 @@ export interface Facts {
     }
   }
   pairing: PairingFact
+  update?: UpdateFact
   settings?: SettingsFact
   log: { entries: LogEntry[]; dropped: number; areas: string[] }
 }
@@ -170,9 +171,21 @@ export interface SettingsFact {
   naturalScrolling: boolean
   requireBiometricEachSession: boolean
   relayOverInternet: boolean
+  checkForUpdates: boolean
   targetFps: number
   port: number
   webClientURL: string
+}
+
+/** What the host last heard from GitHub about newer releases. */
+export interface UpdateFact {
+  current: string
+  latest?: string
+  url?: string
+  available: boolean
+  checkedAt?: string
+  problem?: string
+  enabled: boolean
 }
 
 export interface LogEntry {
@@ -254,6 +267,10 @@ export type PaneId =
   | 'settings'
 
 export const facts = signal<Facts | null>(null)
+
+/** Whether the update line was closed in this window. Not remembered: the
+ *  next launch says it again, because the release is still newer. */
+export const updateDismissed = signal(false)
 export const claude = signal<ClaudeView>(emptyClaude)
 export const pane = signal<PaneId>('overview')
 export const pairOpen = signal(false)

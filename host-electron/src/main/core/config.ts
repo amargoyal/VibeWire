@@ -30,6 +30,9 @@ export function parseLadder(raw: unknown): QualityLadder {
  * Mac host writes. Settings changed from the phone or the dashboard are written
  * back so they survive a restart.
  */
+/** The project's own copy of the client, published from `main`. */
+export const PUBLISHED_WEB_CLIENT = 'https://amargoyal.github.io/VibeWire'
+
 export interface HostSettings {
   quality: QualityLadder
   /** 07A "Cap on cellular · CEILING 3 MB/S" */
@@ -51,6 +54,12 @@ export interface HostSettings {
    * this host serves itself.
    */
   webClientURL: string | null
+  /**
+   * Whether this host asks GitHub, at launch and every six hours, if a newer
+   * VibeWire has been published. One request, no identifiers beyond the
+   * version in the user agent, and nothing is ever installed by it.
+   */
+  checkForUpdates: boolean
 }
 
 export const DEFAULT_SETTINGS: HostSettings = {
@@ -64,6 +73,7 @@ export const DEFAULT_SETTINGS: HostSettings = {
   targetFps: 60,
   port: 8787,
   webClientURL: null,
+  checkForUpdates: true,
 }
 
 function decodeSettings(raw: unknown): HostSettings {
@@ -82,6 +92,7 @@ function decodeSettings(raw: unknown): HostSettings {
   if (typeof record.targetFps === 'number') settings.targetFps = record.targetFps
   if (typeof record.port === 'number' && record.port > 0 && record.port < 65536) settings.port = record.port
   if (typeof record.webClientURL === 'string' && record.webClientURL) settings.webClientURL = record.webClientURL
+  if (typeof record.checkForUpdates === 'boolean') settings.checkForUpdates = record.checkForUpdates
   return settings
 }
 
@@ -185,13 +196,20 @@ class ConfigStore {
   }
 
   /**
-   * The public web client to send a scanned QR to, or null to use the copy this
-   * host serves. `VIBEWIRE_WEB_CLIENT` wins over the stored setting.
+   * The public web client to send a scanned QR to. `VIBEWIRE_WEB_CLIENT` wins
+   * over the stored setting, which wins over the project's own copy.
+   *
+   * The default matters on the relay path: without it the QR handed out the
+   * quick tunnel's own `https://<four-random-words>.trycloudflare.com`, which
+   * is a stranger's domain on the screen of someone being asked to trust it,
+   * and a different one on every launch. Only used when this host has an
+   * `https` address of its own; on the LAN the QR points at the copy this host
+   * serves, because an `https` page may not open a plain `http` origin.
    */
   get webClientURL(): string | null {
     const override = this.state.env.VIBEWIRE_WEB_CLIENT
     if (override) return override
-    return this.loadSettings().webClientURL
+    return this.loadSettings().webClientURL ?? PUBLISHED_WEB_CLIENT
   }
 
   /**
