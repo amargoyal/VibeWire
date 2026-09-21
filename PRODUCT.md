@@ -14,7 +14,7 @@ Where the browser cannot do what the phone does, the web client states the diffe
 
 One user today: the author, a developer who runs Claude Code and other work on a Mac and wants that Mac in hand while away from the desk — on a couch, in bed, in transit, on a phone that may be on cellular or on a Tailscale path with no Wi-Fi at all.
 
-A public iOS release is possible later but is not committed. The consequence for design is a quality bar, not an audience change: every surface is built to look and behave like a shipping product, so a later App Store decision needs no rework. Do not design for a hypothetical stranger's onboarding until that decision is made — but do not leave anything raw, unlabeled, or diagnostic-only either.
+A public iOS release is possible later but is not committed. The consequence for design is a quality bar, not an audience change: every surface is built to look and behave like a shipping product, so a later App Store decision needs no rework. Device-specific onboarding is now in scope: a working host setup checklist and optional, replayable browser/iPhone guides. Public release remains undecided; setup must not invent accounts, distribution promises, or service guarantees.
 
 ## Product Purpose
 

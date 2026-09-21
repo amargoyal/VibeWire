@@ -15,6 +15,7 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         header
+                        PhoneSetupGuide(initiallyClosed: true).padding(.top, 18)
 
                         group("PAIRED") { pairedDevices }
                         group("VIDEO") { videoSection }

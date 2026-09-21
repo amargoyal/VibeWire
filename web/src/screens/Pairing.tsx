@@ -22,6 +22,7 @@
  * part is missing rather than sitting there as a control that does nothing.
  */
 
+import { SetupGuide } from './SetupGuide'
 import type { ComponentChildren, JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
@@ -133,7 +134,7 @@ export function Pairing() {
   }, [probeTarget?.origin, exchanging])
 
   useEffect(() => {
-    field.current?.focus()
+    // Let people read setup before choosing to open the keyboard.
   }, [])
 
   const submit = async (code: string) => {
@@ -273,6 +274,7 @@ export function Pairing() {
   return (
     <>
       <ScreenBody scrolls>
+        <SetupGuide />
         <header class="row" style={{ minHeight: '34px', flex: '0 0 auto' }}>
           <Caps size="var(--fs-11)" tracking="0.32em" weight={500} color="var(--ns-text-secondary)">
             VibeWire

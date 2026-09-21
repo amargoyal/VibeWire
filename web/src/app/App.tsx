@@ -3,7 +3,7 @@
  * Mirrored by ios/VibeWire/App/VibeWireApp.swift.
  *
  * Three routes and two sheets, and deliberately absent: light mode, a tab bar, an
- * onboarding tour. The whole application is the screens in `../screens`.
+ * blocking tour. Setup help lives beside pairing and in Settings.
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks'

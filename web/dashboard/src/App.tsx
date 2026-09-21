@@ -1,4 +1,5 @@
-import { useEffect } from 'preact/hooks'
+import { Setup } from './Setup'
+import { useEffect, useRef } from 'preact/hooks'
 import { Caps, Spinner } from '../../src/design/components'
 import { Chip } from './parts'
 import { duration } from './format'
@@ -28,10 +29,17 @@ const PANES: { id: PaneId; label: string }[] = [
   { id: 'transport', label: 'TRANSPORT' },
   { id: 'log', label: 'LOG' },
   { id: 'settings', label: 'SETTINGS' },
+  { id: 'setup', label: 'SETUP GUIDE' },
 ]
 
 export function App() {
   const state = facts.value
+  const choseInitialPane = useRef(false)
+  useEffect(() => {
+    if (!state || state.devicesReadable !== 'yes' || choseInitialPane.current) return
+    choseInitialPane.current = true
+    if (!location.hash && pane.value === 'overview' && state.devices.length === 0) pane.value = 'setup'
+  }, [state])
 
   // The window can be opened straight onto a pane — the menu's "Pair a device…"
   // does exactly that. A fragment on first load, a call afterwards, because a
@@ -57,7 +65,7 @@ export function App() {
     }
   }, [])
 
-  // ⌘1…⌘7 for the panes, which is what a window with a sidebar is expected to
+  // ⌘1…⌘8 for the panes, which is what a window with a sidebar is expected to
   // do on this platform.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -257,6 +265,7 @@ export function App() {
         </nav>
 
         <main class="mac__pane">
+          {pane.value === 'setup' && <Setup state={state} />}
           {pane.value === 'overview' && <Overview state={state} />}
           {pane.value === 'devices' && <Devices state={state} />}
           {pane.value === 'displays' && <Displays state={state} />}
