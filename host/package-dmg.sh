@@ -32,6 +32,22 @@ dmg="$here/build/VibeWire-$version-mac-universal.dmg"
   -D "app=$app" -D "instructions=$here/build/Start here.txt" \
   "Install VibeWire" "$dmg"
 hdiutil verify "$dmg"
+# Verify the copy inside the image too: Finder metadata can invalidate a bundle
+# that verified before packaging.
+mountpoint="$(mktemp -d)"
+cleanup() {
+  hdiutil detach "$mountpoint" >/dev/null 2>&1 || true
+  rmdir "$mountpoint" 2>/dev/null || true
+}
+trap cleanup EXIT
+hdiutil attach -readonly -nobrowse -mountpoint "$mountpoint" "$dmg" >/dev/null
+codesign --verify --strict "$mountpoint/VibeWire.app"
+test "$(readlink "$mountpoint/Applications")" = /Applications
+for asset in web dashboard; do
+  test -f "$mountpoint/VibeWire.app/Contents/Resources/$asset/index.html"
+done
+cleanup
+trap - EXIT
 shasum -a 256 "$dmg"
 echo "Ready: $dmg"
 echo "Distribution signing and Apple notarization are separate from DMG packaging."
