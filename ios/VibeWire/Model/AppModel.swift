@@ -546,6 +546,32 @@ final class AppModel {
         }
     }
 
+    /// Every address the host named, as origins.
+    ///
+    /// A current host sends `candidates` and that is the whole answer. One that
+    /// predates the field sends the same facts spread across `tailscaleAddress`,
+    /// `lanAddress` and `cloudflareHostname`, and assembling them here is the
+    /// difference between a phone that can leave the house and one that cannot.
+    /// The browser client has read both spellings since it learned to fail over.
+    private func candidateOrigins(_ payload: [String: Any]) -> [String] {
+        if let reported = payload["candidates"] as? [String], !reported.isEmpty {
+            return Endpoint.normalise(reported)
+        }
+
+        let port = payload["port"] as? Int ?? pairedHost?.port ?? 8787
+        var origins: [String] = []
+        if let tailscale = transport.tailscaleAddress {
+            origins.append("http://\(tailscale):\(port)")
+        }
+        if let lan = transport.lanAddress {
+            origins.append("http://\(lan):\(port)")
+        }
+        if transport.cloudflareRunning, let tunnel = transport.cloudflareHostname {
+            origins.append(tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel)
+        }
+        return Endpoint.normalise(origins)
+    }
+
     private func connectionChanged(_ state: HostClient.State) {
         connection = state
         switch state {
@@ -647,7 +673,7 @@ final class AppModel {
             // minted at host launch and never written down. Learning it here,
             // over a socket that is already up, is what lets this phone reach
             // the same Mac from cellular later without pairing again.
-            transport.candidates = (payload["candidates"] as? [String]) ?? []
+            transport.candidates = candidateOrigins(payload)
             let learned = transport.candidates
             if !learned.isEmpty {
                 Task { await client.learn(alternates: learned) }
