@@ -448,6 +448,21 @@ body,
   color: var(--ns-red);
 }
 
+/* A release is out. Accent rather than amber: nothing is wrong, there is
+   simply something newer than what is running. */
+.mac__notice--update {
+  background: color-mix(in srgb, var(--ns-accent) 12%, transparent);
+  color: var(--ns-accent);
+}
+
+.mac__notice--update button {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 38px;
+  padding-inline: 4px;
+}
+
 .mac__notice--warn {
   background: color-mix(in srgb, var(--ns-amber) 12%, transparent);
   color: var(--ns-amber);

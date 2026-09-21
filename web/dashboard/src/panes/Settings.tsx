@@ -104,6 +104,35 @@ export function Settings({ state }: { state: Facts }) {
           />
         </Section>
 
+        <Section title="UPDATES">
+          <Row
+            label="Check for a newer VibeWire"
+            value={updateLine(state)}
+            toggle={{
+              on: settings.checkForUpdates,
+              onChange: (on) => void send({ do: 'setting.set', key: 'checkForUpdates', value: on }),
+            }}
+          />
+          <Row label="Releases" value="NOTHING IS INSTALLED FOR YOU">
+            <div class="row" style={{ gap: 10 }}>
+              <div style={{ width: 150 }}>
+                <OutlinedAction
+                  title="CHECK NOW"
+                  height={40}
+                  onClick={() => void send({ do: 'update.check' })}
+                />
+              </div>
+              <div style={{ width: 150 }}>
+                <OutlinedAction
+                  title="OPEN RELEASES"
+                  height={40}
+                  onClick={() => void send({ do: 'update.open' })}
+                />
+              </div>
+            </div>
+          </Row>
+        </Section>
+
         <Section title="TRUST">
           <Row
             label="Face ID each session"
@@ -181,6 +210,17 @@ export function Settings({ state }: { state: Facts }) {
       </div>
     </div>
   )
+}
+
+/** One line about updates, whichever of the four states the host is in. */
+function updateLine(state: Facts): string {
+  const update = state.update
+  if (!update) return 'NOT ASKED'
+  if (!update.enabled) return 'OFF · THIS HOST NEVER ASKS'
+  if (update.available && update.latest) return `${update.latest} IS OUT · RUNNING ${update.current}`
+  if (update.problem) return `COULD NOT ASK · ${update.problem.toUpperCase()}`
+  if (update.latest) return `UP TO DATE · ${update.current}`
+  return 'ASKING GITHUB'
 }
 
 function Section({ title, children }: { title: string; children: preact.ComponentChildren }) {

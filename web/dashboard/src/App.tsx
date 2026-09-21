@@ -18,6 +18,8 @@ import {
   pairOpen,
   pane,
   reachability,
+  send,
+  updateDismissed,
   type PaneId,
 } from './store'
 
@@ -151,6 +153,27 @@ export function App() {
       {reachability.value === 'lost' && (
         <div class="mac__notice mac__notice--lost">
           THE HOST STOPPED ANSWERING · EVERY READING BELOW IS THE LAST ONE IT GAVE
+        </div>
+      )}
+      {state.update?.available && state.update.latest && !updateDismissed.value && (
+        <div class="mac__notice mac__notice--update">
+          {`VIBEWIRE ${state.update.latest} IS OUT · RUNNING ${state.update.current}`}
+          <button type="button" onClick={() => void send({ do: 'update.open' })}>
+            DOWNLOAD
+          </button>
+          <span class="spacer" />
+          <button
+            type="button"
+            onClick={() => {
+              // Dismissed for this window, not for this version: the next
+              // launch says it again, because the reason to update did not go
+              // away when the line did.
+              updateDismissed.value = true
+            }}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
       {notice.value && (
