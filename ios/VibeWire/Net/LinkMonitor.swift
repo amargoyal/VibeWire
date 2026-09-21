@@ -29,12 +29,18 @@ final class LinkMonitor {
     struct PathSignature: Equatable {
         let satisfied: Bool
         let interfaces: [String]
+        /// The routers on the way out. One Wi-Fi network to another keeps the
+        /// interface name, the cost and the status, and changes nothing else
+        /// this framework reports — except these. Without them the walk from
+        /// home Wi-Fi to café Wi-Fi is a move the phone cannot see.
+        let gateways: [String]
         let expensive: Bool
         let constrained: Bool
 
         init(_ path: NWPath) {
             satisfied = path.status == .satisfied
             interfaces = path.availableInterfaces.map(\.name)
+            gateways = path.gateways.map { "\($0)" }
             expensive = path.isExpensive
             constrained = path.isConstrained
         }
