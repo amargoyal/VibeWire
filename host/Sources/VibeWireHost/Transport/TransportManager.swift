@@ -32,6 +32,10 @@ actor TransportManager {
         /// A Mac on Wi-Fi and a dock at once has two, and which of them the
         /// phone is on is not something this end can know.
         var lanAddresses: [String] = []
+        /// Whether macOS itself would refuse the phone's connection. Not a
+        /// property of the network, and the one fact that makes a correct
+        /// address behave exactly like a wrong one.
+        var firewall = FirewallStatus.Verdict()
         var lastContact: Date?
         /// The port the host is serving on, so a client can build an origin out
         /// of the addresses below without being told separately.
@@ -94,6 +98,9 @@ actor TransportManager {
             payload["cloudflareHostname"] = cloudflareHostname
             payload["lanAddress"] = lanAddress
             payload["lanAddresses"] = lanAddresses
+            if firewall.blocksIncoming {
+                payload["conditions"] = ["firewallBlocksIncoming": true]
+            }
             payload["lastContact"] = lastContact.map(ISO8601DateFormatter().string(from:))
             return payload
         }
@@ -114,6 +121,10 @@ actor TransportManager {
     private var cloudflared: Process?
     private var cloudflareHostname: String?
     private var lastRefresh: Date?
+    /// The firewall is three subprocesses to ask about and changes about as
+    /// often as someone opens System Settings, so it is asked on its own
+    /// clock rather than on every address refresh.
+    private var lastFirewallRead: Date?
 
     /// The same child process, reachable without going through the actor.
     ///
@@ -205,6 +216,14 @@ actor TransportManager {
         }
         if !next.cloudflareRunning { cloudflareHostname = nil }
         next.cloudflareHostname = cloudflareHostname
+
+        if lastFirewallRead.map({ Date().timeIntervalSince($0) > 30 }) ?? true {
+            next.firewall = await FirewallStatus.read(appPath: FirewallStatus.appPath)
+            lastFirewallRead = Date()
+            if next.firewall.blocksIncoming, !cached.firewall.blocksIncoming {
+                Log.warn(.transport, next.firewall.detail ?? "firewall blocks incoming")
+            }
+        }
 
         cached = next
         lastRefresh = Date()
