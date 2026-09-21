@@ -332,9 +332,16 @@ actor HostClient {
         // registered last, so replies went to one socket while the app read the
         // other: Claude sat on "WORKING" forever with the answer delivered
         // somewhere the app was not listening.
+        //
+        // A socket that has stopped answering is not one of those: it reads
+        // `connected` while nothing comes back, and returning here is how
+        // coming back to the app in a different place used to do nothing at
+        // all.
         if self.host?.deviceId == host.deviceId, task != nil {
             switch state {
-            case .connected, .connecting:
+            case .connecting:
+                return
+            case .connected where socketIsAnswering:
                 return
             default:
                 break
