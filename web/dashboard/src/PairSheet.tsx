@@ -29,7 +29,7 @@ export function PairSheet({ state }: { state: Facts }) {
   // so the only way to get new ones is to ask again.
   useEffect(() => {
     setQrTick((value) => value + 1)
-  }, [pairing.code])
+  }, [pairing.code, state.addresses.origin])
 
   // The sheet takes focus when it opens, so the keyboard and a screen reader
   // start inside it rather than behind the scrim.
@@ -218,6 +218,8 @@ export function PairSheet({ state }: { state: Facts }) {
               />
             </div>
 
+            <Reach state={state} />
+
             <div class="row" style={{ gap: 10, marginTop: 20 }}>
               <Caps size="var(--fs-9)" tracking="var(--caps-tracking-wide)" color="var(--ns-text-faint)">
                 EXCHANGE
@@ -352,6 +354,130 @@ export function PairSheet({ state }: { state: Facts }) {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * What the phone has to be able to reach, and what to do when it cannot.
+ *
+ * A QR is a promise that scanning it works, and this one carries a bare
+ * address on a private network. When the phone is somewhere that address does
+ * not answer — another network, or one of the school, hotel and guest networks
+ * that stop devices seeing each other at all — the phone shows a page that
+ * would not load and the Mac shows a code being read by nobody. Neither end
+ * says why, and the address on screen looks perfectly correct, because it is.
+ *
+ * So the sheet says which address it handed out, which networks this Mac is
+ * on, and the two things that answer the failure: the firewall on this machine,
+ * and the relay for everything else.
+ */
+function Reach({ state }: { state: Facts }) {
+  const { origin, lanAddresses, firewall, tunnelRunning, publishedSite } = state.addresses
+  const [starting, setStarting] = useState(false)
+  const remote = tunnelRunning || Boolean(state.transport.tailscaleAddress)
+
+  async function startRelay() {
+    setStarting(true)
+    await send({ do: 'transport.tunnel', on: true })
+  }
+
+  return (
+    <div class="stack" style={{ gap: 10, marginTop: 16 }}>
+      <div class="row" style={{ gap: 10 }}>
+        <Caps size="var(--fs-9)" tracking="var(--caps-tracking-wide)" color="var(--ns-text-faint)">
+          THE PHONE HAS TO REACH
+        </Caps>
+        <span class="dashed-rule spacer" />
+      </div>
+
+      <pre class="code" style={{ wordBreak: 'break-all', margin: 0 }}>
+        {origin}
+      </pre>
+
+      <Caps size="var(--fs-9)" style={{ lineHeight: 1.6 }}>
+        {tunnelRunning
+          ? 'RELAY IS UP · THIS ADDRESS ANSWERS FROM ANYWHERE, INCLUDING CELLULAR'
+          : state.transport.tailscaleAddress
+            ? 'TAILNET ADDRESS · ANSWERS WHEREVER TAILSCALE IS UP ON BOTH DEVICES'
+            : lanAddresses.length > 0
+              ? `THIS MAC IS ON ${lanAddresses.join(' · ')} · THE PHONE MUST BE ON THE SAME NETWORK`
+              : 'NO ADDRESS BUT LOOPBACK · NOTHING OFF THIS MAC CAN REACH IT'}
+      </Caps>
+
+      {firewall.blocksIncoming && (
+        <div
+          class="card card--tinted"
+          style={{ padding: 16, ['--tint' as string]: 'var(--ns-red)' }}
+        >
+          <div class="stack" style={{ gap: 10 }}>
+            <Caps size="var(--fs-9)" color="var(--ns-red)">
+              macOS FIREWALL IS REFUSING INCOMING CONNECTIONS
+            </Caps>
+            <span
+              style={{
+                fontSize: 'var(--fs-13)',
+                lineHeight: 1.45,
+                color: 'var(--ns-text-secondary)',
+                textWrap: 'pretty',
+              }}
+            >
+              {firewall.detail} Until that changes, a phone on the same Wi-Fi gets the same
+              nothing as a phone on the other side of the world.
+            </span>
+            <div style={{ maxWidth: 260 }}>
+              <OutlinedAction
+                title="OPEN FIREWALL SETTINGS"
+                height={44}
+                onClick={() => void send({ do: 'settings.open', which: 'firewall' })}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {state.transport.relayProblem && (
+        <Caps size="var(--fs-9)" color="var(--ns-amber)" style={{ lineHeight: 1.6 }}>
+          RELAY · {state.transport.relayProblem.toUpperCase()}
+        </Caps>
+      )}
+
+      {!remote && (
+        <div class="card" style={{ padding: 16 }}>
+          <div class="stack" style={{ gap: 10 }}>
+            <Caps size="var(--fs-9)" color="var(--ns-amber)">
+              SCANNED IT AND NOTHING LOADED?
+            </Caps>
+            <span
+              style={{
+                fontSize: 'var(--fs-13)',
+                lineHeight: 1.45,
+                color: 'var(--ns-text-secondary)',
+                textWrap: 'pretty',
+              }}
+            >
+              That address only answers from this Mac's own network, and school, hotel and guest
+              Wi-Fi usually stop devices reaching each other even when both are connected to it.
+              Turn on the relay and the QR above changes to an{' '}
+              <span class="mono">https://</span> address that answers from anywhere, cellular
+              included. {publishedSite ? 'The code then opens the published client.' : ''} Scan the
+              new code; the old one points at the old address.
+            </span>
+            <div style={{ maxWidth: 260 }}>
+              <FilledAction
+                title={starting ? 'Starting the relay…' : 'Turn on relay over internet'}
+                tint="var(--ns-accent)"
+                ink="var(--ns-on-accent)"
+                height={44}
+                onClick={() => void startRelay()}
+              />
+            </div>
+            <Caps size="var(--fs-9)" style={{ lineHeight: 1.6 }}>
+              CLOUDFLARE QUICK TUNNEL · TLS TO THE EDGE · THE HOST STILL CHECKS EVERY DEVICE KEY
+            </Caps>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

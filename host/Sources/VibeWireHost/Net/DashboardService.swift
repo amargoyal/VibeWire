@@ -510,6 +510,13 @@ actor DashboardService {
             }
         }
 
+        var firewall: [String: Any] = [
+            "known": status.firewall.known,
+            "enabled": status.firewall.enabled,
+            "blocksIncoming": status.firewall.blocksIncoming,
+        ]
+        firewall["detail"] = status.firewall.detail
+
         return [
             "origin": origin,
             "reach": reach,
@@ -517,6 +524,12 @@ actor DashboardService {
             "host": host,
             "port": Int(port),
             "candidates": status.candidates,
+            // Every address on this Mac's own networks, not just the one the
+            // QR happens to carry. A phone that cannot reach the first may be
+            // sitting on the second.
+            "lanAddresses": status.lanAddresses,
+            "tunnelRunning": status.cloudflareRunning && status.cloudflareHostname != nil,
+            "firewall": firewall,
             "listening": [
                 "LISTENING ON :\(port)",
                 reachable == nil ? "NO ADDRESS BUT LOOPBACK" : nil,
@@ -793,6 +806,20 @@ actor DashboardService {
 
         case "transport.refresh":
             await transport.refresh()
+            return .json(200, ["ok": true])
+
+        case "settings.open":
+            // The firewall is the one thing in the pairing path this host can
+            // name but cannot change: allowing an app through needs an
+            // administrator, and a screen-sharing app that asks for one to
+            // open a port is an app nobody should say yes to. So it opens the
+            // pane and lets the reader decide.
+            switch string("which") {
+            case "firewall":
+                FirewallStatus.openSettings()
+            default:
+                return .error(400, "unknown_settings_pane")
+            }
             return .json(200, ["ok": true])
 
         case "permission.request":

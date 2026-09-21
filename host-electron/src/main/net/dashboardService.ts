@@ -247,7 +247,7 @@ export class DashboardService {
     payload.devicesReadable = this.lastDevices === null ? 'asking' : this.lastDevices.ok ? 'yes' : 'no'
 
     payload.transport = transportWire(status)
-    payload.addresses = addresses(status, settings.port)
+    payload.addresses = addresses(status, settings.port, conditions)
 
     const pairingPayload: Record<string, unknown> = {
       open: code !== null,
@@ -368,7 +368,11 @@ export class DashboardService {
       // there is no `https` origin to give it, the QR sends the phone to the
       // copy this host serves instead, which is same-origin with the protocol.
       const published = Config.webClientURL
-      const publishable = published && !(published.startsWith('https://') && !origin.startsWith('https://')) ? null : published
+      // An https page may not open an http origin, so the published client is
+      // only usable when this host has an https address of its own. Read the
+      // other way round, as it was, the QR sent the phone to a page that is
+      // forbidden from reaching the host it was scanned from.
+      const publishable = published && published.startsWith('https://') && !origin.startsWith('https://') ? null : published
       if (!publishable && published) {
         Log.info('net', `browser QR points at this host: ${origin} is not https, and the published client is`)
       }
@@ -546,7 +550,11 @@ function fingerprint(key: Buffer): string {
 }
 
 /** Every address this host can be reached on, and what each one is worth. */
-export function addresses(status: TransportStatus, port: number): Record<string, unknown> & { origin: string; host: string } {
+export function addresses(
+  status: TransportStatus,
+  port: number,
+  conditions: Record<string, boolean> = {},
+): Record<string, unknown> & { origin: string; host: string } {
   const reachable = status.tailscaleAddress ?? status.lanAddress ?? status.tailscaleDNSName
   const host = reachable ?? '127.0.0.1'
   const preferred = preferredOrigin(status)
@@ -566,6 +574,22 @@ export function addresses(status: TransportStatus, port: number): Record<string,
     host,
     port,
     candidates: candidates(status),
+    // The same shape the Mac host sends, so the one dashboard bundle can read
+    // either without asking which machine it is talking to. Windows names a
+    // missing inbound rule as a condition; that is this platform's answer to
+    // "would this machine refuse the phone".
+    lanAddresses: status.lanAddress ? [status.lanAddress] : [],
+    tunnelRunning: status.cloudflareRunning && status.cloudflareHostname !== null,
+    firewall: {
+      known: true,
+      enabled: conditions.firewallRuleMissing === true,
+      blocksIncoming: conditions.firewallRuleMissing === true,
+      detail: conditions.firewallRuleMissing === true
+        ? 'Windows Firewall has no inbound rule for VibeWire, so phones on this '
+          + 'network cannot reach it. The installer adds one; it can also be added '
+          + 'by hand for port ' + String(port) + '.'
+        : undefined,
+    },
     listening: [
       `LISTENING ON :${port}`,
       reachable === null ? 'NO ADDRESS BUT LOOPBACK' : null,

@@ -32,6 +32,8 @@ export interface TransportStatus {
   cloudflareRunning: boolean
   cloudflareHostname: string | null
   lanAddress: string | null
+  /** What stopped the relay coming up, when it was asked for and did not. */
+  relayProblem: string | null
   lastContact: Date | null
   /** So a client can build an origin out of the addresses without being told separately. */
   port: number
@@ -84,6 +86,8 @@ export function transportWire(status: TransportStatus): Record<string, unknown> 
   if (status.peerLatencyMillis !== null) payload.peerLatencyMillis = Math.round(status.peerLatencyMillis * 10) / 10
   if (status.cloudflareHostname) payload.cloudflareHostname = status.cloudflareHostname
   if (status.lanAddress) payload.lanAddress = status.lanAddress
+  payload.lanAddresses = status.lanAddress ? [status.lanAddress] : []
+  if (status.relayProblem) payload.relayProblem = status.relayProblem
   if (status.lastContact) payload.lastContact = status.lastContact.toISOString()
   if (status.networkProfile) payload.networkProfile = status.networkProfile
   return payload
@@ -114,6 +118,7 @@ export class TransportManager {
       cloudflareRunning: false,
       cloudflareHostname: null,
       lanAddress: null,
+      relayProblem: null,
       lastContact: null,
       port,
       networkProfile: null,
@@ -217,14 +222,21 @@ export class TransportManager {
         const destination = this.platform.paths.cloudflaredDownload
         if (!destination) {
           Log.warn('transport', 'cloudflared not installed; relay unavailable')
+          this.cached.relayProblem = 'cloudflared is not installed and this platform has nowhere to put it.'
           return
         }
         try {
           removeStaleDownload(destination)
+          // Said out loud rather than left to the log: the switch reads on
+          // from the moment it is pressed, and a fetch takes a while.
+          this.cached.relayProblem = 'Downloading cloudflared…'
           await downloadCloudflared(destination)
           binary = destination
+          this.cached.relayProblem = null
         } catch (error) {
-          Log.error('transport', `relay unavailable: ${describeError(error)}`)
+          const detail = describeError(error)
+          Log.error('transport', `relay unavailable: ${detail}`)
+          this.cached.relayProblem = detail
           return
         }
       }
@@ -237,7 +249,9 @@ export class TransportManager {
           Log.info('transport', `cloudflare tunnel live at ${hostname}`)
         })
       } catch (error) {
-        Log.error('transport', `failed to start cloudflared: ${describeError(error)}`)
+        const detail = describeError(error)
+        Log.error('transport', `failed to start cloudflared: ${detail}`)
+        this.cached.relayProblem = detail
       }
     })().finally(() => {
       this.starting = null

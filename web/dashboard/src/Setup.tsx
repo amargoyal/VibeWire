@@ -1,6 +1,22 @@
 import { useState } from 'preact/hooks'
 import { pairOpen, pane, reachability, send, type Facts } from './store'
 
+/**
+ * What the address on the QR requires of the phone, in one sentence.
+ *
+ * A private address on screen looks correct from both ends when it is
+ * unreachable, so the difference between "works from anywhere" and "works in
+ * this building" is said rather than left to be discovered on a phone that
+ * shows a page failing to load.
+ */
+function reachLine(state: Facts): string {
+  const { lanAddresses, tunnelRunning } = state.addresses
+  if (tunnelRunning) return 'The relay is on, so that address answers from anywhere, cellular included.'
+  if (state.transport.tailscaleAddress) return 'That is the tailnet address; it answers wherever Tailscale is running on both devices.'
+  if (lanAddresses.length === 0) return 'This computer has no address but its own loopback, so nothing else can reach it yet.'
+  return `It answers only on this computer’s own network (${lanAddresses.join(', ')}), so the phone has to be on it.`
+}
+
 /** Progress is observed host state, never a remembered sequence of clicks. */
 export function Setup({ state }: { state: Facts }) {
   const [pending, setPending] = useState<string | null>(null)
@@ -9,6 +25,7 @@ export function Setup({ state }: { state: Facts }) {
   const permissions = state.permissions.screenRecording && state.permissions.accessibility
   const paired = state.devicesReadable === 'yes' && state.devices.length > 0
   const live = reachability.value === 'live'
+  const relayOn = state.addresses.tunnelRunning
   async function request(which: string) {
     setPending(which)
     if (await send({ do: 'permission.request', which })) setRequested(which)
@@ -39,7 +56,18 @@ export function Setup({ state }: { state: Facts }) {
       <li><span class="setup__number">2</span><div>
         <h2>{paired ? 'A device is paired' : 'Pair your phone'}</h2>
         <p>Keep both devices awake and start on the same Wi-Fi. Open the pairing code here, then scan the browser QR with your phone’s Camera. In the iPhone app, use its scanner and the app QR instead.</p>
+        <p class="setup__hint">Your phone opens {state.addresses.origin}. {reachLine(state)}</p>
+        {state.addresses.firewall.blocksIncoming && <div class="setup__blocked" role="alert">
+          <h3>This computer is refusing the connection</h3>
+          <p>{state.addresses.firewall.detail} A phone on the same Wi-Fi gets the same nothing as a phone on the other side of the world until that changes.</p>
+          <button class="setup__button" onClick={() => void send({ do: 'settings.open', which: 'firewall' })}>Open Firewall settings</button>
+        </div>}
         <button class="setup__button" disabled={!live} onClick={() => { pairOpen.value = true }}>Open pairing code</button>
+        <details><summary>Scanned it and nothing loaded?</summary>
+          <p>That address answers only on this computer’s own network, and school, hotel and guest Wi-Fi usually stop devices from reaching each other even when both are on it. Turn on the relay: the pairing QR changes to an https address that works from anywhere, including cellular. Scan the new code, because the old one points at the old address.</p>
+          <button class="setup__button" disabled={!live || relayOn} onClick={() => void send({ do: 'transport.tunnel', on: true })}>{relayOn ? 'Relay is on' : 'Turn on relay over internet'}</button>
+          {state.transport.relayProblem && <p role="status">{state.transport.relayProblem}</p>}
+        </details>
         <p class="setup__hint">Only pair a device you trust: it can control this computer. Remove its access later in Devices.</p>
       </div></li>
       <li><span class="setup__number">3</span><div>
