@@ -66,6 +66,31 @@ cd host && swift build && ./package-app.sh      # installs /Applications/VibeWir
 Follow Setup guide to grant Screen Recording and Accessibility. The iPhone app builds from
 `ios/VibeWire.xcodeproj`. Details: `HANDOFF.md`, `web/README.md`.
 
+Where the phone has to be, same as on Windows:
+
+| Situation | What happens | Needs |
+|---|---|---|
+| Same Wi-Fi | The QR carries `http://<mac-ip>:8787/`. Works with nothing installed. | Nothing, as long as the two devices can see each other. |
+| Away, Tailscale on both | The host lists its tailnet address first. | [Tailscale](https://tailscale.com) on the Mac and the phone. |
+| Away, or a network that isolates its clients | Setup guide → **Turn on relay over internet**, or Settings → **Relay over internet**. The host fetches `cloudflared`, opens a quick tunnel, and the QR points at an `https://…trycloudflare.com` address. The address changes each time the host starts; re-scan the QR. | Nothing on the phone. |
+
+## Scanned the QR and nothing loaded
+
+The address on the QR is a private one, and a phone that cannot reach it shows
+a page that will not load while the Mac shows a code nobody is reading. Three
+causes, in the order they happen:
+
+1. **The phone is on another network.** School, hotel, office and guest Wi-Fi
+   also stop devices on the same network from reaching each other, which looks
+   identical. Turn on the relay and scan the new code.
+2. **The firewall on the computer is refusing incoming connections.** macOS:
+   the pairing window and Setup guide say so and open System Settings → Network
+   → Firewall → Options, where VibeWire has to be allowed. Windows: the
+   installer adds the inbound rule, and the tray says when it is missing.
+3. **The Mac has more than one network and the QR named the other one.** The
+   pairing window lists every address this machine is on; the phone has to be
+   on one of them.
+
 ## Building the Windows host
 
 On any machine with Node 22:
