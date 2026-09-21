@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Whether macOS would let a phone reach this host at all.
@@ -69,6 +70,15 @@ enum FirewallStatus {
                 + "so your phone cannot reach it on this network. "
                 + "System Settings, Network, Firewall, Options, and allow VibeWire."
         )
+    }
+
+    /// Opens the pane that holds the switch. macOS 13 and later answer this
+    /// URL with System Settings, Network, Firewall.
+    static func openSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Firewall"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     /// The path to ask about: the bundle when there is one, since that is what
