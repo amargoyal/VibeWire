@@ -21,6 +21,7 @@ import {
   lenientEndpoint,
   normaliseOrigins,
   socketOrigin,
+  unreachableHint,
   type Endpoint,
 } from './endpoint'
 import { parseVideoFrame, type VideoFrameHeader } from '../video/frame'
@@ -245,7 +246,11 @@ export class HostClient {
         error instanceof DOMException && error.name === 'TimeoutError'
           ? `nothing answered in ${elapsed}ms`
           : (error as Error).message || 'the request did not complete'
-      throw new PairFailure(`No answer from ${endpoint.host} — ${detail}.`, false)
+      const hint = unreachableHint(endpoint)
+      throw new PairFailure(
+        `No answer from ${endpoint.host} — ${detail}.${hint ? ` ${hint}` : ''}`,
+        false,
+      )
     }
 
     if (!response.ok) {

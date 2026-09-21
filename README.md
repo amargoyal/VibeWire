@@ -83,11 +83,16 @@ causes, in the order they happen:
 1. **The phone is on another network.** School, hotel, office and guest Wi-Fi
    also stop devices on the same network from reaching each other, which looks
    identical. Turn on the relay and scan the new code.
-2. **The firewall on the computer is refusing incoming connections.** macOS:
+2. **A VPN on the phone is routing past the network.** Cloudflare WARP and most
+   always-on VPNs send the phone's traffic out through their own tunnel, so a
+   private address on the Wi-Fi it is sitting on is never reached. Pause it,
+   set it to allow local addresses, or turn on the relay, which works with WARP
+   on because the address is then a public one.
+3. **The firewall on the computer is refusing incoming connections.** macOS:
    the pairing window and Setup guide say so and open System Settings → Network
    → Firewall → Options, where VibeWire has to be allowed. Windows: the
    installer adds the inbound rule, and the tray says when it is missing.
-3. **The Mac has more than one network and the QR named the other one.** The
+4. **The Mac has more than one network and the QR named the other one.** The
    pairing window lists every address this machine is on; the phone has to be
    on one of them.
 

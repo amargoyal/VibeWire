@@ -64,7 +64,7 @@ export function Setup({ state }: { state: Facts }) {
         </div>}
         <button class="setup__button" disabled={!live} onClick={() => { pairOpen.value = true }}>Open pairing code</button>
         <details><summary>Scanned it and nothing loaded?</summary>
-          <p>That address answers only on this computer’s own network, and school, hotel and guest Wi-Fi usually stop devices from reaching each other even when both are on it. Turn on the relay: the pairing QR changes to an https address that works from anywhere, including cellular. Scan the new code, because the old one points at the old address.</p>
+          <p>That address answers only on this computer’s own network, and school, hotel and guest Wi-Fi usually stop devices from reaching each other even when both are on it. A VPN on the phone has the same effect from the other end: Cloudflare WARP and most always-on VPNs route the phone past the network it is sitting on, so a private address never reaches anything. Turn on the relay: the pairing QR changes to an https address that works from anywhere, including cellular and WARP. Scan the new code, because the old one points at the old address.</p>
           <button class="setup__button" disabled={!live || relayOn} onClick={() => void send({ do: 'transport.tunnel', on: true })}>{relayOn ? 'Relay is on' : 'Turn on relay over internet'}</button>
           {state.transport.relayProblem && <p role="status">{state.transport.relayProblem}</p>}
         </details>

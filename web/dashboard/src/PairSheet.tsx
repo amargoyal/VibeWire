@@ -458,10 +458,13 @@ function Reach({ state }: { state: Facts }) {
             >
               That address only answers from this Mac's own network, and school, hotel and guest
               Wi-Fi usually stop devices reaching each other even when both are connected to it.
-              Turn on the relay and the QR above changes to an{' '}
+              A VPN on the phone does the same from the other end: Cloudflare WARP and most
+              always-on VPNs route it past the network it is sitting on, so a private address
+              never gets there. Turn on the relay and the QR above changes to an{' '}
               <span class="mono">https://</span> address that answers from anywhere, cellular
-              included. {publishedSite ? 'The code then opens the published client.' : ''} Scan the
-              new code; the old one points at the old address.
+              included, and through WARP.{' '}
+              {publishedSite ? 'The code then opens the published client.' : ''} Scan the new
+              code; the old one points at the old address.
             </span>
             <div style={{ maxWidth: 260 }}>
               <FilledAction
