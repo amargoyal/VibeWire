@@ -203,10 +203,9 @@ export function Remote() {
     single: null as { id: number; type: string; x: number; y: number } | null,
     lastTapAt: 0,
     lastTapPoint: { x: 0, y: 0 },
-    // When the second finger landed, and when the last two-finger tap lifted:
-    // together they are how two fingers, tapped twice, put the view back to fit.
+    // When the second finger landed. A pair that goes down and comes straight
+    // back up is a right click; one that travels is a scroll or a pinch.
     pinchAt: 0,
-    twoFingerTapAt: 0,
     // The last click a captured mouse landed, for the same double-click test on
     // hardware that has a real button rather than a finger.
     lastClickAt: 0,
@@ -479,21 +478,24 @@ export function Remote() {
       return
     }
 
-    // Two fingers down and straight back up, twice, puts the view back to fit.
-    // This is where the one-finger double tap used to live; that gesture now
-    // belongs to the Mac, because a double click is the commoner act and the only
-    // one the desktop under the glass cannot do without. Two fingers were already
-    // the pair that means "the view", so it kept the meaning and changed hands.
+    // Two fingers down and straight back up is a right click, which is what two
+    // fingers on a trackpad have meant since the trackpad had two fingers. It
+    // goes out on the lift and not a moment later: a right click that waited to
+    // find out whether a second tap was coming would be a right click nobody
+    // could aim.
+    //
+    // This is where the two-finger double tap that put the view back to fit used
+    // to live. Fit moved to the region map, which is on the glass, says what it
+    // does, and only exists while the view is zoomed — a better home for it than
+    // a gesture nobody could discover, and the only way both could keep these
+    // two fingers was to delay every right click behind a double-tap clock.
     if (wasPinching) {
       const quick = performance.now() - gesture.current.pinchAt < DOUBLE_TAP_MS
-      if (quick && gesture.current.travel < TAP_SLOP * 2) {
-        const now = performance.now()
-        if (now - gesture.current.twoFingerTapAt < DOUBLE_TAP_MS + 120) {
-          gesture.current.twoFingerTapAt = 0
-          resetView()
-        } else {
-          gesture.current.twoFingerTapAt = now
-        }
+      if (quick && gesture.current.travel < TAP_SLOP * 2 && padMode === 'pointer') {
+        store.click(1, 'right')
+        // Distinct from the single tick a left click gets: the menu that opens
+        // is a different kind of answer.
+        navigator.vibrate?.([4, 20, 4])
       }
       return
     }
@@ -735,7 +737,7 @@ export function Remote() {
 
       <HoldRing ringRef={ring} />
 
-      {zoom > 1.02 ? <Minimap /> : null}
+      {zoom > 1.02 ? <Minimap onFit={resetView} /> : null}
       {showZoomBadge ? <ZoomBadge /> : null}
       {stalled ? <ReconnectingCard millis={stalledMillis} landscape={landscape} /> : null}
       {/* Never in landscape. The dock down the right-hand side *is* this drawer,
@@ -1215,28 +1217,38 @@ function ZoomBadge() {
             back to fit is stated in the pair of fingers that already means "the
             view" — and on hardware with no second finger, the wheel that zoomed
             in is the way back out. */}
-        {tapVerb() === 'TAP' ? 'TWO-FINGER DOUBLE-TAP FITS' : '⌃WHEEL ZOOMS BACK OUT'}
+        {tapVerb() === 'TAP' ? 'TAP THE REGION MAP TO FIT' : '⌃WHEEL ZOOMS BACK OUT'}
       </Caps>
     </div>
   )
 }
 
-/** Only appears above 1.0×. It answers "where am I", which is the only question
- *  zoom creates. */
-function Minimap() {
+/**
+ * Only appears above 1.0×. It answers "where am I", which is the only question
+ * zoom creates, and it is now also the way back: tapping it fits the picture.
+ *
+ * That used to be a two-finger double tap, which nothing on the screen said and
+ * which two fingers can no longer mean, because two fingers are a right click.
+ * A control that is visible exactly when it is useful is the better trade.
+ */
+function Minimap({ onFit }: { onFit: () => void }) {
   const zoom = store.zoomScale.value
   const display = store.selectedDisplay.value
   return (
-    <div
+    <button
+      type="button"
       class="stack"
-      aria-hidden="true"
+      data-nopad
+      onClick={onFit}
+      aria-label="Fit the picture to the screen"
       style={{
         position: 'absolute',
         top: 'calc(62px + var(--safe-top))',
         right: 'calc(16px + var(--safe-right))',
         gap: '6px',
         alignItems: 'flex-end',
-        pointerEvents: 'none',
+        background: 'transparent',
+        padding: 0,
       }}
     >
       <span
@@ -1264,9 +1276,9 @@ function Minimap() {
         />
       </span>
       <Caps size="var(--fs-9)" tracking="0.12em">
-        {display ? `${display.name.toUpperCase()} REGION` : 'REGION'}
+        {display ? `${display.name.toUpperCase()} · TAP TO FIT` : 'TAP TO FIT'}
       </Caps>
-    </div>
+    </button>
   )
 }
 

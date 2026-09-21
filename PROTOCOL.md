@@ -221,7 +221,7 @@ How a phone reaches a Windows host, with nothing installed on the phone:
 | `stopStream` | `{}` | ✕ |
 | `setQuality` | `{ ladder: "auto"\|"1080"\|"720"\|"540", cellularCapMbps }` | 07A |
 | `pointer` | `{ phase, dx, dy, display, sensitivity }` relative trackpad delta | 03A pad |
-| `click` | `{ button, count, display }` | tap |
+| `click` | `{ button, count, display }` | tap; `button: "right"` is a two-finger tap |
 | `drag` | `{ phase: "begin"\|"move"\|"end", dx, dy, count }` | hold-to-drag, double-tap-and-hold |
 | `scroll` | `{ dx, dy, momentum, natural }` | two-finger |
 | `zoom` | `{ scale, anchorX, anchorY, locked }` | pinch (03B) |
