@@ -583,7 +583,15 @@ struct TwoFingerPan: UIViewRepresentable {
 /// which needs a real double click far more than the picture needs a shortcut
 /// back to 1.0×. Installed exactly as `TwoFingerPan` is, on the window, without
 /// swallowing the touch: the trackpad in front must keep working for one finger.
-struct TwoFingerDoubleTap: UIViewRepresentable {
+/// A two-finger tap on the pad, counted in taps.
+///
+/// SwiftUI's `TapGesture` cannot count fingers, so both of the pad's
+/// two-finger meanings are recognised here: one tap is a right click, which is
+/// what two fingers have meant on a trackpad for as long as trackpads have had
+/// two, and two taps was how the view used to be put back to fit.
+struct TwoFingerTap: UIViewRepresentable {
+    /// How many taps. One is a right click; two was the old fit gesture.
+    var taps: Int = 1
     let onTap: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -611,7 +619,7 @@ struct TwoFingerDoubleTap: UIViewRepresentable {
                 action: #selector(Coordinator.handle(_:))
             )
             recognizer.numberOfTouchesRequired = 2
-            recognizer.numberOfTapsRequired = 2
+            recognizer.numberOfTapsRequired = taps
             recognizer.cancelsTouchesInView = false
             recognizer.delaysTouchesBegan = false
             recognizer.delaysTouchesEnded = false

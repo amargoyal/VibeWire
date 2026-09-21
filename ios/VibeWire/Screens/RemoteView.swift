@@ -206,7 +206,7 @@ struct RemoteView: View {
         // act and the only one the desktop under the glass cannot do without.
         // Two fingers were already the pair that means "the view", so the
         // meaning kept its owner and changed hands.
-        .background(TwoFingerDoubleTap { resetView() })
+        .background(TwoFingerTap { rightClick() })
         .overlay(alignment: .topTrailing) {
             if model.zoomScale > 1.02 { minimap.padding(.top, 66).padding(.trailing, 20) }
         }
@@ -467,15 +467,19 @@ struct RemoteView: View {
             // One finger belongs to the Mac now, double taps included, so the way
             // back to fit is stated in the pair of fingers that already means
             // "the view".
-            MonoCaps("TWO-FINGER DOUBLE-TAP FITS", size: 10, color: NS.Color.accent, tracking: 2)
+            MonoCaps("TAP THE REGION MAP TO FIT", size: 10, color: NS.Color.accent, tracking: 2)
         }
         .allowsHitTesting(false)
         .transition(.opacity)
     }
 
     /// Only appears above 1.0×. It answers "where am I", which is the only
-    /// question zoom creates.
+    /// question zoom creates, and it is now also the way back: tapping it fits
+    /// the picture. That was a two-finger double tap, which nothing on the
+    /// screen said and which two fingers can no longer mean, because two
+    /// fingers are a right click.
     private var minimap: some View {
+        Button { resetView() } label: {
         VStack(alignment: .trailing, spacing: 6) {
             ZStack(alignment: .center) {
                 Rectangle()
@@ -488,12 +492,15 @@ struct RemoteView: View {
                     .overlay(Rectangle().stroke(NS.Color.accent, lineWidth: 1))
             }
             MonoCaps(
-                model.displays.first(where: \.selected).map { "\($0.name.uppercased()) REGION" } ?? "REGION",
+                model.displays.first(where: \.selected)
+                    .map { "\($0.name.uppercased()) · TAP TO FIT" } ?? "TAP TO FIT",
                 size: 9,
                 tracking: 1.2
             )
         }
-        .allowsHitTesting(false)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Fit the picture to the screen")
     }
 
     /// A stall looks like a stall: it says how old the picture is — where that
@@ -815,7 +822,7 @@ struct RemoteView: View {
             // The same pair of fingers, tapped twice, fits the picture here too:
             // a gesture that exists in one orientation and not the other is a
             // gesture nobody trusts.
-            .background(TwoFingerDoubleTap { resetView() })
+            .background(TwoFingerTap { rightClick() })
             .overlay { HoldRingLayer(model: ring) }
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 10) {
@@ -1141,6 +1148,17 @@ struct RemoteView: View {
         // carrying a stale offset into a differently shaped glass.
         pan = .zero
         panStart = .zero
+    }
+
+    /// Two fingers, tapped: a right click, in the place the desktop under the
+    /// glass expects one. It goes out on the tap and not a moment later, which
+    /// is why fit moved off this gesture and onto the region map.
+    private func rightClick() {
+        guard padMode == .pointer, !isDragging, !isTwoFingerPanning else { return }
+        model.click(count: 1, button: "right")
+        // Distinct from the single tick a left click gets: the menu that opens
+        // is a different kind of answer.
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7)
     }
 
     private func resetView() {

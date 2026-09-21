@@ -150,9 +150,13 @@ not a choice.
   the Mac's button is down.
 - **A double click, and a double click that held on.** Two taps land a real double
   click; hold the second one and the button stays down, so the move that follows is
-  the drag that selects a word and stretches it. The one-finger double tap that used
-  to snap the picture back to fit gave the gesture up to the Mac — two fingers,
-  tapped twice, do that now.
+  the drag that selects a word and stretches it.
+- **A right click.** Two fingers, tapped, which is what two fingers on a trackpad
+  have meant since the trackpad had two. It goes out on the lift rather than waiting
+  to find out whether a second tap is coming, because a right click that waits is a
+  right click nobody can aim — which is why fit moved off these two fingers and onto
+  the region map, where it is a control that says what it does and appears exactly
+  when it is useful.
 - **A real keyboard.** Captured keydown goes straight through, modifiers included, so
   ⌘⇧Z arrives as ⌘⇧Z.
 - **Wheel and ⌃wheel.** Scroll wheel scrolls the Mac; the pinch a trackpad reports as
