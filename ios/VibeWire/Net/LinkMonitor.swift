@@ -44,6 +44,15 @@ final class LinkMonitor {
 
     var onChange: ((_ expensive: Bool, _ constrained: Bool) -> Void)?
 
+    /// Fired when the route itself changed, satisfied or not.
+    ///
+    /// This is the one event that says "everything you knew about how to reach
+    /// the Mac may have just become wrong". Walking out of the house and back
+    /// in is exactly this event, twice, and until it had a listener the phone
+    /// sat out both of them: the socket had already given up, and nothing asked
+    /// it to try again until the app was backgrounded and opened.
+    var onPathChange: ((_ satisfied: Bool) -> Void)?
+
     func start() {
         guard !started else { return }
         started = true
@@ -55,6 +64,10 @@ final class LinkMonitor {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 let changed = expensive != self.isExpensive || constrained != self.isConstrained
+                // The first update is what the phone started on, not a move. It
+                // reports the link, so the cellular cap is right from the
+                // outset, and it does not claim the network changed.
+                let moved = self.signature != nil && self.signature != signature
                 self.isExpensive = expensive
                 self.isConstrained = constrained
                 self.isSatisfied = signature.satisfied
@@ -65,6 +78,7 @@ final class LinkMonitor {
                     self.hasReported = true
                     self.onChange?(expensive, constrained)
                 }
+                if moved { self.onPathChange?(signature.satisfied) }
             }
         }
         monitor.start(queue: DispatchQueue(label: "com.vibewire.phone.path"))
