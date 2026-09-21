@@ -468,6 +468,10 @@ actor HostClient {
         handshakeConfirmed = true
         reconnectAttempt = 0
         reconnectStartedAt = nil
+        // The socket answered, so the silence clock starts here rather than at
+        // the first pong: a socket that opens and then says nothing is exactly
+        // the case this measures.
+        lastPongAt = MonotonicClock.micros()
         promoteDialledOrigin()
         transition(to: .connected)
         flushQueue()
@@ -641,6 +645,7 @@ actor HostClient {
     /// Called when a pong arrives, closing the loop on one ping.
     func notePong(echoedMicros: UInt64) {
         let now = MonotonicClock.micros()
+        lastPongAt = now
         guard now > echoedMicros else { return }
         lastRttMillis = Double(now - echoedMicros) / 1000.0
     }
