@@ -726,14 +726,21 @@ actor HostClient {
 
         if reconnectStartedAt == nil { reconnectStartedAt = Date() }
 
-        // The socket never proved itself, so the address it was opened against
-        // is a suspect. Move to the next one the Mac gave us — this is what
-        // turns "the phone works on the Wi-Fi it was paired on" into "the phone
-        // works", since the LAN address and the tunnel fail in exactly this way
-        // from the other side of the front door.
-        if let host, host.candidates.count > 1 {
+        // The socket never proved itself, or it proved itself and then went
+        // quiet. Either way the address it was opened against is a suspect, so
+        // move to the next one the Mac gave us — this is what turns "the phone
+        // works on the Wi-Fi it was paired on" into "the phone works", since
+        // the LAN address and the tunnel fail in exactly these two ways from
+        // the other side of the front door.
+        //
+        // An address that carried a working socket and then closed it cleanly
+        // is not a suspect: the Mac restarting is not a reason to walk away
+        // from the address this phone has just proved it can reach it on.
+        if !handshakeConfirmed || addressSuspect,
+           let host, host.candidates.count > 1 {
             dialIndex = (dialIndex + 1) % host.candidates.count
         }
+        addressSuspect = false
         print("[VibeWire] socket failed on \(dialledOrigin ?? "?"): \(reason)")
 
         // 03D: "GIVING UP AT 30S" — thirty seconds per address, not thirty
