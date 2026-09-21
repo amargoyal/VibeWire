@@ -7,6 +7,7 @@ import type { HostRouter } from '../app/hostRouter'
 import type { CaptureHost } from '../capture/captureHost'
 import { Config } from '../core/config'
 import { eventLog, Log, describeError } from '../core/log'
+import { RELEASES_PAGE, UpdateCheck } from '../core/updateCheck'
 import { PairingService, progressWire } from '../pairing/pairingService'
 import { TrustStore, type TrustedDevice } from '../pairing/trustStore'
 import type { HostPlatform } from '../platform/hostPlatform'
@@ -39,6 +40,7 @@ export class DashboardService {
   private devicesRefresh: Promise<void> | null = null
   private hostIdCache: string | null = null
   private readonly launchedAt = Date.now()
+  private readonly updates = new UpdateCheck(Config.hostVersion)
 
   constructor(
     private readonly router: HostRouter,
@@ -246,6 +248,12 @@ export class DashboardService {
     })
     payload.devicesReadable = this.lastDevices === null ? 'asking' : this.lastDevices.ok ? 'yes' : 'no'
 
+    // Asked of GitHub at most every six hours and served from the cache here:
+    // a window that polls once a second must not become a client of someone
+    // else's API.
+    payload.update = this.updates.verdict()
+    void this.updates.refreshIfStale(settings.checkForUpdates)
+
     payload.transport = transportWire(status)
     payload.addresses = addresses(status, settings.port, conditions)
 
@@ -273,6 +281,7 @@ export class DashboardService {
       naturalScrolling: settings.naturalScrolling,
       requireBiometricEachSession: settings.requireBiometricEachSession,
       relayOverInternet: settings.relayOverInternet,
+      checkForUpdates: settings.checkForUpdates,
       targetFps: settings.targetFps,
       port: settings.port,
       webClientURL: settings.webClientURL ?? '',
@@ -479,6 +488,16 @@ export class DashboardService {
         // Routed through the setting, so the Transport pane's toggle and the
         // Settings pane's cannot disagree about whether the relay is meant on.
         await this.router.dashboardApplySetting('relayOverInternet', { kind: 'bool', value: bool('on') ?? false })
+        return Response.json(200, { ok: true })
+      case 'update.open': {
+        // The URL comes from the cached verdict rather than from the caller:
+        // this window may only open a page this host decided on.
+        const { shell } = await import('electron')
+        await shell.openExternal(this.updates.verdict().url ?? RELEASES_PAGE)
+        return Response.json(200, { ok: true })
+      }
+      case 'update.check':
+        await this.updates.refresh()
         return Response.json(200, { ok: true })
       case 'transport.refresh':
         await this.transport.refresh()

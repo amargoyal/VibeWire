@@ -543,6 +543,7 @@ export class HostRouter implements Router {
     else if (key === 'cellularCeilingMbps' && (value.kind === 'double' || value.kind === 'int')) s.cellularCeilingMbps = value.value
     else if (key === 'requireBiometricEachSession' && value.kind === 'bool') s.requireBiometricEachSession = value.value
     else if (key === 'relayOverInternet' && value.kind === 'bool') s.relayOverInternet = value.value
+    else if (key === 'checkForUpdates' && value.kind === 'bool') s.checkForUpdates = value.value
     else if (key === 'quality' && value.kind === 'string') s.quality = value.value === '1080' || value.value === '720' || value.value === '540' ? value.value : 'auto'
     else Log.debug('app', `ignoring unknown setting ${key}`)
 

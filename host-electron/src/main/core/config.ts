@@ -54,6 +54,12 @@ export interface HostSettings {
    * this host serves itself.
    */
   webClientURL: string | null
+  /**
+   * Whether this host asks GitHub, at launch and every six hours, if a newer
+   * VibeWire has been published. One request, no identifiers beyond the
+   * version in the user agent, and nothing is ever installed by it.
+   */
+  checkForUpdates: boolean
 }
 
 export const DEFAULT_SETTINGS: HostSettings = {
@@ -67,6 +73,7 @@ export const DEFAULT_SETTINGS: HostSettings = {
   targetFps: 60,
   port: 8787,
   webClientURL: null,
+  checkForUpdates: true,
 }
 
 function decodeSettings(raw: unknown): HostSettings {
@@ -85,6 +92,7 @@ function decodeSettings(raw: unknown): HostSettings {
   if (typeof record.targetFps === 'number') settings.targetFps = record.targetFps
   if (typeof record.port === 'number' && record.port > 0 && record.port < 65536) settings.port = record.port
   if (typeof record.webClientURL === 'string' && record.webClientURL) settings.webClientURL = record.webClientURL
+  if (typeof record.checkForUpdates === 'boolean') settings.checkForUpdates = record.checkForUpdates
   return settings
 }
 
