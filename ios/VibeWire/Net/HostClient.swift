@@ -484,6 +484,7 @@ actor HostClient {
         // then retried a dead address until it gave up, with the Mac answering
         // on the other two the whole time.
         handshakeConfirmed = false
+        lastPongAt = nil
         dialledOrigin = endpoint.origin
         print("[VibeWire] dialing \(endpoint.origin)")
 
