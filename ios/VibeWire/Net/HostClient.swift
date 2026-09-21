@@ -61,6 +61,26 @@ actor HostClient {
     private var reconnectStartedAt: Date?
     private var shouldReconnect = true
     private var pingTask: Task<Void, Never>?
+    /// The next dial, waiting out its backoff.
+    ///
+    /// The wait used to run inside whichever task noticed the failure, which
+    /// left no handle on it: the one moment worth dialling immediately, a phone
+    /// that has just changed network, was the one moment nothing could cut the
+    /// wait short.
+    private var retryTask: Task<Void, Never>?
+    /// When the last pong came back, on the monotonic clock.
+    ///
+    /// A network that changes under a live socket does not always close it: the
+    /// radio switches, the old route stops carrying anything, and the socket
+    /// waits on a TCP timeout that can outlast anyone's patience. The phone
+    /// reads "connected" the whole time, with nothing coming back and the
+    /// rotation held on an address that is already dead. Pongs arrive every
+    /// second, so their absence is the proof.
+    private var lastPongAt: UInt64?
+    /// Set when a socket that *had* worked went quiet. The address is suspect
+    /// even though the handshake succeeded on it, so the next attempt moves
+    /// along the list rather than dialling the dead one again.
+    private var addressSuspect = false
     /// Whether the current socket has delivered a frame. Until it has, the
     /// upgrade may still be refused.
     private var handshakeConfirmed = false
@@ -312,9 +332,16 @@ actor HostClient {
         // registered last, so replies went to one socket while the app read the
         // other: Claude sat on "WORKING" forever with the answer delivered
         // somewhere the app was not listening.
+        //
+        // A socket that has stopped answering is not one of those: it reads
+        // `connected` while nothing comes back, and returning here is how
+        // coming back to the app in a different place used to do nothing at
+        // all.
         if self.host?.deviceId == host.deviceId, task != nil {
             switch state {
-            case .connected, .connecting:
+            case .connecting:
+                return
+            case .connected where socketIsAnswering:
                 return
             default:
                 break
@@ -327,6 +354,52 @@ actor HostClient {
         reconnectStartedAt = nil
         // A fresh session starts from the address that worked last, not from
         // wherever the previous session's rotation happened to stop.
+        dialIndex = 0
+        await openSocket()
+    }
+
+    /// The phone moved to a different network.
+    ///
+    /// Whatever this client believes about which of the Mac's addresses answers
+    /// was measured on a network that no longer exists, so the backoff it is
+    /// sitting out and the verdict it has already reached are both worthless.
+    /// It dials now, from the top of the list, and the give-up clock starts
+    /// again — a phone that gave up in the lift is not a phone that should stay
+    /// given up in the street.
+    ///
+    /// A socket still carrying pongs is left alone. A second interface coming
+    /// up does not invalidate a path that is working, and the silence watchdog
+    /// is what catches one that has quietly stopped.
+    func networkChanged() async {
+        guard host != nil, state != .unauthorized, !socketIsAnswering else { return }
+        await redial(reason: "network changed")
+    }
+
+    /// The reader tapped "Try again".
+    ///
+    /// Unlike a path change this does not spare a socket that looks healthy:
+    /// they are reading a screen that says the Mac is lost, and the one outcome
+    /// a tap must not produce is nothing at all.
+    func retryNow() async {
+        guard host != nil, state != .unauthorized else { return }
+        await redial(reason: "asked to try again")
+    }
+
+    /// Dial now, from the top of the list, whatever this client believed a
+    /// moment ago. The backoff it was sitting out and the verdict it had
+    /// reached were both measured against circumstances that have changed.
+    private func redial(reason: String) async {
+        // A dial already in flight is the dial this would start. Networks that
+        // come up in stages report themselves several times in a second, and
+        // each report must not throw away the attempt the last one began.
+        guard !isOpening else { return }
+
+        print("[VibeWire] \(reason), dialing again")
+        retryTask?.cancel()
+        retryTask = nil
+        shouldReconnect = true
+        reconnectAttempt = 0
+        reconnectStartedAt = nil
         dialIndex = 0
         await openSocket()
     }
@@ -361,6 +434,10 @@ actor HostClient {
         shouldReconnect = false
         pingTask?.cancel()
         pingTask = nil
+        retryTask?.cancel()
+        retryTask = nil
+        lastPongAt = nil
+        addressSuspect = false
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
         // The queue exists to cover a brief reconnect inside one session, not
@@ -419,6 +496,7 @@ actor HostClient {
         // then retried a dead address until it gave up, with the Mac answering
         // on the other two the whole time.
         handshakeConfirmed = false
+        lastPongAt = nil
         dialledOrigin = endpoint.origin
         print("[VibeWire] dialing \(endpoint.origin)")
 
@@ -459,6 +537,10 @@ actor HostClient {
         handshakeConfirmed = true
         reconnectAttempt = 0
         reconnectStartedAt = nil
+        // The socket answered, so the silence clock starts here rather than at
+        // the first pong: a socket that opens and then says nothing is exactly
+        // the case this measures.
+        lastPongAt = MonotonicClock.micros()
         promoteDialledOrigin()
         transition(to: .connected)
         flushQueue()
@@ -601,9 +683,42 @@ actor HostClient {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self else { return }
-                await self.sendPing()
+                await self.tick()
             }
         }
+    }
+
+    /// One second of keepalive: notice a socket that has gone quiet, or ping.
+    private func tick() async {
+        if await noteSilenceIfDead() { return }
+        sendPing()
+    }
+
+    /// Whether the live socket has stopped answering, and the reconnect that
+    /// follows from it.
+    ///
+    /// The radio switches, the old route stops carrying anything, and the
+    /// socket sits open on a TCP timeout that can outlast anyone's patience.
+    /// Until this existed the phone read "connected" throughout, held the
+    /// rotation on an address that was already dead, and never reached the Mac
+    /// on the tunnel address that was answering the whole time. It is the
+    /// difference between walking out of the house costing a few seconds and
+    /// costing the session.
+    private func noteSilenceIfDead() async -> Bool {
+        guard case .connected = state, lastPongAt != nil, !socketIsAnswering else {
+            return false
+        }
+
+        // The handshake succeeded on this address, so the identity is not in
+        // question, but the address is: the next attempt moves along the list.
+        addressSuspect = true
+        // Retired on purpose, and the generation bump says so — otherwise the
+        // receive loop reads the cancellation as a failure of its own and
+        // schedules a second reconnect beside this one.
+        socketGeneration &+= 1
+        task?.cancel(with: .goingAway, reason: nil)
+        await scheduleReconnect(reason: "nothing came back from the host", task: nil)
+        return true
     }
 
     private func sendPing() {
@@ -632,6 +747,7 @@ actor HostClient {
     /// Called when a pong arrives, closing the loop on one ping.
     func notePong(echoedMicros: UInt64) {
         let now = MonotonicClock.micros()
+        lastPongAt = now
         guard now > echoedMicros else { return }
         lastRttMillis = Double(now - echoedMicros) / 1000.0
     }
@@ -642,6 +758,7 @@ actor HostClient {
         pingTask?.cancel()
         pingTask = nil
         task = nil
+        lastPongAt = nil
 
         guard shouldReconnect else {
             transition(to: .idle)
@@ -662,14 +779,21 @@ actor HostClient {
 
         if reconnectStartedAt == nil { reconnectStartedAt = Date() }
 
-        // The socket never proved itself, so the address it was opened against
-        // is a suspect. Move to the next one the Mac gave us — this is what
-        // turns "the phone works on the Wi-Fi it was paired on" into "the phone
-        // works", since the LAN address and the tunnel fail in exactly this way
-        // from the other side of the front door.
-        if let host, host.candidates.count > 1 {
+        // The socket never proved itself, or it proved itself and then went
+        // quiet. Either way the address it was opened against is a suspect, so
+        // move to the next one the Mac gave us — this is what turns "the phone
+        // works on the Wi-Fi it was paired on" into "the phone works", since
+        // the LAN address and the tunnel fail in exactly these two ways from
+        // the other side of the front door.
+        //
+        // An address that carried a working socket and then closed it cleanly
+        // is not a suspect: the Mac restarting is not a reason to walk away
+        // from the address this phone has just proved it can reach it on.
+        if !handshakeConfirmed || addressSuspect,
+           let host, host.candidates.count > 1 {
             dialIndex = (dialIndex + 1) % host.candidates.count
         }
+        addressSuspect = false
         print("[VibeWire] socket failed on \(dialledOrigin ?? "?"): \(reason)")
 
         // 03D: "GIVING UP AT 30S" — thirty seconds per address, not thirty
@@ -686,8 +810,20 @@ actor HostClient {
         reconnectAttempt += 1
         let delay = backoffMillis()
         transition(to: .reconnecting(attempt: reconnectAttempt, nextRetryMs: delay))
+        scheduleDial(afterMillis: delay)
+    }
 
-        try? await Task.sleep(for: .milliseconds(delay))
+    /// Dials again once the backoff has run, unless something cancels it first.
+    private func scheduleDial(afterMillis delay: Int) {
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            await self.dialIfWanted()
+        }
+    }
+
+    private func dialIfWanted() async {
         guard shouldReconnect else { return }
         await openSocket()
     }
@@ -697,6 +833,20 @@ actor HostClient {
     var giveUpSeconds: TimeInterval {
         30 * Double(max(1, host?.candidates.count ?? 1))
     }
+
+    /// Whether the live socket is still carrying pongs, which is the only
+    /// evidence that the address under it still reaches the Mac.
+    private var socketIsAnswering: Bool {
+        guard case .connected = state, let last = lastPongAt else { return false }
+        return Double(MonotonicClock.micros() - last) / 1000 <= pongTimeoutMillis
+    }
+
+    /// How long a connected socket may go without a pong before it is treated
+    /// as dead. Pings go out every second, so this is eight missed round trips:
+    /// long enough that a slow relay hop is not mistaken for a lost network,
+    /// short enough that walking out of Wi-Fi range costs seconds rather than a
+    /// TCP timeout nobody waits through.
+    private let pongTimeoutMillis: Double = 8000
 
     /// 0.5 s doubling to a 8 s ceiling.
     private func backoffMillis() -> Int {

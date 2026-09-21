@@ -317,6 +317,21 @@ final class AppModel {
                 "constrained": constrained,
             ])
         }
+
+        // A path change is the one event that says "everything you knew about
+        // how to reach the Mac may have just become wrong", and it is the
+        // moment this app used to sit out: the socket had already given up on
+        // an address that stopped answering, and nothing asked it to try again
+        // until the app was backgrounded and opened. Walking out of the house
+        // and back in is this event, twice, and it is what the browser client
+        // has answered since it learned to fail over.
+        linkMonitor.onPathChange = { [weak self] satisfied in
+            guard satisfied else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.isForeground, self.pairedHost != nil else { return }
+                await self.client.networkChanged()
+            }
+        }
         linkMonitor.start()
     }
 
@@ -340,6 +355,17 @@ final class AppModel {
     }
 
     // MARK: Lifecycle
+
+    /// Whether the app is in front.
+    ///
+    /// A path change that lands while the phone is in a pocket must not open a
+    /// socket: going away is what closed the last one, and the Mac releases
+    /// every stream when it closes.
+    private(set) var isForeground = true
+
+    func noteForeground(_ active: Bool) {
+        isForeground = active
+    }
 
     func connectIfPaired() async {
         guard let pairedHost else { return }
@@ -510,6 +536,25 @@ final class AppModel {
             return
         }
 
+        // A link to the address this phone is already paired on is a stale one:
+        // a photograph of the QR, a second scan of the one on screen, or a cold
+        // launch from history. Pairing again would tear down a working session
+        // and spend a code that has since rotated, so it is read as the
+        // no-op it is.
+        //
+        // A link to a *different* address is left to pair properly. The link
+        // carries no host id, so this phone cannot tell the Mac that moved from
+        // the second Mac in the house, and trading keys is the answer that is
+        // right either way.
+        if let paired = pairedHost,
+           let scanned = try? Endpoint.parse(address, fallbackPort: offered.port),
+           scanned.origin == paired.origin {
+            if !offered.alternates.isEmpty {
+                await client.learn(alternates: offered.alternates)
+            }
+            return
+        }
+
         if let failure = await completePairing(
             address: address,
             port: offered.port,
@@ -518,6 +563,32 @@ final class AppModel {
         ) {
             banner = failure
         }
+    }
+
+    /// Every address the host named, as origins.
+    ///
+    /// A current host sends `candidates` and that is the whole answer. One that
+    /// predates the field sends the same facts spread across `tailscaleAddress`,
+    /// `lanAddress` and `cloudflareHostname`, and assembling them here is the
+    /// difference between a phone that can leave the house and one that cannot.
+    /// The browser client has read both spellings since it learned to fail over.
+    private func candidateOrigins(_ payload: [String: Any]) -> [String] {
+        if let reported = payload["candidates"] as? [String], !reported.isEmpty {
+            return Endpoint.normalise(reported)
+        }
+
+        let port = payload["port"] as? Int ?? pairedHost?.port ?? 8787
+        var origins: [String] = []
+        if let tailscale = transport.tailscaleAddress {
+            origins.append("http://\(tailscale):\(port)")
+        }
+        if let lan = transport.lanAddress {
+            origins.append("http://\(lan):\(port)")
+        }
+        if transport.cloudflareRunning, let tunnel = transport.cloudflareHostname {
+            origins.append(tunnel.hasSuffix("/") ? String(tunnel.dropLast()) : tunnel)
+        }
+        return Endpoint.normalise(origins)
     }
 
     private func connectionChanged(_ state: HostClient.State) {
@@ -621,7 +692,7 @@ final class AppModel {
             // minted at host launch and never written down. Learning it here,
             // over a socket that is already up, is what lets this phone reach
             // the same Mac from cellular later without pairing again.
-            transport.candidates = (payload["candidates"] as? [String]) ?? []
+            transport.candidates = candidateOrigins(payload)
             let learned = transport.candidates
             if !learned.isEmpty {
                 Task { await client.learn(alternates: learned) }
@@ -1149,7 +1220,13 @@ final class AppModel {
 
     func retry() {
         send(["t": "retry"])
-        Task { await connectIfPaired() }
+        Task {
+            // Not `connect`, which does nothing when the client already reads
+            // connected: a socket that stopped answering reads exactly that,
+            // and it is the state the reader is tapping about.
+            await client.retryNow()
+            await connectIfPaired()
+        }
     }
 
     func wake() {

@@ -89,8 +89,10 @@ struct RootView: View {
             Task {
                 switch phase {
                 case .active:
+                    model.noteForeground(true)
                     await model.connectIfPaired()
                 case .background:
+                    model.noteForeground(false)
                     // Nothing is left running on the Mac when the phone goes
                     // away — the socket close is what releases the streams.
                     await model.disconnect()

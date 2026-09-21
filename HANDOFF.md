@@ -124,7 +124,7 @@ E2E harness (`scratchpad/e2e.swift`, run with the pairing code as argv[1]) passe
 - Pinch-anchor zoom and two-finger pan (`RemoteView`) are written and compile but were never exercised — System Events cannot synthesize multitouch.
 - `cloudflared` not installed; relay path unexercised.
 - SHOT copies a PNG to the phone clipboard and shows no confirmation — `lastScreenshot` is stored and never rendered.
-- No Bonjour/mDNS. `Identity.PairedHost` stores one address, so a Mac that changes IP is unreachable until re-pairing.
+- No Bonjour/mDNS. `Identity.PairedHost` now keeps every address the Mac names and dials them in turn, so a Mac that changes IP costs a reconnect rather than a re-pair. A Mac at an address nobody ever named still needs Home → THE MAC MOVED.
 - `wakeOnLan` is reported in capabilities but no magic packet is ever sent.
 - README.md still does not exist. Needs: Screen Recording + Accessibility, Tailscale, `claude login`, and the `ANTHROPIC_API_KEY`-must-be-unset warning.
 

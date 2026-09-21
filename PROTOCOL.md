@@ -304,10 +304,30 @@ deny  → { "behavior": "deny", "message": "<why>" }
 
 ## 6. Reconnection
 
-The phone reconnects with exponential backoff (0.5 s → 8 s, capped) for 30 s
-total, matching the "GIVING UP AT 30S" readout on 03D. Input generated while
-disconnected is queued locally, capped at 64 events, and replayed in order once
-`streamState` returns to `live`. The count is surfaced as `QUEUED INPUT`.
+The phone reconnects with exponential backoff (0.5 s → 8 s, capped), matching
+the "GIVING UP AT 30S" readout on 03D. Input generated while disconnected is
+queued locally, capped at 64 events, and replayed in order once `streamState`
+returns to `live`. The count is surfaced as `QUEUED INPUT`.
+
+A client holds every address the host named (§3, `transport.candidates`) and
+dials them in the host's order. A socket that fails before it is accepted moves
+to the next address and the backoff carries on; the address that carries a
+working socket is promoted and dialled first next time. The give-up budget is
+30 s per address rather than 30 s shared between them, so a client holding three
+addresses does not report a host unreachable that was answering on the third.
+
+A socket that was accepted and then went quiet counts as a failed address too.
+Pings go out once a second, so eight seconds without a `pong` is eight missed
+round trips, and the client dials the next address rather than waiting on a TCP
+timeout. This is what a radio change under a live connection looks like: the
+route stops carrying anything and the socket stays open, so silence is the only
+evidence there is.
+
+A client also dials at once, rather than waiting out its backoff, when the
+machine it runs on changes network: the `online` event in the browser, an
+`NWPathMonitor` path change on the phone. The give-up clock starts again with
+it, because a client that gave up in a lift should not stay given up in the
+street.
 
 The browser client uses the same policy, with two differences the platform
 forces. Success is `onopen` rather than the first frame — a refused upgrade never
