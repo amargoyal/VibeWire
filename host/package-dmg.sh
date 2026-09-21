@@ -14,7 +14,13 @@ version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Co
 for asset in web dashboard; do
   test -f "$app/Contents/Resources/$asset/index.html"
 done
-lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/VibeWire"
+architectures="$(lipo -archs "$app/Contents/MacOS/VibeWire")"
+for required in arm64 x86_64; do
+  case " $architectures " in
+    *" $required "*) ;;
+    *) echo "Missing required architecture: $required" >&2; exit 1 ;;
+  esac
+done
 codesign --verify --strict "$app"
 
 # Isolated, pinned tooling; never installs packages into the system Python.
