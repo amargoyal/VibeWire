@@ -58,6 +58,21 @@ actor DashboardService {
     private var hostIdCache: String?
     private var hostIdRefresh: Task<Void, Never>?
 
+    /// A Google or Apple sign-in the dashboard started in the default browser.
+    ///
+    /// Providers refuse to sign in inside an embedded web view, so setup hands
+    /// the page to the real browser and waits here for the code to come back.
+    /// `flow` is the dashboard's random value, carried through the redirect, so
+    /// only the callback for this attempt is kept. The code alone is worth
+    /// nothing: the PKCE verifier never leaves the dashboard.
+    private struct BrowserSignIn {
+        let flow: String
+        let startedAt: Date
+        var outcome: [String: String]?
+    }
+
+    private var browserSignIn: BrowserSignIn?
+
     init(
         router: HostRouter,
         trust: TrustStore,
