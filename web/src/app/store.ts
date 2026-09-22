@@ -461,6 +461,9 @@ export class Store {
       hostRecord: (host) => {
         this.pairedHost.value = host
       },
+      requiresAccount: (required) => {
+        this.accountRequired.value = required
+      },
     })
 
     // A radio change is the one event that says "everything you knew about how
@@ -656,10 +659,13 @@ export class Store {
       batch(() => {
         this.pairedHost.value = paired
         this.hostName.value = paired.hostName
-        // The last step of setup, and the first one that is optional. The wire
+        // The last step of setup, and usually the first optional one: the wire
         // is proven by the time this is asked, so a person who says no keeps
-        // everything they came for.
-        this.route.value = this.shouldInviteSignIn() ? 'signin' : 'home'
+        // everything they came for. Where the host has said it requires an
+        // account, the same screen is the way in rather than an offer, and it
+        // is shown whether or not the offer was already declined once.
+        const required = this.accountRequired.value && !this.account.value
+        this.route.value = required || this.shouldInviteSignIn() ? 'signin' : 'home'
       })
       await this.client.connect(paired)
       void this.rememberAccountContext()

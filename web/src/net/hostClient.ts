@@ -46,6 +46,9 @@ export interface Handlers {
   /** Fired when the stored pairing changes underneath the app — a different
    *  address won, or the Mac named one this browser did not have. */
   hostRecord?(host: PairedHost): void
+  /** What the host said at the end of pairing about needing an account, so the
+   *  last step of setup knows whether it is an offer or a requirement. */
+  requiresAccount?(required: boolean): void
 }
 
 /** Monotonic microseconds, so a clock adjustment mid-session cannot make a
@@ -279,6 +282,7 @@ export class HostClient {
       hostKey: string
       deviceId: string
       protocol?: number
+      requiresAccount?: boolean
     }
 
     if (decoded.protocol != null && decoded.protocol !== 1) {
@@ -305,6 +309,7 @@ export class HostClient {
     await Identity.savePairedHost(paired)
     this.host = paired
     this.dialIndex = 0
+    this.handlers?.requiresAccount?.(decoded.requiresAccount === true)
     return paired
   }
 
