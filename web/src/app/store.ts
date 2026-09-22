@@ -932,6 +932,11 @@ export class Store {
           this.hostOS.value = str(payload['os']) ?? ''
           this.hostBuild.value = str(payload['osBuild']) ?? ''
           this.capabilities.value = (payload['capabilities'] as Record<string, boolean>) ?? {}
+          // A host that requires an account says so on every hello, so a client
+          // paired before the setting was turned on learns it at the same moment
+          // as one paired after.
+          this.accountRequired.value = bool(payload['requiresAccount'], false)
+          if (!this.accountRequired.value) this.accountRefusal.value = null
           if (platform === 'macos' && this.capabilities.value['screenRecording'] === false) {
             this.banner.value = {
                 text: 'Screen Recording is off on the Mac. Grant it in System Settings.',
@@ -1132,15 +1137,29 @@ export class Store {
         this.receiveClaude(payload)
         break
 
-      case 'error':
+      case 'error': {
+        const message = str(payload['message']) ?? `${this.HostNoun} reported an error.`
+        // The one refusal that is not a fault and has somewhere to go. A banner
+        // over Home would be a dead end: the socket is about to close and the
+        // only thing that changes the answer is on the sign-in screen.
+        if (str(payload['code']) === 'account_required') {
+          batch(() => {
+            this.accountRequired.value = true
+            this.accountRefusal.value = message
+            this.route.value = 'signin'
+          })
+          this.disconnect()
+          break
+        }
         this.banner.value = {
-          text: str(payload['message']) ?? `${this.HostNoun} reported an error.`,
+          text: message,
           // The host marks its own errors: a capture that failed is worth trying
           // again, a refused request is not. Both used to read identically and
           // offer nothing.
           retriable: payload['retriable'] === true,
         }
         break
+      }
 
       default:
         break
