@@ -431,7 +431,8 @@ Commands: `pair.begin` `{name, reusable}`, `pair.end`, `device.revoke`
 `{deviceId}|{all}`, `device.sever` `{deviceId}`, `device.rename`
 `{deviceId, name}`, `display.select` `{displayIds, sideBySide}`, `capture.stop`,
 `setting.set` `{key, value}`, `transport.tunnel` `{on}`, `transport.refresh`,
-`permission.request` `{which}`, and `claude` carrying any §5 phone → host `sub`.
+`permission.request` `{which}`, `account.browser.begin` `{flow, url}`,
+`account.browser.take`, and `claude` carrying any §5 phone → host `sub`.
 
 Everything routes through the paths the phone already uses, so the two surfaces
 cannot disagree: settings persist and retune the encoder identically, a revoke
