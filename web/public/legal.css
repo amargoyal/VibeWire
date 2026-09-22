@@ -19,3 +19,6 @@ main {
   margin: 0 auto;
   padding: 48px 16px 64px;
 }
+
+h1 { font-size: 32px; line-height: 1.2; letter-spacing: -0.03em; margin: 0 0 8px; }
+h2 { font-size: 19px; letter-spacing: -0.02em; margin: 36px 0 8px; }
