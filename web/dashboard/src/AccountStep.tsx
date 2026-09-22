@@ -34,5 +34,22 @@ export function AccountStep() {
   return <section class="setup-account">
     <h2>Sign in or create an account</h2>
     <p>One email, one code. New to VibeWire? We’ll create your account when you verify your email.</p>
+    {!accountsConfigured ? <p role="alert">Account sign-in is not configured in this build. Install a configured VibeWire release to finish setup.</p> :
+      <form onSubmit={submit} class="setup-account__form">
+        <label htmlFor="setup-email">Email address</label>
+        <input id="setup-email" type="email" autoComplete="email" required value={email}
+          disabled={sent || busy} onInput={event => setEmail(event.currentTarget.value)} />
+        {sent && <>
+          <p role="status">Enter the code sent to {email}. Check your spam folder too.</p>
+          <label htmlFor="setup-code">Email code</label>
+          <input id="setup-code" inputMode="numeric" autoComplete="one-time-code" required
+            pattern="[0-9]{6,10}" value={code} disabled={busy || !!verified}
+            onInput={event => setCode(event.currentTarget.value.replace(/\D/g, ''))} />
+        </>}
+        {error && <p role="alert">{error}</p>}
+        <button class="setup__button" disabled={busy} type="submit">
+          {busy ? 'Please wait…' : sent ? 'Finish setup' : 'Send email code'}
+        </button>
+      </form>}
   </section>
 }
