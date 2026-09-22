@@ -6,3 +6,10 @@
   --hairline: #26292f;
   --accent: #5ce4b1;
 }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
