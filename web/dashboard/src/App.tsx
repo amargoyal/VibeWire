@@ -103,7 +103,7 @@ export function App() {
     )
   }
 
-  if (state.host.platform !== 'windows' && !state.setupCompleted) {
+  if (state.setupCompleted === false) {
     return <><Onboarding state={state} />{pairOpen.value && <PairSheet state={state} />}</>
   }
 
