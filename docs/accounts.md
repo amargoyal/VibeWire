@@ -57,6 +57,13 @@ Google and Apple are optional. Until a provider is enabled, its button is not dr
 
 Both providers return to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/auth/v1/callback`, and Supabase then returns to the page that asked. Mac setup asks from the host itself, so add `http://127.0.0.1:*/**` to Redirect URLs beside the published client. Without it, a Mac setup sign-in lands on the Site URL and is refused there.
 
+### Google
+
+1. In Google Cloud Console, configure the OAuth consent screen: External, app name `VibeWire`, authorized domains `amargoyal.github.io` and `iqtuikhyqkythaffxuca.supabase.co`, home page `https://amargoyal.github.io/VibeWire/`, privacy policy `https://amargoyal.github.io/VibeWire/privacy.html`, terms `https://amargoyal.github.io/VibeWire/terms.html`.
+2. Create an OAuth client ID of type Web application. Origin `https://amargoyal.github.io`, redirect URI the Supabase callback above.
+3. In Supabase, Authentication → Sign In / Providers → Google: enable it and paste the client ID and secret.
+4. Publish the consent screen. In Testing mode only listed test users can sign in. A logo sends the app through brand verification first.
+
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` build the client against another project. `VIBEWIRE_ACCOUNT_URL` / `VIBEWIRE_ACCOUNT_KEY` do the same for either host. Clearing them leaves a build with no account screens and a requirement that cannot be switched on.
 
 ## Validation
