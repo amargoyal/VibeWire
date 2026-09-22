@@ -475,12 +475,25 @@ export async function startProviderSignIn(provider: Provider): Promise<void> {
   const verifier = randomVerifier()
   await records.write(VERIFIER_RECORD, verifier)
 
+  location.assign(await providerAuthorizeUrl(provider, location.origin + location.pathname, verifier))
+}
+
+/**
+ * The account server's authorize URL for a provider, with the PKCE challenge
+ * for `verifier`. Whoever holds the verifier is the only one who can turn the
+ * code that comes back into a session.
+ */
+export async function providerAuthorizeUrl(
+  provider: Provider,
+  redirectTo: string,
+  verifier: string,
+): Promise<string> {
   const url = new URL(authUrl('authorize'))
   url.searchParams.set('provider', provider)
-  url.searchParams.set('redirect_to', location.origin + location.pathname)
+  url.searchParams.set('redirect_to', redirectTo)
   url.searchParams.set('code_challenge', await challengeFor(verifier))
   url.searchParams.set('code_challenge_method', 's256')
-  location.assign(url.toString())
+  return url.toString()
 }
 
 export function randomVerifier(): string {
