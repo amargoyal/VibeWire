@@ -371,17 +371,22 @@ function AccountSection({ email }: { email: string }) {
         label={email || 'Signed in'}
         value={confirming ? 'SIGNING OUT UNPAIRS EVERY DEVICE' : 'SIGNED IN ON THIS MAC'}
       >
-        <span class="row" style={{ gap: 8 }}>
+        <div class="settings-actions">
           {confirming && (
-            <OutlinedAction title="CANCEL" height={40} enabled={!busy} onClick={() => setConfirming(false)} />
+            <div style={{ width: 150 }}>
+              <OutlinedAction title="CANCEL" height={40} enabled={!busy} onClick={() => setConfirming(false)} />
+            </div>
           )}
-          <OutlinedAction
-            title={confirming ? (busy ? 'SIGNING OUT…' : 'SIGN OUT AND UNPAIR') : 'SIGN OUT'}
-            height={40}
-            enabled={!busy}
-            onClick={() => (confirming ? void signOutOfMac() : setConfirming(true))}
-          />
-        </span>
+          <div style={{ width: confirming ? 210 : 150 }}>
+            <OutlinedAction
+              title={confirming ? (busy ? 'SIGNING OUT…' : 'SIGN OUT AND UNPAIR') : 'SIGN OUT'}
+              tint={confirming ? 'var(--ns-red)' : undefined}
+              height={40}
+              enabled={!busy}
+              onClick={() => (confirming ? void signOutOfMac() : setConfirming(true))}
+            />
+          </div>
+        </div>
       </Row>
     </Section>
   )
