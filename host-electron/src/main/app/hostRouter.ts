@@ -242,6 +242,9 @@ export class HostRouter implements Router {
         deviceId: result.device.id,
         pairedAt: result.device.pairedAt.toISOString(),
         protocol: Config.protocolVersion,
+        // So the browser knows, before its first socket, that the end of setup
+        // is a sign-in it has to do rather than one it is being offered.
+        requiresAccount: Config.accountsAvailable && this.settings.requireAccount,
       })
     } catch (error) {
       if (error instanceof PairError) {
