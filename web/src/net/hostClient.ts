@@ -16,6 +16,7 @@
  */
 
 import { fromBase64, Identity, type PairedHost } from './identity'
+import { accessToken } from './account'
 import {
   dialable,
   lenientEndpoint,
@@ -520,6 +521,7 @@ export class HostClient {
         // refused upgrade never opens. Unlike the phone, which had to wait for a
         // first frame to be sure, this is the definitive moment.
         this.noteHandshakeConfirmed()
+        void this.presentAccount(generation)
       }
       socket.onmessage = (event) => {
         if (generation !== this.generation) return
@@ -544,6 +546,32 @@ export class HostClient {
       this.opening = false
       await this.scheduleReconnect((error as Error).message, null)
     }
+  }
+
+  /**
+   * Offers the account this browser is signed into, once per socket.
+   *
+   * Sent on the socket rather than as an upgrade parameter, because a browser
+   * cannot set headers on a WebSocket and the alternative was an access token in
+   * a URL — which is the one place a token gets into a server log, a referrer,
+   * and the history of whatever proxy the relay runs through.
+   *
+   * Unconditional, and not only where the host asked: the host decides what to
+   * do with it, and a client that waits to be asked would need a second round
+   * trip before the first frame on every connection to a host that requires one.
+   * Signed out, nothing is sent and a host that requires an account says so.
+   */
+  private async presentAccount(generation: number): Promise<void> {
+    let token: string | null = null
+    try {
+      token = await accessToken()
+    } catch {
+      return
+    }
+    if (!token) return
+    if (generation !== this.generation) return
+    if (this.socket?.readyState !== WebSocket.OPEN) return
+    this.socket.send(JSON.stringify({ t: 'account', token }))
   }
 
   /** The socket has proven itself. Only now is it safe to clear the backoff,
