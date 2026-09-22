@@ -483,7 +483,7 @@ export async function startProviderSignIn(provider: Provider): Promise<void> {
   location.assign(url.toString())
 }
 
-function randomVerifier(): string {
+export function randomVerifier(): string {
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
   return base64Url(bytes)
