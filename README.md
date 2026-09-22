@@ -225,5 +225,17 @@ is compiled against the app's own `WaveMark` and `Palette` and renders the
 background at 1x and 2x, which `tiffutil` combines into the multi-resolution TIFF
 Finder reads. The mark on the installer and the mark in the menu bar are one
 path, so neither can drift from the other, and a checked-in PNG cannot go stale
-the next time either changes. The volume carries the app's icon too. Developer ID signing and notarization are required
+the next time either changes. The volume carries the app's icon too.
+
+The window is light while the app is dark, and that is not an oversight. Finder
+draws the label under each icon in the reader's own system appearance, and
+nothing inside a disk image can change that colour; on a near-black ground, a
+Light Mode reader sees two invisible words where VibeWire and Applications
+should be.
+
+    host/Tools/DMGBackground.swift --preview out.png /Applications/VibeWire.app
+
+renders the background with the icons and labels composited at the positions
+`dmg-settings.py` hands Finder, which is how to look at a change to the artwork
+without mounting anything. Developer ID signing and notarization are required
 separately for a distribution that passes Gatekeeper by default.
