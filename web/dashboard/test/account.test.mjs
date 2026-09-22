@@ -45,3 +45,14 @@ test('provider sign-in sends a PKCE challenge, never the verifier', async () => 
   assert.equal(url.searchParams.get('code_challenge_method'), 's256')
   assert.equal(url.toString().includes(verifier), false)
 })
+
+test('provider codes are exchanged with their verifier', async () => {
+  globalThis.fetch = async (url, init) => {
+    assert.equal(new URL(url).searchParams.get('grant_type'), 'pkce')
+    assert.deepEqual(JSON.parse(init.body), { auth_code: 'provider-code', code_verifier: 'kept-verifier' })
+    return Response.json({ access_token: 'provider-token', refresh_token: 'refresh-token',
+      expires_in: 3600, user: { id: 'google-user', email: 'g@example.com' } })
+  }
+  const result = await account.exchangeProviderCode('provider-code', 'kept-verifier')
+  assert.equal(result.accessToken, 'provider-token')
+})
