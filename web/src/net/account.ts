@@ -468,7 +468,7 @@ export async function providers(): Promise<Provider[]> {
     })
     if (!response.ok) return []
     const body = (await response.json()) as { external?: Record<string, boolean> }
-    return (['google', 'apple'] as Provider[]).filter((name) => body.external?.[name] === true)
+    return (['google'] as Provider[]).filter((name) => body.external?.[name] === true)
   } catch {
     return []
   }
