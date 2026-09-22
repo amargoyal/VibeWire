@@ -192,6 +192,16 @@ export interface UpdateFact {
   checkedAt?: string
   problem?: string
   enabled: boolean
+  /** Whether the release carries a disk image and a checksum to install from. */
+  installable?: boolean
+  /** Whether this host is running from a bundle it is allowed to replace. */
+  canInstall?: boolean
+  /** How far an install has got: idle, downloading, verifying, staging,
+   *  restarting, failed. */
+  stage?: string
+  /** 0 to 1, only while downloading and only where the server declared a
+   *  length. */
+  progress?: number
 }
 
 export interface LogEntry {
