@@ -37,10 +37,17 @@ A host setting, off by default: **Require a signed-in browser**. It appears in t
 
 ## Configuring the Supabase project
 
-Two things cannot be set from code and have to be done once in the dashboard.
+Three things cannot be set from code and have to be done once in the dashboard, in this order.
 
-1. **Put the code in the email.** Authentication → Emails. The default Magic Link and Confirm Signup templates contain only `{{ .ConfirmationURL }}`. Add `{{ .Token }}` to both, or the six digits the sign-in screen asks for are in no email anyone receives.
-2. **Allow the origins that can use a link.** Authentication → URL Configuration → Redirect URLs. Add the published client (`https://amargoyal.github.io/VibeWire/**`) and any fixed host address. A Cloudflare quick-tunnel hostname changes every restart and cannot be listed; the code path covers it.
+1. **Set up custom SMTP.** Authentication → Emails → SMTP Settings. Supabase refuses to let the templates be edited until a project has its own SMTP, and its shared sender is capped at two emails an hour, so this is not optional for either reason. The project currently sends through Resend: host `smtp.resend.com`, port `465`, username `resend`, password a Resend API key, sender `onboarding@resend.dev`.
+2. **Put the code in the email.** Authentication → Emails. The default Magic Link and Confirm Signup templates contain only `{{ .ConfirmationURL }}`. Add `{{ .Token }}` to both — and to the subject line, where a phone shows it in the notification and `autocomplete="one-time-code"` can lift it. Without it the six digits the sign-in screen asks for are in no email anyone receives. Confirm Signup matters as much as Magic Link: it is the template a first-ever address gets, which is most sign-ins at this stage.
+3. **Allow the origins that can use a link.** Authentication → URL Configuration → Redirect URLs. Add the published client (`https://amargoyal.github.io/VibeWire/**`) and any fixed host address. A Cloudflare quick-tunnel hostname changes every restart and cannot be listed; the code path covers it.
+
+### The sender is a placeholder, and its limit is real
+
+`onboarding@resend.dev` is Resend's shared test sender. **It delivers only to the address on the Resend account that owns the key.** Anyone else who types their email into the sign-in screen gets a 403 at Resend and then waits for a code that was never sent — the client cannot tell that apart from a slow inbox, because the `POST /otp` that triggered it succeeded.
+
+That is acceptable while the only person signing in is the person who owns the project, and it is the reason there is no VibeWire domain in this document. Before a second person signs in, buy a domain, verify it in Resend, and change the sender to something at that domain. `vibewire.app`, `vibewire.com` and `vibewire.dev` were taken as of 2026-09-21; `vibewire.io` and `vibewire.sh` were not.
 
 Google and Apple are optional and need credentials from Google and Apple plus those same redirect URLs. Until a provider is enabled, its button is not drawn.
 
