@@ -26,3 +26,10 @@ h2 { font-size: 19px; letter-spacing: -0.02em; margin: 36px 0 8px; }
 p, li { color: var(--text-secondary); }
 a { color: var(--accent); }
 .updated { font-size: 13px; color: var(--text-secondary); }
+
+footer {
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  font-size: 13px;
+}
