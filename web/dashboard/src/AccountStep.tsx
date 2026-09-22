@@ -28,7 +28,7 @@ export function AccountStep() {
         setSent(true)
         setCooldown(60)
       } else {
-        const session = verified ?? await verifyEmailCode(email.trim(), code.trim())
+        const session = (verified && verified.expiresAt > Date.now() / 1000 ? verified : null) ?? await verifyEmailCode(email.trim(), code.trim())
         setVerified(session)
         await command({ do: 'setup.complete', accessToken: session.accessToken })
         pane.value = 'overview'
