@@ -2,7 +2,7 @@
 
 The Mac window now opens as a dedicated four-stage setup flow: Welcome, Permissions, Connect your phone, Your account. The dashboard is unavailable until setup completes. Sidebar links, menu pane requests, keyboard shortcuts and URL fragments cannot dismiss the flow.
 
-Both macOS permissions must be granted. Phone pairing can be done now or later. The final step requires email verification through Supabase, creating an account for a new address or signing in an existing one. Where the project has Google or Apple enabled, the same step offers them. They open in the default browser and return to the Mac on `/account/callback`. The Mac independently verifies the returned access token before saving `vibewire.setup.completed.v2` in UserDefaults. Closing or restarting before completion does not mark setup done. Existing installations complete this new flow once.
+Both macOS permissions must be granted. Phone pairing can be done now or later. The final step requires email verification through Supabase, creating an account for a new address or signing in an existing one. Where the project has Google enabled, the same step offers it. It opens in the default browser and return to the Mac on `/account/callback`. The Mac independently verifies the returned access token before saving `vibewire.setup.completed.v2` in UserDefaults. Closing or restarting before completion does not mark setup done. Existing installations complete this new flow once.
 
 Completed setup works offline on subsequent launches. Browser account requirements for remote connections remain a separate host setting.
 

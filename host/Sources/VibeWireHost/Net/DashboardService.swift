@@ -58,7 +58,7 @@ actor DashboardService {
     private var hostIdCache: String?
     private var hostIdRefresh: Task<Void, Never>?
 
-    /// A Google or Apple sign-in the dashboard started in the default browser.
+    /// A Google sign-in the dashboard started in the default browser.
     ///
     /// Providers refuse to sign in inside an embedded web view, so setup hands
     /// the page to the real browser and waits here for the code to come back.
@@ -127,7 +127,7 @@ actor DashboardService {
 
     // MARK: Browser sign-in
 
-    /// Where Google or Apple sends the default browser back to.
+    /// Where Google sends the default browser back to.
     ///
     /// Carries no launch key, because the browser that lands here is not the
     /// dashboard. It keeps the code or the refusal for the matching attempt and

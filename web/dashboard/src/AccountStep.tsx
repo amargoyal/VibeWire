@@ -7,7 +7,7 @@ import { accountsConfigured } from '../../src/net/supabase'
 import { ApiError, command } from './api'
 import { facts, pane } from './store'
 
-const PROVIDER_NAME: Record<Provider, string> = { google: 'Google', apple: 'Apple' }
+const PROVIDER_NAME: Record<Provider, string> = { google: 'Google' }
 
 export function AccountStep() {
   const [email, setEmail] = useState('')
@@ -42,7 +42,7 @@ export function AccountStep() {
   useEffect(() => () => { attempt.current++ }, [])
 
   /**
-   * Google and Apple refuse to sign in inside this window, so the Mac opens the
+   * Google refuses to sign in inside this window, so the Mac opens the
    * default browser and keeps the code it is sent back. The verifier stays
    * here, and only this window can turn that code into a session.
    */

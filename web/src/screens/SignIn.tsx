@@ -48,7 +48,6 @@ type Stage = 'address' | 'code'
 
 const PROVIDER_LABEL: Record<Provider, string> = {
   google: 'Continue with Google',
-  apple: 'Continue with Apple',
 }
 
 export function SignIn() {

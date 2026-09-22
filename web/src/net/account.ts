@@ -19,7 +19,7 @@
  *    lands back here with tokens in the fragment, which is what `adoptFromUrl`
  *    reads. A mail client that opens the link in its own in-app browser signs
  *    that browser in and not this one, which is why the code is offered first.
- *  - **Google or Apple.** Only where the project has the provider enabled and
+ *  - **Google.** Only where the project has the provider enabled and
  *    only where this origin is in the redirect allowlist; `providers()` asks
  *    rather than assuming, so a button that cannot work is not drawn.
  *
@@ -334,7 +334,7 @@ const VERIFIER_RECORD = 'account-pkce-verifier'
  *    are in the fragment, which never left the device — it is not sent with the
  *    request — and they are cleared out of the address bar as soon as they are
  *    read, so a shared screenshot of the URL bar is not a shared session.
- *  - `?code=…`, from Google or Apple, which is exchanged with the verifier this
+ *  - `?code=…`, from Google, which is exchanged with the verifier this
  *    browser kept before it left.
  *
  * `?error=…` arrives too, and is reported rather than swallowed: an origin
@@ -446,16 +446,16 @@ function scrubUrl(names: string[]): void {
   }
 }
 
-// MARK: - Google and Apple
+// MARK: - Google
 
-export type Provider = 'google' | 'apple'
+export type Provider = 'google'
 
 /**
  * Which providers this project actually has switched on.
  *
- * Asked rather than assumed. Enabling Google or Apple needs credentials from
- * Google or Apple and a redirect URL this deployment controls; until that is
- * done the buttons would be two ways to reach an error page, and this client's
+ * Asked rather than assumed. Enabling Google needs credentials from Google and
+ * a redirect URL this deployment controls; until that is done the button would
+ * be a way to reach an error page, and this client's
  * rule everywhere else is that a control which cannot work is not drawn.
  */
 export async function providers(): Promise<Provider[]> {
@@ -468,7 +468,7 @@ export async function providers(): Promise<Provider[]> {
     })
     if (!response.ok) return []
     const body = (await response.json()) as { external?: Record<string, boolean> }
-    return (['google', 'apple'] as Provider[]).filter((name) => body.external?.[name] === true)
+    return (['google'] as Provider[]).filter((name) => body.external?.[name] === true)
   } catch {
     return []
   }
