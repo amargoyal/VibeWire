@@ -51,7 +51,7 @@ The project now uses a Gmail SMTP sender in place of Resend's restricted test se
 
 Gmail is a personal mail service with sending limits and deliverability constraints. Move to a verified domain and transactional provider when usage grows. Verify both signup and returning-user emails after changing the sender.
 
-Google and Apple are optional and need credentials from Google and Apple plus those same redirect URLs. Until a provider is enabled, its button is not drawn.
+Google and Apple are optional. Until a provider is enabled, its button is not drawn, in the browser client and in Mac setup alike.
 
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` build the client against another project. `VIBEWIRE_ACCOUNT_URL` / `VIBEWIRE_ACCOUNT_KEY` do the same for either host. Clearing them leaves a build with no account screens and a requirement that cannot be switched on.
 
