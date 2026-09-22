@@ -477,3 +477,20 @@ body,
 .hoverable:hover {
   background: var(--ns-raised-2);
 }
+
+/* Setup is the window until the Mac confirms completion. */
+.onboarding__main {
+  width: min(100%, 780px);
+  margin-inline: auto;
+  padding: 40px 32px;
+  min-height: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.onboarding__progress { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 40px; color: var(--ns-text-secondary); }
+.onboarding__progress [aria-current='step'] { color: var(--ns-accent); }
+.onboarding__main h1 { margin-bottom: 28px; }
+.onboarding__main h1:focus { outline: none; }
+.onboarding__main section { min-height: 280px; }
+.onboarding__footer { display: flex; justify-content: flex-end; gap: 12px; padding-top: 28px; margin-top: 28px; border-top: 1px solid var(--ns-hairline); }
+.onboarding__main p { overflow-wrap: anywhere; }
