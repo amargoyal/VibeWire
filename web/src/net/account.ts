@@ -110,6 +110,7 @@ async function post(path: string, body: unknown, token?: string): Promise<Respon
     },
     body: JSON.stringify(body),
     cache: 'no-store',
+    signal: AbortSignal.timeout(15000),
   })
 }
 
