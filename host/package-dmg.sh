@@ -23,6 +23,22 @@ for required in arm64 x86_64; do
 done
 codesign --verify --strict "$app"
 
+# The window's artwork, drawn from the app's own mark and palette by a tool
+# compiled out of the same sources. Two resolutions, combined into the
+# multi-resolution TIFF Finder reads, so the window is sharp on a Retina
+# display and right on a projector.
+background_dir="$here/build/dmg-background"
+mkdir -p "$background_dir"
+swiftc -O \
+  "$here/Sources/VibeWireHost/App/Palette.swift" \
+  "$here/Sources/VibeWireHost/App/WaveMark.swift" \
+  "$here/Tools/DMGBackground.swift" \
+  -o "$background_dir/DMGBackground"
+"$background_dir/DMGBackground" "$background_dir/background.png" "$background_dir/background@2x.png"
+tiffutil -cathidpicheck \
+  "$background_dir/background.png" "$background_dir/background@2x.png" \
+  -out "$background_dir/background.tiff"
+
 # Isolated, pinned tooling; never installs packages into the system Python.
 python3 -m venv "$here/build/dmg-tools"
 "$here/build/dmg-tools/bin/python" -m pip install -r "$here/dmg-requirements.txt"
@@ -30,6 +46,8 @@ cp "$here/Resources/Install.txt" "$here/build/Start here.txt"
 dmg="$here/build/VibeWire-$version-mac-universal.dmg"
 "$here/build/dmg-tools/bin/dmgbuild" -s "$here/dmg-settings.py" \
   -D "app=$app" -D "instructions=$here/build/Start here.txt" \
+  -D "background=$background_dir/background.tiff" \
+  -D "volume_icon=$app/Contents/Resources/AppIcon.icns" \
   "Install VibeWire" "$dmg"
 hdiutil verify "$dmg"
 # Verify the copy inside the image too: Finder metadata can invalidate a bundle
