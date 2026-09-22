@@ -38,11 +38,7 @@ export function AccountStep() {
         await finish(session)
       }
     } catch (problem) {
-      setError(problem instanceof ApiError
-        ? problem.code === 'permissions_required'
-          ? 'A Mac permission is missing. Go back to Permissions and enable both permissions.'
-          : 'The Mac could not verify your account. Check your connection and try Finish setup again.'
-        : problem instanceof Error ? problem.message : 'Could not reach the account server. Try again.')
+      setError(describe(problem))
     } finally { setBusy(false) }
   }
   return <section class="setup-account">
@@ -77,4 +73,12 @@ export function AccountStep() {
           }}>{cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}</button>}
       </form>}
   </section>
+}
+
+function describe(problem: unknown): string {
+  if (problem instanceof ApiError) {
+    if (problem.code === 'permissions_required') return 'A Mac permission is missing. Go back to Permissions and enable both permissions.'
+    return 'The Mac could not verify your account. Check your connection and try Finish setup again.'
+  }
+  return problem instanceof Error ? problem.message : 'Could not reach the account server. Try again.'
 }
