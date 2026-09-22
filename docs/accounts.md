@@ -58,4 +58,5 @@ Google and Apple are optional and need credentials from Google and Apple plus th
 - Web client and dashboard: TypeScript checks and production builds.
 - Mac host: `swift build`.
 - Windows host: `npx tsc --noEmit`.
-- Not yet exercised on real hardware: a live email round trip, a provider sign-in, and a phone refused by a host with the requirement on.
+- Live email round trip, against the real project: `POST /auth/v1/otp` returned 200, Resend reported the message delivered with the six digits in its subject, `POST /auth/v1/verify` with `type: "email"` returned a session, and the trigger had already written the `profiles` row. Only the account server's own address can receive one until the sender changes — see above.
+- Not yet exercised: a provider sign-in, and a phone refused by a host with the requirement on.
