@@ -362,19 +362,22 @@ function Address({
  * the browsers, the bar they built — and not one word about "syncing".
  */
 function Keeps() {
-  const rows: [string, string][] = [
-    ['⌘', 'The computers you have paired with, by name and address'],
-    ['◍', 'The browsers you are signed in from'],
-    ['⌨', 'The keyboard bar you built, on every phone you use'],
+  // Numbered rather than pictured. Three glyphs would have to carry "a
+  // computer", "a browser" and "a keyboard row" at 13px on a phone, and the
+  // ones that mean those things are exactly the ones a font may not have.
+  const rows = [
+    'The computers you have paired with, by name and address',
+    'The browsers you are signed in from',
+    'The keyboard bar you built, on every phone you use',
   ]
 
   return (
     <div style={{ marginTop: '22px', flex: '0 0 auto' }}>
       <Card style={{ padding: '4px 16px' }}>
         <div class="stack">
-          {rows.map(([glyph, text], index) => (
+          {rows.map((text, index) => (
             <div
-              key={glyph}
+              key={text}
               class="row row--top"
               style={{
                 gap: '14px',
@@ -393,7 +396,7 @@ function Keeps() {
                   lineHeight: 1.5,
                 }}
               >
-                {glyph}
+                {index + 1}
               </span>
               <span
                 class="wrap"
