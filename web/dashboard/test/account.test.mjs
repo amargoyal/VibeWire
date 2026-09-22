@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { build } from '../../../host-electron/node_modules/esbuild/lib/main.js'
+import { build } from '../../node_modules/esbuild/lib/main.js'
 
 const { outputFiles } = await build({
   entryPoints: ['web/src/net/account.ts'], bundle: true, write: false,
