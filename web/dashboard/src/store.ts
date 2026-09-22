@@ -22,6 +22,8 @@ export interface Facts {
   setupCompleted?: boolean
   /** Whether this host can finish a Google sign-in opened in the default browser. */
   browserSignIn?: boolean
+  /** The account that finished setup on this Mac, or empty when unknown. */
+  accountEmail?: string
   at: string
   host: {
     platform?: string
