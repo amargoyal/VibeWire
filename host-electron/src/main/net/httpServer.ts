@@ -143,8 +143,14 @@ export class HTTPServer {
       return
     }
 
+    // A browser cannot put a header on a WebSocket upgrade, so it
+    // authenticates in the query string; the iPhone app sets headers. That
+    // difference is the only place a host can tell the two apart, and the
+    // account requirement governs browsers alone.
+    const isBrowser = request.headers['x-vibewire-signature'] === undefined
+
     this.wss.handleUpgrade(incoming, socket, head, (ws) => {
-      void this.accept(ws, device)
+      void this.accept(ws, device, isBrowser)
     })
   }
 
@@ -161,8 +167,8 @@ export class HTTPServer {
     )
   }
 
-  private async accept(ws: WebSocket, device: TrustedDevice): Promise<void> {
-    const connection = new SocketConnection(ws, device.id, device.name)
+  private async accept(ws: WebSocket, device: TrustedDevice, isBrowser: boolean): Promise<void> {
+    const connection = new SocketConnection(ws, device.id, device.name, isBrowser)
     this.sockets.add(connection)
 
     ws.on('message', (data, isBinary) => {

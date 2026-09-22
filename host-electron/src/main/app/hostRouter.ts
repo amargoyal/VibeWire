@@ -330,7 +330,8 @@ export class HostRouter implements Router {
         // Said on every hello, not only to newly paired devices: a browser
         // paired last week learns about the requirement at the same moment as
         // one paired a second ago.
-        requiresAccount: Config.accountsAvailable && this.settings.requireAccount,
+        requiresAccount:
+          Config.accountsAvailable && socket.isBrowser && this.settings.requireAccount,
       }),
     )
 
@@ -531,6 +532,10 @@ export class HostRouter implements Router {
    */
   private accountGateCloses(socket: SocketConnection): boolean {
     if (!Config.accountsAvailable) return false
+    // The iPhone app holds a key in the Secure Enclave and has no account to
+    // present. Holding it to this setting would turn the switch into a way to
+    // lock yourself out of your own phone.
+    if (!socket.isBrowser) return false
     if (!this.settings.requireAccount) return false
     return socket.accountUserId === null
   }
@@ -607,7 +612,7 @@ export class HostRouter implements Router {
    * socket with no picture and no explanation.
    */
   private startAccountGrace(socket: SocketConnection): void {
-    if (!Config.accountsAvailable) return
+    if (!Config.accountsAvailable || !socket.isBrowser) return
     if (!this.settings.requireAccount) return
     setTimeout(() => {
       if (socket.accountUserId !== null) return

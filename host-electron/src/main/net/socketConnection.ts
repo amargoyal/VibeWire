@@ -39,6 +39,9 @@ export class SocketConnection {
     private readonly ws: WebSocket,
     readonly deviceId: string,
     readonly deviceName: string,
+    /** Whether a browser opened this socket rather than the iPhone app. See
+     *  `HTTPServer.handleUpgrade` for how it is decided. */
+    readonly isBrowser: boolean = false,
   ) {}
 
   sendJSON(object: Payload): void {
