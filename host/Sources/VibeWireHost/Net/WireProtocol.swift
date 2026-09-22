@@ -33,6 +33,9 @@ enum InboundMessage {
     case claude(ClaudeInbound)
     case revoke(deviceId: String?, all: Bool)
     case setting(key: String, value: SettingValue)
+    /// The account the client is signed into, offered once per socket. Ignored
+    /// by a host that does not require one.
+    case account(token: String)
     case ping(tMicros: UInt64, sequence: UInt64, rttMillis: Double?)
     /// The phone reporting its own radio, so the cellular cap can apply
     /// only when it is actually on cellular.
@@ -226,6 +229,9 @@ extension InboundMessage {
                 all: bool("all")
             )
 
+        case "account":
+            message = .account(token: try requireString("token"))
+
         case "setting":
             let key = try requireString("key")
             let value: SettingValue
@@ -321,7 +327,8 @@ enum Outbound {
         hostName: String,
         model: String,
         osVersion: String,
-        capabilities: [String: Bool]
+        capabilities: [String: Bool],
+        requiresAccount: Bool = false
     ) -> [String: Any] {
         [
             "t": "hello",
@@ -335,6 +342,8 @@ enum Outbound {
             // Additive, still protocol 1. A client that never reads it assumes
             // a Mac, which is what every host was until the Windows one.
             "platform": "macos",
+            // Additive too. Absent from an older host, which required nothing.
+            "requiresAccount": requiresAccount,
         ]
     }
 
