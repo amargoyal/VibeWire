@@ -113,7 +113,7 @@ export function Settings({ state }: { state: Facts }) {
               onChange: (on) => void send({ do: 'setting.set', key: 'checkForUpdates', value: on }),
             }}
           />
-          <Row label="Releases" value="NOTHING IS INSTALLED FOR YOU">
+          <Row label="Releases" value={installLine(state)}>
             <div class="row" style={{ gap: 10 }}>
               <div style={{ width: 150 }}>
                 <OutlinedAction
@@ -122,6 +122,16 @@ export function Settings({ state }: { state: Facts }) {
                   onClick={() => void send({ do: 'update.check' })}
                 />
               </div>
+              {state.update?.available && state.update.canInstall && state.update.installable ? (
+                <div style={{ width: 190 }}>
+                  <OutlinedAction
+                    title="UPDATE AND RESTART"
+                    tint="var(--ns-accent)"
+                    height={40}
+                    onClick={() => void send({ do: 'update.install' })}
+                  />
+                </div>
+              ) : null}
               <div style={{ width: 150 }}>
                 <OutlinedAction
                   title="OPEN RELEASES"
@@ -229,11 +239,32 @@ export function Settings({ state }: { state: Facts }) {
   )
 }
 
+/**
+ * What pressing UPDATE AND RESTART would do, said before it is pressed.
+ *
+ * The old line said NOTHING IS INSTALLED FOR YOU, which stopped being true.
+ * What replaces it is not a promise: it names the two checks, because they are
+ * the reason this is safe to press on a build Apple never notarized.
+ */
+function installLine(state: Facts): string {
+  const update = state.update
+  if (!update?.available) return 'THE CHECKSUM AND THE SIGNATURE ARE CHECKED BEFORE ANYTHING IS REPLACED'
+  if (update.stage === 'failed') {
+    return `LAST ATTEMPT FAILED · ${(update.problem ?? 'NO REASON GIVEN').toUpperCase()}`
+  }
+  if (!update.canInstall) return 'THIS COPY CANNOT REPLACE ITSELF · OPEN THE RELEASE INSTEAD'
+  if (!update.installable) return 'THAT RELEASE HAS NO DISK IMAGE AND CHECKSUM · OPEN THE RELEASE INSTEAD'
+  return 'REPLACES THIS APP AFTER CHECKING THE CHECKSUM AND THE SIGNATURE'
+}
+
 /** One line about updates, whichever of the four states the host is in. */
 function updateLine(state: Facts): string {
   const update = state.update
   if (!update) return 'NOT ASKED'
   if (!update.enabled) return 'OFF · THIS HOST NEVER ASKS'
+  if (update.stage && update.stage !== 'idle' && update.stage !== 'failed') {
+    return `INSTALLING ${update.latest ?? ''} · ${update.stage.toUpperCase()}`
+  }
   if (update.available && update.latest) return `${update.latest} IS OUT · RUNNING ${update.current}`
   if (update.problem) return `COULD NOT ASK · ${update.problem.toUpperCase()}`
   if (update.latest) return `UP TO DATE · ${update.current}`
