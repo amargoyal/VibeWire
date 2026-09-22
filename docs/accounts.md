@@ -64,6 +64,16 @@ Both providers return to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/a
 3. In Supabase, Authentication → Sign In / Providers → Google: enable it and paste the client ID and secret.
 4. Publish the consent screen. In Testing mode only listed test users can sign in. A logo sends the app through brand verification first.
 
+### Apple
+
+Needs a paid Apple Developer account.
+
+1. An App ID with Sign in with Apple enabled.
+2. A Services ID, for example `com.amargoyal.vibewire.web`, with Sign in with Apple configured: domain `iqtuikhyqkythaffxuca.supabase.co`, return URL the Supabase callback above. The Services ID is the client ID.
+3. A key with Sign in with Apple enabled. Download the `.p8` once and keep it out of the repository. Note its Key ID and the Team ID.
+4. Sign a client secret JWT with that key (ES256, `iss` the Team ID, `sub` the Services ID, `aud` `https://appleid.apple.com`).
+5. In Supabase, Authentication → Sign In / Providers → Apple: enable it, add the Services ID to Client IDs, and paste the JWT as the secret.
+
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` build the client against another project. `VIBEWIRE_ACCOUNT_URL` / `VIBEWIRE_ACCOUNT_KEY` do the same for either host. Clearing them leaves a build with no account screens and a requirement that cannot be switched on.
 
 ## Validation
