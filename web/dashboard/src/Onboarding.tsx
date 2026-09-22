@@ -38,6 +38,21 @@ export function Onboarding({ state }: { state: Facts }) {
         <p role="status">{ready ? 'Both permissions are ready. Continue to connect your phone.' : 'Continue becomes available when both permissions are allowed.'}</p>
         <p class="setup__hint">If macOS asks you to quit and reopen VibeWire, do so. You can return to this step after relaunching.</p>
       </section>}
+      {step === 2 && <section>
+        <h2>Bring your phone into the picture</h2>
+        <p>Keep both devices awake on the same Wi-Fi. Open the pairing code and scan the browser QR with your phone’s Camera.</p>
+        <button class="setup__button" disabled={!live} onClick={() => { pairOpen.value = true }}>Open pairing code</button>
+        <p role="status">{state.devices.length > 0 ? 'A device is paired. Open View on your phone and try moving the pointer.' : 'No device paired yet. You can pair now or connect one from the dashboard later.'}</p>
+        {state.addresses.firewall.blocksIncoming && <p role="alert">{state.addresses.firewall.detail}
+          <button class="setup__button setup__button--quiet" onClick={() => void send({ do: 'settings.open', which: 'firewall' })}>Open Firewall settings</button></p>}
+        <details><summary>Phone cannot reach this Mac?</summary>
+          <p>Guest Wi-Fi and VPNs can block local connections. The internet relay provides an HTTPS address your phone can reach. Scan the new QR after it starts.</p>
+          <button class="setup__button" disabled={!live || state.addresses.tunnelRunning}
+            onClick={() => void send({ do: 'transport.tunnel', on: true })}>{state.addresses.tunnelRunning ? 'Relay is on' : 'Turn on internet relay'}</button>
+          {state.transport.relayProblem && <p role="status">{state.transport.relayProblem}</p>}
+        </details>
+        <p class="setup__hint">Only pair devices you trust. They can control this Mac. Remove their access later in Devices.</p>
+      </section>}
       {step === 3 && <AccountStep />}
       <footer class="onboarding__footer">
         {step > 0 && <button class="setup__button setup__button--quiet" onClick={() => setStep(step - 1)}>Back</button>}
