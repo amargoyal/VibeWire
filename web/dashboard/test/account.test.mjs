@@ -36,3 +36,12 @@ test('verified email codes produce the token the Mac must verify', async () => {
   assert.equal(result.accessToken, 'verified-token')
   assert.equal(result.user.email, 'test@example.com')
 })
+
+test('provider sign-in sends a PKCE challenge, never the verifier', async () => {
+  const verifier = account.randomVerifier()
+  const url = new URL(await account.providerAuthorizeUrl('google', 'http://127.0.0.1:8787/account/callback', verifier))
+  assert.equal(url.searchParams.get('provider'), 'google')
+  assert.equal(url.searchParams.get('code_challenge'), await account.challengeFor(verifier))
+  assert.equal(url.searchParams.get('code_challenge_method'), 's256')
+  assert.equal(url.toString().includes(verifier), false)
+})
