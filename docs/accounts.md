@@ -72,4 +72,4 @@ Google returns to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/auth/v1/
 - Mac host: `swift build`.
 - Windows host: `npx tsc --noEmit`.
 - Live email round trip, against the real project: `POST /auth/v1/otp` returned 200, Resend reported the message delivered with the six digits in its subject, `POST /auth/v1/verify` with `type: "email"` returned a session, and the trigger had already written the `profiles` row. This historical check used the former Resend test sender. The Gmail migration requires a fresh delivery check.
-- Not yet exercised: a live Google or Apple sign-in, in the browser client or through Mac setup, and a phone refused by a host with the requirement on.
+- Not yet exercised: a live Google sign-in, in the browser client or through Mac setup, and a phone refused by a host with the requirement on.
