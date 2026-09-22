@@ -1,6 +1,6 @@
 import { render } from 'preact'
 import { App } from '../src/App'
-import { facts, reachability, type Facts } from '../src/store'
+import { facts, pane, reachability, type Facts } from '../src/store'
 import '../src/dashboard.css'
 
 const params = new URLSearchParams(location.search)
@@ -17,4 +17,5 @@ facts.value = {
   update: { available: true, current: '0.16.0', latest: '0.17.0', canInstall: true, installable: true },
 } as Facts
 reachability.value = 'live'
+if (complete) pane.value = 'settings'
 render(<App />, document.getElementById('root')!)
