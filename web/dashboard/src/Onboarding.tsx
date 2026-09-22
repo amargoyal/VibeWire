@@ -63,3 +63,16 @@ export function Onboarding({ state }: { state: Facts }) {
     </main>
   </div>
 }
+
+/** All a signed-out Mac shows: the account step, and nothing behind it. */
+export function SignedOut() {
+  return <div class="mac onboarding">
+    <header class="mac__bar"><span class="mac__wordmark">VIBEWIRE</span></header>
+    <main class="onboarding__main setup">
+      <h1 tabIndex={-1}>Signed out</h1>
+      {notice.value && <p role="alert">{notice.value}</p>}
+      <p>Sign in to use VibeWire on this Mac again. Every paired device was removed, so pair your phone again after signing in.</p>
+      <AccountStep />
+    </main>
+  </div>
+}

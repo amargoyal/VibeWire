@@ -327,6 +327,8 @@ actor DashboardService {
 
         payload["setupCompleted"] = UserDefaults.standard.bool(forKey: "vibewire.setup.completed.v2")
         payload["browserSignIn"] = Config.accountsAvailable
+        payload["accountEmail"] = UserDefaults.standard.string(forKey: "vibewire.account.email") ?? ""
+        payload["signedOut"] = UserDefaults.standard.bool(forKey: "vibewire.account.signedOut")
 
         payload["permissions"] = [
             "screenRecording": screenRecording,
@@ -824,6 +826,26 @@ actor DashboardService {
                   account.email != nil
             else { return .error(401, "account_verification_failed") }
             UserDefaults.standard.set(true, forKey: "vibewire.setup.completed.v2")
+            UserDefaults.standard.set(account.email, forKey: "vibewire.account.email")
+            UserDefaults.standard.removeObject(forKey: "vibewire.account.signedOut")
+            return .json(200, ["ok": true])
+
+        case "account.signOut":
+            // Signing out of the Mac takes every device with it: a phone paired
+            // under one account must not keep controlling this computer once
+            // that account has left. Permissions and settings stay.
+            do {
+                _ = try await router.dashboardRevoke(deviceId: nil, all: true)
+            } catch {
+                return .error(500, "revoke_failed", extra: ["detail": "\(error)"])
+            }
+            await refreshTrustNow()
+            await pairing.endPairing()
+            await router.dashboardReleaseAccount()
+            browserSignIn = nil
+            UserDefaults.standard.set(false, forKey: "vibewire.setup.completed.v2")
+            UserDefaults.standard.removeObject(forKey: "vibewire.account.email")
+            UserDefaults.standard.set(true, forKey: "vibewire.account.signedOut")
             return .json(200, ["ok": true])
 
         case "account.browser.begin":
@@ -851,6 +873,9 @@ actor DashboardService {
             return .json(200, payload)
 
         case "pair.begin":
+            guard !UserDefaults.standard.bool(forKey: "vibewire.account.signedOut") else {
+                return .error(409, "signed_out")
+            }
             let code = await pairing.beginPairing(
                 name: string("name"),
                 reusable: bool("reusable") ?? false

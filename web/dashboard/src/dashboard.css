@@ -516,3 +516,4 @@ body,
 .settings-actions { display: flex; flex-wrap: wrap; gap: 10px; max-width: 100%; }
 .settings-actions > div { max-width: 100%; }
 .settings-grid .kv { min-width: 0; overflow-wrap: anywhere; }
+.setup-account__providers .setup__button--quiet { min-height: 44px; border: 1px solid var(--ns-stroke); border-radius: var(--radius-inner); }

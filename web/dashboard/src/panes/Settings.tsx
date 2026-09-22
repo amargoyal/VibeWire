@@ -2,6 +2,8 @@ import { Caps, Card, OutlinedAction, Segmented, Toggle } from '../../../src/desi
 import { Kv, PaneHeading, RuledLabel } from '../parts'
 import { bytes, fingerprint } from '../format'
 import { send, type Facts } from '../store'
+import { useState } from 'preact/hooks'
+import { signOut } from '../../../src/net/account'
 
 /**
  * 06 · SETTINGS.
@@ -142,6 +144,8 @@ export function Settings({ state }: { state: Facts }) {
             </div>
           </Row>
         </Section>
+
+        {state.accountEmail !== undefined && <AccountSection email={state.accountEmail} />}
 
         <Section title="TRUST">
           <Row
@@ -339,5 +343,51 @@ function Permission({
       </span>
       <OutlinedAction title="GRANT…" tint="var(--ns-amber)" edge="var(--ns-amber)" onClick={onGrant} />
     </div>
+  )
+}
+
+/**
+ * Who this Mac is signed in as, and the way out.
+ *
+ * Signing out unpairs every device, so it asks once before doing it. The
+ * second press is the confirmation, in place, rather than a dialog this
+ * window's web view may not draw.
+ */
+function AccountSection({ email }: { email: string }) {
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function signOutOfMac() {
+    setBusy(true)
+    await signOut()
+    await send({ do: 'account.signOut' })
+    setBusy(false)
+    setConfirming(false)
+  }
+
+  return (
+    <Section title="ACCOUNT">
+      <Row
+        label={email || 'Signed in'}
+        value={confirming ? 'SIGNING OUT UNPAIRS EVERY DEVICE' : 'SIGNED IN ON THIS MAC'}
+      >
+        <div class="settings-actions">
+          {confirming && (
+            <div style={{ width: 150 }}>
+              <OutlinedAction title="CANCEL" height={40} enabled={!busy} onClick={() => setConfirming(false)} />
+            </div>
+          )}
+          <div style={{ width: confirming ? 210 : 150 }}>
+            <OutlinedAction
+              title={confirming ? (busy ? 'SIGNING OUT…' : 'SIGN OUT AND UNPAIR') : 'SIGN OUT'}
+              tint={confirming ? 'var(--ns-red)' : undefined}
+              height={40}
+              enabled={!busy}
+              onClick={() => (confirming ? void signOutOfMac() : setConfirming(true))}
+            />
+          </div>
+        </div>
+      </Row>
+    </Section>
   )
 }

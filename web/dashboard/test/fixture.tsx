@@ -6,7 +6,7 @@ import '../src/dashboard.css'
 const params = new URLSearchParams(location.search)
 const complete = params.has('complete')
 facts.value = {
-  setupCompleted: complete, browserSignIn: true, at: '',
+  setupCompleted: complete, browserSignIn: true, accountEmail: 'owner@example.com', signedOut: params.has('signedout'), at: '',
   host: { platform: 'macos', name: 'Test Mac', model: 'MacBook Pro', os: '15', version: 'test', protocol: 1, uptimeSeconds: 10, port: 8787, awake: true, hostKey: 'test', pathWord: 'DIRECT', webBundle: { present: true, bytes: 123 }, dashboardBundle: { present: true, bytes: 123 } },
   permissions: { screenRecording: params.has('permissions'), accessibility: params.has('permissions'), checkedAt: '' },
   devices: [], devicesReadable: 'yes', displays: [], sideBySide: false,

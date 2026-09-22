@@ -1206,6 +1206,20 @@ final class HostRouter: Router, @unchecked Sendable {
         state.read { $0.activeSocket }?.sendJSON(settingsPayload())
     }
 
+    /// Forgets the account that claimed this computer, as signing out of the
+    /// Mac does. The switch keeps its position; while it is on, the next
+    /// signed-in browser claims the computer again.
+    func dashboardReleaseAccount() async {
+        let updated = state.withLock { current -> HostSettings in
+            current.settings.accountOwnerId = nil
+            current.settings.accountOwnerEmail = nil
+            return current.settings
+        }
+        Config.saveSettings(updated)
+        await accounts.forgetEverything()
+        state.read { $0.activeSocket }?.sendJSON(settingsPayload())
+    }
+
     /// Revoke, from the Mac rather than from a phone.
     ///
     /// The severing is the point: PROTOCOL §1.1 promises a live socket dies
