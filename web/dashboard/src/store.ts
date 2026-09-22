@@ -24,6 +24,8 @@ export interface Facts {
   browserSignIn?: boolean
   /** The account that finished setup on this Mac, or empty when unknown. */
   accountEmail?: string
+  /** Whether someone signed out of this Mac, which leaves only the sign-in screen. */
+  signedOut?: boolean
   at: string
   host: {
     platform?: string
