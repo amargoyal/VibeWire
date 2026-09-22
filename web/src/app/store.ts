@@ -240,6 +240,9 @@ function firstLine(text: string): string {
   return line.length > 48 ? `${line.slice(0, 47)}…` : line
 }
 
+/** Where "the account was offered and answered" is remembered. */
+const ACCOUNT_INVITE_KEY = 'vibewire.account-invite.v1'
+
 export class Store {
   // Navigation
   route = signal<Route>('pairing')
@@ -547,6 +550,33 @@ export class Store {
     ]).catch(() => undefined)
   }
 
+  /**
+   * Whether the end of setup should offer an account.
+   *
+   * Asked once. A person who skipped it has answered the question, and asking
+   * again on the next pairing would make the answer meaningless — Settings is
+   * where they say yes later, and the host can still insist on its own behalf.
+   */
+  private shouldInviteSignIn(): boolean {
+    if (!this.accountsAvailable || this.account.value) return false
+    try {
+      return localStorage.getItem(ACCOUNT_INVITE_KEY) == null
+    } catch {
+      // Blocked storage means the invitation cannot be remembered as declined.
+      // Offering it once per pairing is the smaller annoyance of the two.
+      return true
+    }
+  }
+
+  /** Records that the invitation was answered, either way. */
+  noteSignInAnswered(): void {
+    try {
+      localStorage.setItem(ACCOUNT_INVITE_KEY, 'answered')
+    } catch {
+      /* Nothing is lost that this browser could have kept. */
+    }
+  }
+
   /** Ends the account session. The pairing, which is a different thing, stays. */
   async signOutAccount(): Promise<void> {
     await signOut()
@@ -621,9 +651,13 @@ export class Store {
       batch(() => {
         this.pairedHost.value = paired
         this.hostName.value = paired.hostName
-        this.route.value = 'home'
+        // The last step of setup, and the first one that is optional. The wire
+        // is proven by the time this is asked, so a person who says no keeps
+        // everything they came for.
+        this.route.value = this.shouldInviteSignIn() ? 'signin' : 'home'
       })
       await this.client.connect(paired)
+      void this.rememberAccountContext()
       return null
     } catch (error) {
       return (error as Error).message
