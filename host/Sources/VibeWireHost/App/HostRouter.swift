@@ -261,6 +261,12 @@ final class HostRouter: Router, @unchecked Sendable {
                 "deviceId": result.device.id,
                 "pairedAt": ISO8601DateFormatter().string(from: result.device.pairedAt),
                 "protocol": Config.protocolVersion,
+                // So the browser knows, before its first socket, that the end
+                // of setup is a sign-in it has to do rather than one it is
+                // being offered. The alternative was pairing, connecting, and
+                // being turned away — the same destination, one refusal later.
+                "requiresAccount": Config.accountsAvailable
+                    && state.read { $0.settings.requireAccount },
             ])
         } catch PairingService.PairError.lockedOut(let retryAfter) {
             Log.info(.net, "pair rejected 429 too_many_attempts, retry in \(retryAfter)s")
