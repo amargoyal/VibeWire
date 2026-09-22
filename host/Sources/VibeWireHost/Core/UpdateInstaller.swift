@@ -139,38 +139,61 @@ actor UpdateInstaller {
         let actual = try Self.digest(of: image)
         guard actual == expected else { throw Failure.digestMismatch(expected: expected, actual: actual) }
 
-        // 4. Mount it, and always unmount it.
+        // 4. Mount it, take what is needed, unmount it. The unmount is not a
+        //    `defer` with a detached task in it: this function ends by
+        //    terminating the process, and a task started on the way out never
+        //    runs, which left a disk image mounted after every single update.
         let mount = try await Self.attach(image)
-        defer { Task { await Self.detach(mount) } }
+        let staged: (app: URL, directory: URL, version: String)
+        do {
+            staged = try await stageCopy(from: mount, target: target, latest: latest)
+        } catch {
+            await Self.detach(mount)
+            throw error
+        }
+        await Self.detach(mount)
 
+        // 5. Arm the swap and go.
+        let candidateVersion = staged.version
+        stage = .restarting
+        try Self.armSwap(target: target, staged: staged.app, staging: staged.directory)
+        Log.info(.app, "update \(candidateVersion) staged; restarting")
+        await MainActor.run { NSApp.terminate(nil) }
+    }
+
+    /// Everything that needs the image mounted, in one place so the unmount
+    /// has exactly one caller on the way out and one on the way to a throw.
+    ///
+    /// Returns the copy already sitting on the destination volume, so what is
+    /// left afterwards is two renames that cannot half-finish, rather than a
+    /// copy across volumes that can.
+    private func stageCopy(
+        from mount: URL,
+        target: URL,
+        latest: String
+    ) async throws -> (app: URL, directory: URL, version: String) {
         let candidate = mount.appendingPathComponent(target.lastPathComponent)
         guard FileManager.default.fileExists(atPath: candidate.path) else {
             throw Failure.noAppInImage(target.lastPathComponent)
         }
 
-        // 5. The signature, and that the thing inside is actually newer.
         try await Self.verifySignature(of: candidate, matching: target)
-        let candidateVersion = Self.version(of: candidate) ?? latest
-        guard UpdateCheck.isNewer(candidateVersion, than: Config.hostVersion) else {
-            throw Failure.notNewer(candidateVersion)
+        let version = Self.version(of: candidate) ?? latest
+        guard UpdateCheck.isNewer(version, than: Config.hostVersion) else {
+            throw Failure.notNewer(version)
         }
 
-        // 6. Copy onto the volume the old copy lives on, so the swap is a
-        //    rename rather than a copy that can half-finish.
         stage = .staging
-        let staging = target
+        let directory = target
             .deletingLastPathComponent()
             .appendingPathComponent(".VibeWire-update-\(UUID().uuidString.prefix(8))")
-        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-        let staged = staging.appendingPathComponent(target.lastPathComponent)
-        try await Self.ditto(from: candidate, to: staged)
-        try await Self.verifySignature(of: staged, matching: target)
-
-        // 7. Arm the swap and go.
-        stage = .restarting
-        try Self.armSwap(target: target, staged: staged, staging: staging)
-        Log.info(.app, "update \(candidateVersion) staged; restarting")
-        await MainActor.run { NSApp.terminate(nil) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let app = directory.appendingPathComponent(target.lastPathComponent)
+        try await Self.ditto(from: candidate, to: app)
+        // Again on the copy: `ditto` preserves a signature, and a copy whose
+        // signature stopped verifying is a copy that must not be installed.
+        try await Self.verifySignature(of: app, matching: target)
+        return (app, directory, version)
     }
 }
 
@@ -316,7 +339,15 @@ extension UpdateInstaller {
         _ arguments: [String],
         timeout: TimeInterval = 120
     ) async -> (status: Int32, out: String, error: String) {
-        await withCheckedContinuation { continuation in
+        // Checked before a pipe exists. A `Process` that fails to start leaves
+        // its pipes with no writer that will ever close, and the readers below
+        // then wait on an EOF that cannot arrive: the first version of this
+        // hung the whole install on a tool whose path was one directory out.
+        guard FileManager.default.isExecutableFile(atPath: path) else {
+            return (-1, "", "\(path) is not an executable on this machine")
+        }
+
+        return await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: path)
             process.arguments = arguments
@@ -347,7 +378,9 @@ extension UpdateInstaller {
                     return state
                 }
                 guard !already else { return }
-                group.wait()
+                // Bounded, for the same reason. A reader that cannot reach EOF
+                // must cost this call a few seconds, never the whole install.
+                _ = group.wait(timeout: .now() + 5)
                 continuation.resume(returning: (
                     status,
                     String(decoding: outData.read { $0 }, as: UTF8.self),
@@ -427,7 +460,7 @@ extension UpdateInstaller {
     /// anything. The pair is what makes a swapped download useless to an
     /// attacker who does not hold this project's key.
     static func verifySignature(of candidate: URL, matching installed: URL) async throws {
-        let verified = await run("/usr/sbin/codesign", [
+        let verified = await run("/usr/bin/codesign", [
             "--verify", "--strict", "--deep", candidate.path,
         ])
         guard verified.status == 0 else {
@@ -455,7 +488,7 @@ extension UpdateInstaller {
     /// `codesign -dv` writes its report to standard error, one `key=value` per
     /// line, with the leaf certificate first among the authorities.
     static func identity(of app: URL) async -> SigningIdentity? {
-        let result = await run("/usr/sbin/codesign", ["-dv", "--verbose=4", app.path], timeout: 30)
+        let result = await run("/usr/bin/codesign", ["-dv", "--verbose=4", app.path], timeout: 30)
         guard result.status == 0 else { return nil }
         var authority: String?
         var team: String?
