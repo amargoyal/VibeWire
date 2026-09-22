@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import { sendEmailCode, verifyEmailCode, type Session } from '../../src/net/account'
 import { accountsConfigured } from '../../src/net/supabase'
 import { command } from './api'
@@ -10,6 +10,12 @@ export function AccountStep() {
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [cooldown, setCooldown] = useState(0)
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setTimeout(() => setCooldown(cooldown - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [cooldown])
   const [verified, setVerified] = useState<Session | null>(null)
   async function submit(event: Event) {
     event.preventDefault()
@@ -20,6 +26,7 @@ export function AccountStep() {
       if (!sent) {
         await sendEmailCode(email.trim(), 'https://amargoyal.github.io/VibeWire/')
         setSent(true)
+        setCooldown(60)
       } else {
         const session = verified ?? await verifyEmailCode(email.trim(), code.trim())
         setVerified(session)
@@ -50,6 +57,17 @@ export function AccountStep() {
         <button class="setup__button" disabled={busy} type="submit">
           {busy ? 'Please wait…' : sent ? 'Finish setup' : 'Send email code'}
         </button>
+        {sent && <button class="setup__button setup__button--quiet" type="button" disabled={busy}
+          onClick={() => { setSent(false); setCode(''); setVerified(null); setError('') }}>Change email</button>}
+        {sent && <button class="setup__button setup__button--quiet" type="button" disabled={busy || cooldown > 0}
+          onClick={async () => {
+            setBusy(true); setError('')
+            try {
+              await sendEmailCode(email.trim(), 'https://amargoyal.github.io/VibeWire/')
+              setCooldown(60); setCode(''); setVerified(null)
+            } catch (problem) { setError(problem instanceof Error ? problem.message : 'Could not resend the code.') }
+            finally { setBusy(false) }
+          }}>{cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}</button>}
       </form>}
   </section>
 }
