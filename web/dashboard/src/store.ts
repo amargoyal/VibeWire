@@ -20,6 +20,8 @@ import { fetchEvents, fetchState, command, ApiError } from './api'
 
 export interface Facts {
   setupCompleted?: boolean
+  /** Whether this host can finish a Google or Apple sign-in opened in the default browser. */
+  browserSignIn?: boolean
   at: string
   host: {
     platform?: string
