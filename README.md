@@ -132,6 +132,10 @@ Signing in is a six-digit code by email. The same email holds a link, and Google
 and Apple appear where the project has them enabled, in the browser client and in
 Mac setup.
 
+The [privacy policy](https://amargoyal.github.io/VibeWire/privacy.html) and
+[terms of service](https://amargoyal.github.io/VibeWire/terms.html) are published
+with the web client.
+
 The host has one related setting, off by default: **Require a signed-in
 browser**, in the pairing sheet and in Settings. On, this computer answers only
 browsers signed into the account that owns it — the first account to sign in
