@@ -2,8 +2,10 @@
  * The root, and 15 · SCREENSHOT FROM THE MAC.
  * Mirrored by ios/VibeWire/App/VibeWireApp.swift.
  *
- * Three routes and two sheets, and deliberately absent: light mode, a tab bar, an
- * blocking tour. Setup help lives beside pairing and in Settings.
+ * Four routes and two sheets, and deliberately absent: light mode, a tab bar, an
+ * blocking tour. Setup help lives beside pairing and in Settings. The fourth
+ * route is the account, which sits after pairing rather than before it: nothing
+ * on the other three needs one.
  */
 
 import { useEffect, useRef, useState } from 'preact/hooks'
@@ -25,6 +27,7 @@ import { Home } from '../screens/Home'
 import { Pairing } from '../screens/Pairing'
 import { Remote } from '../screens/Remote'
 import { Settings } from '../screens/Settings'
+import { SignIn } from '../screens/SignIn'
 import { showShortcuts, ShortcutsSheet, useShortcuts } from './shortcuts'
 import { watchTabCondition } from './tabIndicator'
 
@@ -99,7 +102,15 @@ export function App() {
 
   return (
     <>
-      {route === 'pairing' ? <Pairing /> : route === 'home' ? <Home /> : <Remote />}
+      {route === 'pairing' ? (
+        <Pairing />
+      ) : route === 'signin' ? (
+        <SignIn />
+      ) : route === 'home' ? (
+        <Home />
+      ) : (
+        <Remote />
+      )}
 
       {store.banner.value ? (
         <BannerView banner={store.banner.value} onDismiss={() => (store.banner.value = null)} />
