@@ -17,7 +17,10 @@ enum WaveMark {
     /// segment runs crest to crest with horizontal control points, which is what
     /// gives a sine its shape; only the tail departs from that, easing out of the
     /// last crest into the flat line the wave settles to.
-    private static func path(in rect: NSRect) -> NSBezierPath {
+    /// Not private: the disk image's background art strokes this same path,
+    /// so the mark on the installer window and the mark in the menu bar are
+    /// one drawing rather than two that agree today.
+    static func path(in rect: NSRect) -> NSBezierPath {
         func point(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
             // y is quoted from the top, and AppKit draws from the bottom.
             NSPoint(x: rect.minX + x * rect.width, y: rect.maxY - y * rect.height)
