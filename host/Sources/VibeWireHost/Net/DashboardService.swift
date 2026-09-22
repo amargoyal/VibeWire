@@ -127,7 +127,7 @@ actor DashboardService {
 
     // MARK: Browser sign-in
 
-    /// Where Google or Apple sends the default browser back to.
+    /// Where Google sends the default browser back to.
     ///
     /// Carries no launch key, because the browser that lands here is not the
     /// dashboard. It keeps the code or the refusal for the matching attempt and
