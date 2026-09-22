@@ -432,7 +432,7 @@ Commands: `pair.begin` `{name, reusable}`, `pair.end`, `device.revoke`
 `{deviceId, name}`, `display.select` `{displayIds, sideBySide}`, `capture.stop`,
 `setting.set` `{key, value}`, `transport.tunnel` `{on}`, `transport.refresh`,
 `permission.request` `{which}`, `account.browser.begin` `{flow, url}`,
-`account.browser.take`, and `claude` carrying any §5 phone → host `sub`.
+`account.browser.take`, `account.signOut`, and `claude` carrying any §5 phone → host `sub`.
 
 `account.browser.begin` opens only the account server's own authorize URL in the
 default browser, because providers refuse to sign in inside an embedded web
