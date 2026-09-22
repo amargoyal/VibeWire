@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { AccountStep } from './AccountStep'
-import { pairOpen, reachability, send, type Facts } from './store'
+import { notice, pairOpen, reachability, send, type Facts } from './store'
 
 const steps = ['Welcome', 'Permissions', 'Connect your phone', 'Your account']
 
@@ -16,6 +16,7 @@ export function Onboarding({ state }: { state: Facts }) {
       <div class="onboarding__progress" aria-label="Setup progress">{steps.map((label, index) =>
         <span key={label} aria-current={index === step ? 'step' : undefined}>{index + 1}. {label}</span>)}</div>
       <h1 ref={heading} tabIndex={-1}>{steps[step]}</h1>
+      {notice.value && <p role="alert">{notice.value}</p>}
       {!live && <p role="alert">The host is not answering. Setup will resume when it reconnects.</p>}
       {step === 0 && <section>
         <h2>Your Mac. Within reach.</h2>
