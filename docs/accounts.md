@@ -74,6 +74,8 @@ Needs a paid Apple Developer account.
 4. Sign a client secret JWT with that key (ES256, `iss` the Team ID, `sub` the Services ID, `aud` `https://appleid.apple.com`).
 5. In Supabase, Authentication → Sign In / Providers → Apple: enable it, add the Services ID to Client IDs, and paste the JWT as the secret.
 
+Apple caps the client secret at six months. When it expires, Apple sign-in fails until a new JWT is signed from the same `.p8` and pasted into Supabase.
+
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` build the client against another project. `VIBEWIRE_ACCOUNT_URL` / `VIBEWIRE_ACCOUNT_KEY` do the same for either host. Clearing them leaves a build with no account screens and a requirement that cannot be switched on.
 
 ## Validation
