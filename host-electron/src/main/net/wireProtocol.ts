@@ -61,6 +61,9 @@ export type Inbound =
   | { t: 'claude'; claude: ClaudeInbound }
   | { t: 'revoke'; deviceId: string | null; all: boolean }
   | { t: 'setting'; key: string; value: SettingValue }
+  /** The account the client is signed into, offered once per socket. Ignored
+   *  by a host that does not require one. */
+  | { t: 'account'; token: string }
   | { t: 'ping'; tMicros: number; sequence: number; rttMillis: number | null }
   /** The phone reporting its own radio, so the cellular cap applies only when
    *  it is actually on cellular. */
@@ -211,6 +214,9 @@ export function decodeInbound(text: string): { id: string | null; message: Inbou
     case 'revoke':
       message = { t: type, deviceId: str(record, 'deviceId'), all: bool(record, 'all') }
       break
+    case 'account':
+      message = { t: type, token: requireString(record, type, 'token') }
+      break
     case 'setting': {
       const key = requireString(record, type, 'key')
       const raw = record.value
@@ -291,6 +297,8 @@ export interface HelloFields {
   protocol: number
   capabilities: Record<string, boolean>
   conditions: Record<string, boolean>
+  /** Whether a browser must be signed in before this host answers it. */
+  requiresAccount: boolean
 }
 
 /**
@@ -313,6 +321,8 @@ export const Outbound = {
       // it did against a Mac host that never sent them.
       platform: fields.platform,
       conditions: fields.conditions,
+      // Additive too. Absent from an older host, which required nothing.
+      requiresAccount: fields.requiresAccount,
     }
     if (fields.osBuild) payload.osBuild = fields.osBuild
     return payload
