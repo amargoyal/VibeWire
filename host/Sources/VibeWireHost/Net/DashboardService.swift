@@ -96,6 +96,9 @@ actor DashboardService {
     /// The response for anything the dashboard owns, or nil to let the request
     /// fall through to the web client.
     func response(for request: HTTPRequest) async -> HTTPResponse? {
+        if request.path == "/account/callback" {
+            return await browserCallback(request)
+        }
         if request.path.hasPrefix("/v1/dashboard/") {
             guard authorised(request) else { return .error(401, "unauthorized") }
             return await api(request)
@@ -120,6 +123,45 @@ actor DashboardService {
         var difference: UInt8 = 0
         for index in 0..<a.count { difference |= a[index] ^ b[index] }
         return difference == 0
+    }
+
+    // MARK: Browser sign-in
+
+    /// Where Google or Apple sends the default browser back to.
+    ///
+    /// Carries no launch key, because the browser that lands here is not the
+    /// dashboard. It keeps the code or the refusal for the matching attempt and
+    /// tells the person to go back to setup, which picks it up.
+    private func browserCallback(_ request: HTTPRequest) async -> HTTPResponse {
+        guard request.method == "GET",
+              let pending = browserSignIn, pending.outcome == nil,
+              let flow = request.query["flow"], Self.constantTimeEqual(flow, pending.flow)
+        else {
+            return Self.callbackPage("This sign-in was not started from VibeWire setup, or it already finished.")
+        }
+        if let code = request.query["code"], !code.isEmpty {
+            browserSignIn?.outcome = ["code": code]
+        } else {
+            let reason = request.query["error_description"] ?? "Signing in was cancelled."
+            browserSignIn?.outcome = ["error": reason]
+        }
+        await MainActor.run { NSApp.activate(ignoringOtherApps: true) }
+        return Self.callbackPage("You can close this tab and return to VibeWire.")
+    }
+
+    private static func callbackPage(_ message: String) -> HTTPResponse {
+        let html = """
+        <!doctype html><html lang="en"><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>VibeWire</title></head>
+        <body style="background:#0f1114;color:#f2f3f6;font:16px/1.6 -apple-system,sans-serif;padding:48px 16px;text-align:center">
+        <p>\(message)</p></body></html>
+        """
+        return HTTPResponse(
+            status: 200,
+            headers: ["Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"],
+            body: Data(html.utf8)
+        )
     }
 
     // MARK: The bundle
