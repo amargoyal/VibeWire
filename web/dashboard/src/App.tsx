@@ -21,6 +21,7 @@ import {
   send,
   updateDismissed,
   type PaneId,
+  type UpdateFact,
 } from './store'
 
 const PANES: { id: PaneId; label: string }[] = [
@@ -157,10 +158,22 @@ export function App() {
       )}
       {state.update?.available && state.update.latest && !updateDismissed.value && (
         <div class="mac__notice mac__notice--update">
-          {`VIBEWIRE ${state.update.latest} IS OUT · RUNNING ${state.update.current}`}
-          <button type="button" onClick={() => void send({ do: 'update.open' })}>
-            DOWNLOAD
-          </button>
+          {updateNotice(state.update)}
+          {/* One button, and it does the whole thing: fetch the release, check
+              it against the checksum and the signature already on this Mac,
+              replace the app and come back. Where this host cannot replace
+              itself, which is any build not running from an application
+              bundle it owns, the old behaviour is still here and still
+              honest. */}
+          {installing(state.update) ? null : state.update.canInstall && state.update.installable ? (
+            <button type="button" onClick={() => void send({ do: 'update.install' })}>
+              UPDATE AND RESTART
+            </button>
+          ) : (
+            <button type="button" onClick={() => void send({ do: 'update.open' })}>
+              OPEN RELEASE
+            </button>
+          )}
           <span class="spacer" />
           <button
             type="button"
@@ -317,5 +330,43 @@ function Fatal({ title, children }: { title: string; children: string }) {
         </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * The update line, which is four different sentences depending on what the
+ * host is doing about it.
+ *
+ * A percentage is drawn only while one is being reported. A stage with no
+ * number behind it says the stage, because "VERIFYING" is the honest word for
+ * a second of hashing and a spinner would be a claim about duration.
+ */
+function updateNotice(update: UpdateFact): string {
+  const version = `VIBEWIRE ${update.latest} IS OUT · RUNNING ${update.current}`
+  switch (update.stage) {
+    case 'downloading':
+      return update.progress != null
+        ? `DOWNLOADING ${update.latest} · ${Math.round(update.progress * 100)}%`
+        : `DOWNLOADING ${update.latest}`
+    case 'verifying':
+      return `CHECKING THE DOWNLOAD AGAINST THE RELEASE`
+    case 'staging':
+      return `PUTTING ${update.latest} IN PLACE`
+    case 'restarting':
+      return `QUITTING AND REOPENING AS ${update.latest}`
+    case 'failed':
+      return `UPDATE FAILED · ${(update.problem ?? 'NO REASON GIVEN').toUpperCase()}`
+    default:
+      return version
+  }
+}
+
+/** Whether an install is under way, so the button stops offering to start one. */
+function installing(update: UpdateFact): boolean {
+  return (
+    update.stage === 'downloading' ||
+    update.stage === 'verifying' ||
+    update.stage === 'staging' ||
+    update.stage === 'restarting'
   )
 }
