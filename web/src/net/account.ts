@@ -110,6 +110,7 @@ async function post(path: string, body: unknown, token?: string): Promise<Respon
     },
     body: JSON.stringify(body),
     cache: 'no-store',
+    signal: AbortSignal.timeout(15000),
   })
 }
 
@@ -284,11 +285,11 @@ export async function signOut(): Promise<void> {
  * could have listed in advance. That rejection costs nothing: the code in the
  * same email still works, which is why it is the thing the screen asks for.
  */
-export async function sendEmailCode(email: string): Promise<void> {
+export async function sendEmailCode(email: string, redirectTo = location.origin + location.pathname): Promise<void> {
   // The redirect is a query parameter on this endpoint, not a body field. Sent
   // as a body field it is accepted, ignored, and the link in the email then
   // lands on the project's Site URL instead of on the page that asked.
-  const redirect = encodeURIComponent(location.origin + location.pathname)
+  const redirect = encodeURIComponent(redirectTo)
   const response = await post(`otp?redirect_to=${redirect}`, {
     email,
     create_user: true,

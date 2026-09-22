@@ -16,7 +16,7 @@ One user today: the author, a developer who runs Claude Code and other work on a
 
 A public iOS release is possible later but is not committed. The consequence for design is a quality bar, not an audience change: every surface is built to look and behave like a shipping product, so a later App Store decision needs no rework. Device-specific onboarding is now in scope: a working host setup checklist and optional, replayable browser/iPhone guides. Public release remains undecided; setup must not invent distribution promises or service guarantees.
 
-Accounts are now in scope, with a narrow brief. Pairing stays a key exchange and is never a login, and every screen up to and including the first frame works signed out. An account is offered once, at the end of setup, and is remembered as answered either way; it carries a directory — the computers paired with, the browsers signed in from, the keyboard bar — and never a key, a code, a frame or a transcript. A host may be set to require one, off by default. `docs/accounts.md` is the reasoning and the remaining project configuration.
+Accounts are now in scope, with a narrow brief. Pairing stays a key exchange and is never a login, and every screen up to and including the first frame works signed out. On Mac, an account is required at the end of the full-window setup flow and completion is remembered only after the host verifies the sign-in. Browser account onboarding remains optional; it carries a directory — the computers paired with, the browsers signed in from, the keyboard bar — and never a key, a code, a frame or a transcript. A host may be set to require one, off by default. `docs/accounts.md` is the reasoning and the remaining project configuration.
 
 ## Product Purpose
 

@@ -229,9 +229,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func warnAboutMissingPermissions() {
         let screen = DisplayCatalog.hasScreenRecordingPermission()
         let accessibility = InputInjector.hasAccessibilityPermission()
-        let firstSetup = !UserDefaults.standard.bool(forKey: "vibewire.setup.presented.v1")
+        let firstSetup = !UserDefaults.standard.bool(forKey: "vibewire.setup.completed.v2")
         guard firstSetup || !screen || !accessibility else { return }
-        UserDefaults.standard.set(true, forKey: "vibewire.setup.presented.v1")
 
         // Explain each permission before its user-initiated system request.
         dashboard?.show(pane: "setup")

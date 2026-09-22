@@ -38,6 +38,9 @@ jobs:
         run: npm ci && npm run build:all
         working-directory: web
 
+      - name: Account regression tests
+        run: node --test web/dashboard/test/account.test.mjs
+
       - name: Build host
         run: npm ci && npm run build
         working-directory: host-electron

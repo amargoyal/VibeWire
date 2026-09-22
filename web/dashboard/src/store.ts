@@ -19,6 +19,7 @@ import { fetchEvents, fetchState, command, ApiError } from './api'
 // MARK: - The shape the host sends
 
 export interface Facts {
+  setupCompleted?: boolean
   at: string
   host: {
     platform?: string

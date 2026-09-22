@@ -1,6 +1,8 @@
 # Accounts
 
-The activation target is unchanged: see the computer's desktop on the phone, move its pointer, click. An account is not on the path to that and never blocks it. What an account adds is memory that outlives a browser's site data, and one optional answer to a question pairing cannot answer — *who* is holding the phone.
+Mac setup requires a verified account as its final step. The host remembers completion, so normal launches remain available offline. Remote browser account enforcement is a separate setting. The email-code flow below serves both sign-in and account creation.
+
+For the phone client, the activation target is unchanged: see the computer's desktop on the phone, move its pointer, click. An account is not on the path to that and never blocks it. What an account adds is memory that outlives a browser's site data, and one optional answer to a question pairing cannot answer — *who* is holding the phone.
 
 ## Research and decisions
 
@@ -39,15 +41,15 @@ A host setting, off by default: **Require a signed-in browser**. It appears in t
 
 Three things cannot be set from code and have to be done once in the dashboard, in this order.
 
-1. **Set up custom SMTP.** Authentication → Emails → SMTP Settings. Supabase refuses to let the templates be edited until a project has its own SMTP, and its shared sender is capped at two emails an hour, so this is not optional for either reason. The project currently sends through Resend: host `smtp.resend.com`, port `465`, username `resend`, password a Resend API key, sender `onboarding@resend.dev`.
+1. **Set up custom SMTP.** Authentication → Emails → SMTP Settings. Supabase refuses to let the templates be edited until a project has its own SMTP, and its shared sender is capped at two emails an hour, so this is not optional for either reason. The project currently uses Gmail SMTP; see the sender notes below.
 2. **Put the code in the email.** Authentication → Emails. The default Magic Link and Confirm Signup templates contain only `{{ .ConfirmationURL }}`. Add `{{ .Token }}` to both — and to the subject line, where a phone shows it in the notification and `autocomplete="one-time-code"` can lift it. Without it the six digits the sign-in screen asks for are in no email anyone receives. Confirm Signup matters as much as Magic Link: it is the template a first-ever address gets, which is most sign-ins at this stage.
 3. **Allow the origins that can use a link.** Authentication → URL Configuration → Redirect URLs. Add the published client (`https://amargoyal.github.io/VibeWire/**`) and any fixed host address. A Cloudflare quick-tunnel hostname changes every restart and cannot be listed; the code path covers it.
 
-### The sender is a placeholder, and its limit is real
+### Gmail sender
 
-`onboarding@resend.dev` is Resend's shared test sender. **It delivers only to the address on the Resend account that owns the key.** Anyone else who types their email into the sign-in screen gets a 403 at Resend and then waits for a code that was never sent — the client cannot tell that apart from a slow inbox, because the `POST /otp` that triggered it succeeded.
+The project now uses a Gmail SMTP sender in place of Resend's restricted test sender. The SMTP host is `smtp.gmail.com`, port `465`, with the sender address as the username and a Google app password stored only in Supabase. Never commit SMTP credentials.
 
-That is acceptable while the only person signing in is the person who owns the project, and it is the reason there is no VibeWire domain in this document. Before a second person signs in, buy a domain, verify it in Resend, and change the sender to something at that domain. `vibewire.app`, `vibewire.com` and `vibewire.dev` were taken as of 2026-09-21; `vibewire.io` and `vibewire.sh` were not.
+Gmail is a personal mail service with sending limits and deliverability constraints. Move to a verified domain and transactional provider when usage grows. Verify both signup and returning-user emails after changing the sender.
 
 Google and Apple are optional and need credentials from Google and Apple plus those same redirect URLs. Until a provider is enabled, its button is not drawn.
 
@@ -58,5 +60,5 @@ Google and Apple are optional and need credentials from Google and Apple plus th
 - Web client and dashboard: TypeScript checks and production builds.
 - Mac host: `swift build`.
 - Windows host: `npx tsc --noEmit`.
-- Live email round trip, against the real project: `POST /auth/v1/otp` returned 200, Resend reported the message delivered with the six digits in its subject, `POST /auth/v1/verify` with `type: "email"` returned a session, and the trigger had already written the `profiles` row. Only the account server's own address can receive one until the sender changes — see above.
+- Live email round trip, against the real project: `POST /auth/v1/otp` returned 200, Resend reported the message delivered with the six digits in its subject, `POST /auth/v1/verify` with `type: "email"` returned a session, and the trigger had already written the `profiles` row. This historical check used the former Resend test sender. The Gmail migration requires a fresh delivery check.
 - Not yet exercised: a provider sign-in, and a phone refused by a host with the requirement on.
