@@ -783,6 +783,18 @@ actor DashboardService {
             UserDefaults.standard.set(true, forKey: "vibewire.setup.completed.v2")
             return .json(200, ["ok": true])
 
+        case "account.browser.begin":
+            // Only the account server's own authorize page may be opened, so a
+            // dashboard request cannot point the default browser anywhere else.
+            let prefix = "\(Config.accountServerURL)/auth/v1/authorize?"
+            guard let flow = string("flow"), flow.count >= 16,
+                  let link = string("url"), link.hasPrefix(prefix),
+                  let target = URL(string: link)
+            else { return .error(400, "malformed_browser_sign_in") }
+            browserSignIn = BrowserSignIn(flow: flow, startedAt: Date(), outcome: nil)
+            await MainActor.run { _ = NSWorkspace.shared.open(target) }
+            return .json(200, ["ok": true])
+
         case "pair.begin":
             let code = await pairing.beginPairing(
                 name: string("name"),
