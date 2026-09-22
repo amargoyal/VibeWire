@@ -20,11 +20,12 @@
 
 import { SetupGuide } from './SetupGuide'
 import type { ComponentChildren } from 'preact'
-import { useEffect } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 
 import { bitrateMbps, store, type PairedDeviceEntry, type RevokeTarget } from '../app/store'
 import { decoderSupport } from '../video/renderer'
 import { dialable } from '../net/endpoint'
+import { listHosts } from '../net/accountSync'
 import {
   Caps,
   Card,
@@ -110,6 +111,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
             </div>
 
             <div class="settings__browser">
+              {store.accountsAvailable ? (
+                <SettingsGroup title="ACCOUNT">
+                  <AccountSection onClose={onClose} />
+                </SettingsGroup>
+              ) : null}
+
               <SettingsGroup title="THIS BROWSER">
                 <BrowserSection />
               </SettingsGroup>
@@ -546,6 +553,95 @@ function AccessSection() {
  * private key lives, whether this engine can decode the video at all, and which
  * origin this pairing belongs to.
  */
+/**
+ * The account, which is not the pairing and says so.
+ *
+ * Two facts that are easy to conflate sit next to each other in this sheet: the
+ * signing key, which is what the host trusts, and the account, which is what
+ * carries a list of hosts between browsers. Signing out leaves the key exactly
+ * where it was, and a person about to tap SIGN OUT deserves to know that before
+ * they do rather than after.
+ */
+function AccountSection({ onClose }: { onClose: () => void }) {
+  const account = store.account.value
+  const [hostCount, setHostCount] = useState<number | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
+
+  useEffect(() => {
+    if (!account) return
+    let live = true
+    void listHosts().then((hosts) => live && setHostCount(hosts.length))
+    return () => {
+      live = false
+    }
+  }, [account?.id])
+
+  if (!account) {
+    return (
+      <Card style={{ padding: '16px' }}>
+        <div class="stack" style={{ gap: '12px' }}>
+          <FactRow label="SIGNED IN" value="NO" tone="var(--ns-text-secondary)" />
+          <p
+            class="wrap"
+            style={{
+              margin: 0,
+              fontSize: 'var(--fs-13)',
+              lineHeight: 1.45,
+              color: 'var(--ns-text-secondary)',
+            }}
+          >
+            Nothing here needs an account. One keeps the list of computers you have paired with,
+            and your keyboard bar, when this browser loses its site data or you pick up another
+            phone.
+          </p>
+          <OutlinedAction
+            title="SIGN IN"
+            height={48}
+            onClick={() => {
+              onClose()
+              store.route.value = 'signin'
+            }}
+          />
+        </div>
+      </Card>
+    )
+  }
+
+  return (
+    <Card style={{ padding: '16px' }}>
+      <div class="stack" style={{ gap: '12px' }}>
+        <FactRow label="SIGNED IN" value={account.email ?? account.displayName ?? 'YES'} tone="var(--ns-green)" />
+        <FactRow
+          label="COMPUTERS KEPT"
+          value={hostCount == null ? '—' : String(hostCount)}
+          tone="var(--ns-text)"
+        />
+        <p
+          class="wrap"
+          style={{
+            margin: 0,
+            fontSize: 'var(--fs-13)',
+            lineHeight: 1.45,
+            color: 'var(--ns-text-secondary)',
+          }}
+        >
+          The account holds names and addresses, nothing that can reach a computer on its own.
+          Signing out leaves this browser paired and its signing key untouched.
+        </p>
+        <OutlinedAction
+          title={signingOut ? 'SIGNING OUT…' : 'SIGN OUT'}
+          height={48}
+          enabled={!signingOut}
+          onClick={() => {
+            setSigningOut(true)
+            void store.signOutAccount().finally(() => setSigningOut(false))
+          }}
+        />
+      </div>
+    </Card>
+  )
+}
+
 function BrowserSection() {
   const storage = store.keyStorage.value
   const decoder = decoderSupport()
