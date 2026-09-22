@@ -24,6 +24,20 @@ export function Onboarding({ state }: { state: Facts }) {
         <p>First, allow screen sharing and control on this Mac. Then connect your phone and finish with your VibeWire account.</p>
         <p class="setup__hint">Have your phone and access to your email ready. Your progress is checked as you go.</p>
       </section>}
+      {step === 1 && <section>
+        <h2>Allow your phone to see and control this Mac</h2>
+        <p>macOS asks for each permission separately. Enable VibeWire in System Settings, then return here.</p>
+        {([
+          ['screen', 'Screen Recording', 'Shares this Mac’s display with your paired phone.', state.permissions.screenRecording],
+          ['accessibility', 'Accessibility', 'Lets your paired phone click, scroll, and type.', state.permissions.accessibility],
+        ] as const).map(([key, label, detail, granted]) => <div class="setup__permission" key={key}>
+          <div><h3>{label}</h3><p>{detail}</p></div>
+          {granted ? <span class="setup__done">Allowed</span> : <button class="setup__button" disabled={!live}
+            onClick={() => void send({ do: 'permission.request', which: key })}>Allow {label}</button>}
+        </div>)}
+        <p role="status">{ready ? 'Both permissions are ready. Continue to connect your phone.' : 'Continue becomes available when both permissions are allowed.'}</p>
+        <p class="setup__hint">If macOS asks you to quit and reopen VibeWire, do so. You can return to this step after relaunching.</p>
+      </section>}
       {step === 3 && <AccountStep />}
       <footer class="onboarding__footer">
         {step > 0 && <button class="setup__button setup__button--quiet" onClick={() => setStep(step - 1)}>Back</button>}
