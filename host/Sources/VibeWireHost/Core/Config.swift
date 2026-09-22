@@ -51,6 +51,26 @@ struct HostSettings: Codable, Sendable {
     /// newer VibeWire has been published. One request, no identifiers beyond
     /// the version in the user agent, and nothing is ever installed by it.
     var checkForUpdates: Bool = true
+    /// Whether a browser has to be signed into a VibeWire account before this
+    /// host will answer it.
+    ///
+    /// Off by default, and off is the honest default: pairing is already a key
+    /// exchange this machine agreed to, and a device that holds a trusted key
+    /// got it by someone reading six digits off this screen. What this adds is a
+    /// second, different question — *who* is at the other end — which matters
+    /// when the host is reachable from the internet over a relay and the phone
+    /// it was paired with can be borrowed, lost, or handed over.
+    ///
+    /// It applies to browser clients. The iPhone app authenticates with a key in
+    /// the Secure Enclave and has no account to present.
+    var requireAccount: Bool = false
+    /// The account this host belongs to, claimed by the first signed-in browser
+    /// to connect while `requireAccount` is on, and cleared when it is turned
+    /// off. Everything else is refused, including a second account of the same
+    /// person's — which is the point: an account that can be added silently is
+    /// not a restriction.
+    var accountOwnerId: String?
+    var accountOwnerEmail: String?
 
     static let `default` = HostSettings()
 
@@ -89,6 +109,10 @@ struct HostSettings: Codable, Sendable {
         webClientURL = try container.decodeIfPresent(String.self, forKey: .webClientURL)
         checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates)
             ?? fallback.checkForUpdates
+        requireAccount = try container.decodeIfPresent(Bool.self, forKey: .requireAccount)
+            ?? fallback.requireAccount
+        accountOwnerId = try container.decodeIfPresent(String.self, forKey: .accountOwnerId)
+        accountOwnerEmail = try container.decodeIfPresent(String.self, forKey: .accountOwnerEmail)
     }
 }
 
