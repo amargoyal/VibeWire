@@ -327,6 +327,7 @@ actor DashboardService {
 
         payload["setupCompleted"] = UserDefaults.standard.bool(forKey: "vibewire.setup.completed.v2")
         payload["browserSignIn"] = Config.accountsAvailable
+        payload["accountEmail"] = UserDefaults.standard.string(forKey: "vibewire.account.email") ?? ""
 
         payload["permissions"] = [
             "screenRecording": screenRecording,
