@@ -13,7 +13,11 @@ volume_name = "Install VibeWire"
 # The volume's own icon, so the thing on the desktop and in the sidebar is the
 # app's mark rather than the generic white disk.
 icon = defines["volume_icon"]
-window_rect = ((200, 140), (660, 500))
+# The size here is the whole window, and the background fills the content area
+# underneath the title bar. Sized to the artwork exactly, Finder is left with a
+# content area 28 points shorter than the picture, decides there is more to see,
+# and puts a scroll bar along the bottom of the installer.
+window_rect = ((200, 120), (660, 548))
 background = defines["background"]
 default_view = "icon-view"
 show_toolbar = False
@@ -26,7 +30,7 @@ text_size = 13
 icon_locations = {
     "VibeWire.app": (175, 206),
     "Applications": (485, 206),
-    "Start here.txt": (330, 368),
+    "Start here.txt": (586, 376),
 }
 # Do not add FinderInfo to the signed app: that invalidates strict verification.
 hide_extensions = []
