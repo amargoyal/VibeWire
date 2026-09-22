@@ -413,7 +413,7 @@ GET  /v1/dashboard/events?since= claude messages, the same ones §5 sends the ph
 GET  /v1/dashboard/snapshot?display=&width=   one PNG frame — a screenshot, not the stream
 GET  /v1/dashboard/qr?kind=app|browser        the pairing QR, with the payload in a header
 POST /v1/dashboard/command      { "do": "…" }
-GET  /account/callback?flow=&code=   where Google or Apple returns the default browser, no key
+GET  /account/callback?flow=&code=   where Google returns the default browser, no key
 ```
 
 The key is 32 random bytes, base64url, minted at launch and held only in memory:
