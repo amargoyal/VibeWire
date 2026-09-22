@@ -58,7 +58,7 @@ export function Settings({ state }: { state: Facts }) {
             label="Quality ladder"
             value={settings.quality === 'auto' ? 'AUTO · CHOSEN FROM THE LINK' : `${settings.quality}P FIXED`}
           >
-            <div style={{ width: 232 }}>
+            <div class="settings-control">
               <Segmented
                 label="Quality ladder"
                 selection={settings.quality}
@@ -85,7 +85,7 @@ export function Settings({ state }: { state: Facts }) {
 
         <Section title="INPUT">
           <Row label="Sensitivity" value={`${settings.sensitivity} OF 8`}>
-            <div style={{ width: 232 }}>
+            <div class="settings-control">
               <Segmented
                 label="Sensitivity"
                 selection={settings.sensitivity}
@@ -114,7 +114,7 @@ export function Settings({ state }: { state: Facts }) {
             }}
           />
           <Row label="Releases" value={installLine(state)}>
-            <div class="row" style={{ gap: 10 }}>
+            <div class="settings-actions">
               <div style={{ width: 150 }}>
                 <OutlinedAction
                   title="CHECK NOW"
@@ -292,10 +292,10 @@ function Row({
   children?: preact.ComponentChildren
 }) {
   return (
-    <div class="group-row" style={{ minHeight: 62, gap: 14 }}>
+    <div class={`group-row settings-row${children ? " settings-row--control" : ""}`} style={{ minHeight: 62, gap: 14 }}>
       <span class="stack" style={{ gap: 4, minWidth: 0 }}>
         <span style={{ fontSize: 'var(--fs-15)', fontWeight: 500 }}>{label}</span>
-        <Caps size="var(--fs-9)" class="ellipsis" title={value}>
+        <Caps size="var(--fs-9)" class="settings-value" title={value}>
           {value}
         </Caps>
       </span>
