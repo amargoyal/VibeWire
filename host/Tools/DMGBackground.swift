@@ -18,28 +18,69 @@ import Foundation
 /// display and correct on the projector it is being demonstrated on.
 @main
 enum DMGBackground {
+    /// This window is drawn light, and the app is not.
+    ///
+    /// Finder draws the label under each icon itself, in the reader's system
+    /// appearance, and nothing inside a disk image can change that colour. In
+    /// Light Mode it is near black. The first version of this art was the
+    /// app's own near-black ground, which made both labels invisible: the two
+    /// words that say which icon is which.
+    ///
+    /// Dark would be right for the one reader in Dark Mode and wrong for
+    /// everyone else, so the ground is light and the contrast comes from the
+    /// app icon, which is a dark tile, and from the mark's own colours.
+    enum Ink {
+        static let groundTop = NSColor(srgbRed: 0xFF / 255, green: 0xFF / 255, blue: 0xFF / 255, alpha: 1)
+        static let groundBottom = NSColor(srgbRed: 0xEB / 255, green: 0xEE / 255, blue: 0xF4 / 255, alpha: 1)
+        static let card = NSColor(srgbRed: 0xFF / 255, green: 0xFF / 255, blue: 0xFF / 255, alpha: 1)
+        static let cardEdge = NSColor(srgbRed: 0xD6 / 255, green: 0xDA / 255, blue: 0xE3 / 255, alpha: 1)
+        /// The app's violet, darkened until it holds its own on white.
+        static let accent = NSColor(srgbRed: 0x5B / 255, green: 0x6C / 255, blue: 0xE8 / 255, alpha: 1)
+        static let text = NSColor(srgbRed: 0x0F / 255, green: 0x11 / 255, blue: 0x14 / 255, alpha: 1)
+        static let textSecondary = NSColor(srgbRed: 0x4A / 255, green: 0x50 / 255, blue: 0x5C / 255, alpha: 1)
+        static let textTertiary = NSColor(srgbRed: 0x75 / 255, green: 0x7C / 255, blue: 0x8A / 255, alpha: 1)
+    }
+
     /// The window's content size, which `dmg-settings.py` states again for
     /// Finder. The two have to agree or the art sits off-centre.
-    static let size = NSSize(width: 660, height: 500)
+    static let size = NSSize(width: 660, height: 520)
 
     /// Where Finder puts the two icons, in its own coordinates: origin at the
     /// top left, y downwards. Everything drawn below is positioned from these
     /// rather than from numbers repeated by hand.
     static let appIcon = NSPoint(x: 175, y: 206)
-    /// The loose file, below the pair. It carries what this picture cannot: the
-    /// steps after the drag, and a link.
-    static let notesIcon = NSPoint(x: 330, y: 368)
+    /// The loose file, in the corner rather than under the pair. Centred, its
+    /// Finder label landed on the footnote, and a text file's icon is a
+    /// thumbnail of its own first paragraph: the loudest thing in the window,
+    /// sitting in the middle of it.
+    static let notesIcon = NSPoint(x: 586, y: 376)
     static let applicationsIcon = NSPoint(x: 485, y: 206)
 
     static func main() {
         let arguments = CommandLine.arguments
+        // `--preview <out.png> <app bundle>` draws the background with the
+        // icons and their labels on top: what the window will look like, for
+        // looking at while the art is being worked on, without mounting
+        // anything or fighting Finder for the front of the screen.
+        if arguments.count == 4, arguments[1] == "--preview" {
+            previewApp = URL(fileURLWithPath: arguments[3])
+            write(scale: 2, to: URL(fileURLWithPath: arguments[2]))
+            return
+        }
         guard arguments.count == 3 else {
-            FileHandle.standardError.write(Data("usage: DMGBackground <1x.png> <2x.png>\n".utf8))
+            FileHandle.standardError.write(
+                Data("usage: DMGBackground <1x.png> <2x.png> | --preview <out.png> <app>\n".utf8)
+            )
             exit(2)
         }
         write(scale: 1, to: URL(fileURLWithPath: arguments[1]))
         write(scale: 2, to: URL(fileURLWithPath: arguments[2]))
     }
+
+    /// Set only in preview mode. The disk image itself never draws icons: they
+    /// are Finder's to place, and drawing them into the background would put a
+    /// second, fixed copy behind the real ones.
+    static var previewApp: URL?
 
     private static func write(scale: CGFloat, to url: URL) {
         let pixels = NSSize(width: size.width * scale, height: size.height * scale)
@@ -83,23 +124,19 @@ extension DMGBackground {
 
         // The ground: the app's own screen colour, lifted a little at the top
         // so the window has a direction and does not read as a flat swatch.
-        NSGradient(
-            colors: [
-                NSColor(srgbRed: 0x14 / 255, green: 0x17 / 255, blue: 0x1C / 255, alpha: 1),
-                Palette.deep,
-            ]
-        )?.draw(in: frame, angle: -90)
+        NSGradient(colors: [Ink.groundTop, Ink.groundBottom])?.draw(in: frame, angle: -90)
 
         // A soft violet cast under the app icon, and nothing under
         // Applications. The eye starts where the light is, which is the icon
         // that has to be picked up.
-        glow(at: flip(NSPoint(x: appIcon.x, y: appIcon.y + 12)), radius: 210, color: Palette.accent, alpha: 0.13)
+        glow(at: flip(NSPoint(x: appIcon.x, y: appIcon.y + 12)), radius: 220, color: Ink.accent, alpha: 0.10)
 
         header()
         headline()
         wells()
         arrow()
         footnote()
+        if previewApp != nil { previewIcons() }
     }
 
     /// The radial wash behind the app icon. Drawn as a gradient to clear
@@ -134,8 +171,8 @@ extension DMGBackground {
         draw(
             "VIBEWIRE",
             at: NSPoint(x: box.maxX + 14, y: box.minY + 4),
-            font: .systemFont(ofSize: 13, weight: .medium),
-            color: Palette.text,
+            font: .systemFont(ofSize: 13, weight: .semibold),
+            color: Ink.text,
             kern: 3.4
         )
     }
@@ -165,8 +202,10 @@ extension DMGBackground {
         context.clip()
         NSGradient(
             colors: [
-                NSColor(srgbRed: 0x6E / 255, green: 0xC7 / 255, blue: 0xE8 / 255, alpha: 1),
-                Palette.green,
+                // The icon's cyan and green, taken a step darker: the icon
+                // carries them on a black tile and this carries them on white.
+                NSColor(srgbRed: 0x2A / 255, green: 0x9A / 255, blue: 0xC4 / 255, alpha: 1),
+                NSColor(srgbRed: 0x1F / 255, green: 0xA8 / 255, blue: 0x7C / 255, alpha: 1),
             ]
         )?.draw(in: box, angle: 0)
         context.restoreGState()
@@ -181,7 +220,7 @@ extension DMGBackground {
             text,
             at: NSPoint(x: (size.width - width) / 2, y: flip(NSPoint(x: 0, y: 118)).y),
             font: font,
-            color: Palette.text,
+            color: Ink.text,
             kern: 0
         )
     }
@@ -203,11 +242,22 @@ extension DMGBackground {
                 height: height
             )
             let path = NSBezierPath(roundedRect: rect, xRadius: 28, yRadius: 28)
-            (lit ? Palette.raised2 : Palette.raised).withAlphaComponent(0.55).setFill()
+
+            // A card, so the label Finder draws under the icon lands on white
+            // whatever the ground is doing, and so the two slots read as one
+            // pair with a direction.
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(lit ? 0.16 : 0.10)
+            shadow.shadowBlurRadius = lit ? 22 : 16
+            shadow.shadowOffset = NSSize(width: 0, height: -4)
+            shadow.set()
+            Ink.card.setFill()
             path.fill()
-            (lit ? Palette.accent.withAlphaComponent(0.42) : NSColor.white.withAlphaComponent(0.07))
-                .setStroke()
-            path.lineWidth = 1
+            NSGraphicsContext.restoreGraphicsState()
+
+            (lit ? Ink.accent.withAlphaComponent(0.55) : Ink.cardEdge).setStroke()
+            path.lineWidth = lit ? 1.5 : 1
             path.stroke()
         }
     }
@@ -234,7 +284,7 @@ extension DMGBackground {
             path.lineWidth = 3
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
-            Palette.accent.withAlphaComponent(0.30 + 0.22 * CGFloat(index)).setStroke()
+            Ink.accent.withAlphaComponent(0.35 + 0.21 * CGFloat(index)).setStroke()
             path.stroke()
         }
     }
@@ -252,11 +302,13 @@ extension DMGBackground {
             draw(
                 line,
                 at: NSPoint(
+                    // Centred on the window, and low enough to clear the label
+                    // Finder draws under the file in the corner above.
                     x: (size.width - width) / 2,
-                    y: flip(NSPoint(x: 0, y: 452 + CGFloat(index) * 17)).y
+                    y: flip(NSPoint(x: 0, y: 472 + CGFloat(index) * 17)).y
                 ),
                 font: font,
-                color: index == 0 ? Palette.textTertiary : Palette.textFaint,
+                color: index == 0 ? Ink.textSecondary : Ink.textTertiary,
                 kern: 0.2
             )
         }
@@ -288,5 +340,52 @@ extension DMGBackground {
             string: text,
             attributes: attributes(font: font, color: color, kern: kern)
         ).draw(at: point)
+    }
+}
+
+// MARK: - Preview
+
+extension DMGBackground {
+    /// Draws what Finder will draw on top of this picture: the three icons at
+    /// the positions `dmg-settings.py` gives it, each with the label Finder
+    /// writes underneath.
+    ///
+    /// An approximation on one point only, and it is the point that matters:
+    /// the label colour is the reader's system appearance, and this draws the
+    /// Light Mode one, because that is the case the artwork has to survive.
+    static func previewIcons() {
+        guard let app = previewApp else { return }
+        let workspace = NSWorkspace.shared
+
+        icon(workspace.icon(forFile: app.path), at: appIcon, label: "VibeWire")
+        icon(workspace.icon(forFile: "/Applications"), at: applicationsIcon, label: "Applications")
+        icon(
+            workspace.icon(forFileType: "public.plain-text"),
+            at: notesIcon,
+            label: "Start here.txt"
+        )
+    }
+
+    static func icon(_ image: NSImage, at point: NSPoint, label: String) {
+        let side: CGFloat = 96
+        let centre = flip(point)
+        image.draw(in: NSRect(
+            x: centre.x - side / 2,
+            y: centre.y - side / 2,
+            width: side,
+            height: side
+        ))
+
+        // Finder's own icon-view label: centred under the icon, at the text
+        // size the settings file asks for, in the appearance's label colour.
+        let font = NSFont.systemFont(ofSize: 13)
+        let width = measure(label, font: font, kern: 0).width
+        draw(
+            label,
+            at: NSPoint(x: centre.x - width / 2, y: centre.y - side / 2 - 19),
+            font: font,
+            color: NSColor(srgbRed: 0x1D / 255, green: 0x1D / 255, blue: 0x1F / 255, alpha: 1),
+            kern: 0
+        )
     }
 }
