@@ -361,7 +361,9 @@ final class HostRouter: Router, @unchecked Sendable {
         await pairing.noteSocketOpened(deviceId: device.id)
 
         let hostId = (try? await trust.hostId()) ?? ""
-        let requiresAccount = Config.accountsAvailable && state.read { $0.settings.requireAccount }
+        let requiresAccount = Config.accountsAvailable
+            && socket.isBrowser
+            && state.read { $0.settings.requireAccount }
         socket.sendJSON(Outbound.hello(
             hostId: hostId,
             hostName: Config.machineName,
@@ -602,6 +604,10 @@ final class HostRouter: Router, @unchecked Sendable {
     /// Whether this socket is being refused for want of an account right now.
     private func accountGateCloses(_ socket: SocketConnection) -> Bool {
         guard Config.accountsAvailable else { return false }
+        // The iPhone app holds a key in the Secure Enclave and has no account
+        // to present. Holding it to this setting would turn the switch into a
+        // way to lock yourself out of your own phone.
+        guard socket.isBrowser else { return false }
         guard state.read({ $0.settings.requireAccount }) else { return false }
         return socket.accountUserId == nil
     }
@@ -678,7 +684,7 @@ final class HostRouter: Router, @unchecked Sendable {
     /// socket with no picture and no explanation, which is the shape of failure
     /// this product refuses to ship.
     private func startAccountGrace(for socket: SocketConnection) {
-        guard Config.accountsAvailable else { return }
+        guard Config.accountsAvailable, socket.isBrowser else { return }
         guard state.read({ $0.settings.requireAccount }) else { return }
         Task { [weak socket] in
             try? await Task.sleep(nanoseconds: UInt64(Self.accountGrace * 1_000_000_000))

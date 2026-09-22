@@ -150,10 +150,17 @@ final class ClientConnection: @unchecked Sendable {
             """
             send(Data(handshake.utf8))
 
+            // A browser cannot put a header on a WebSocket upgrade, so it
+            // authenticates in the query string; the iPhone app sets headers.
+            // That difference is the only place a host can tell the two apart,
+            // and the account requirement governs browsers alone.
+            let isBrowser = request.header("x-vibewire-signature") == nil
+
             let socket = SocketConnection(
                 connection: connection,
                 deviceId: device.id,
-                deviceName: device.name
+                deviceName: device.name,
+                isBrowser: isBrowser
             )
             self.socket = socket
             mode = .webSocket
@@ -253,10 +260,15 @@ final class SocketConnection: @unchecked Sendable {
     /// in a URL. Until it lands, a host that requires one answers nothing.
     private var accountUserIdValue: String?
 
-    init(connection: NWConnection, deviceId: String?, deviceName: String) {
+    /// Whether this socket was opened by a browser rather than by the iPhone
+    /// app. See `ClientConnection.handleUpgrade` for how it is decided.
+    let isBrowser: Bool
+
+    init(connection: NWConnection, deviceId: String?, deviceName: String, isBrowser: Bool = false) {
         self.connection = connection
         self.deviceId = deviceId
         self.deviceName = deviceName
+        self.isBrowser = isBrowser
     }
 
     var accountUserId: String? {
