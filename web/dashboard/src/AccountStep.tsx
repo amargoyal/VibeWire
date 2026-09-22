@@ -78,6 +78,8 @@ export function AccountStep() {
 function describe(problem: unknown): string {
   if (problem instanceof ApiError) {
     if (problem.code === 'permissions_required') return 'A Mac permission is missing. Go back to Permissions and enable both permissions.'
+    if (problem.code === 'browser_sign_in_expired') return 'That sign-in took too long. Try again.'
+    if (problem.code === 'no_browser_sign_in') return 'The browser sign-in was lost. Try again.'
     return 'The Mac could not verify your account. Check your connection and try Finish setup again.'
   }
   return problem instanceof Error ? problem.message : 'Could not reach the account server. Try again.'
