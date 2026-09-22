@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import { sendEmailCode, verifyEmailCode, type Session } from '../../src/net/account'
 import { accountsConfigured } from '../../src/net/supabase'
-import { command } from './api'
+import { ApiError, command } from './api'
 import { facts, pane } from './store'
 
 export function AccountStep() {
@@ -35,7 +35,11 @@ export function AccountStep() {
         if (facts.value) facts.value = { ...facts.value, setupCompleted: true }
       }
     } catch (problem) {
-      setError(problem instanceof Error ? problem.message : 'Could not reach the account server. Try again.')
+      setError(problem instanceof ApiError
+        ? problem.code === 'permissions_required'
+          ? 'A Mac permission is missing. Go back to Permissions and enable both permissions.'
+          : 'The Mac could not verify your account. Check your connection and try Finish setup again.'
+        : problem instanceof Error ? problem.message : 'Could not reach the account server. Try again.')
     } finally { setBusy(false) }
   }
   return <section class="setup-account">
