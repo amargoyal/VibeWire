@@ -489,7 +489,7 @@ export function randomVerifier(): string {
   return base64Url(bytes)
 }
 
-async function challengeFor(verifier: string): Promise<string> {
+export async function challengeFor(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
   return base64Url(new Uint8Array(digest))
 }
