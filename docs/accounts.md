@@ -55,7 +55,7 @@ Google is optional. Until it is enabled, its button is not drawn, in the browser
 
 ### Provider redirect URLs
 
-Both providers return to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/auth/v1/callback`, and Supabase then returns to the page that asked. Mac setup asks from the host itself, so add `http://127.0.0.1:*/**` to Redirect URLs beside the published client. Without it, a Mac setup sign-in lands on the Site URL and is refused there.
+Google returns to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/auth/v1/callback`, and Supabase then returns to the page that asked. Mac setup asks from the host itself, so add `http://127.0.0.1:*/**` to Redirect URLs beside the published client. Without it, a Mac setup sign-in lands on the Site URL and is refused there.
 
 ### Google
 
