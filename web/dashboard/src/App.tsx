@@ -1,4 +1,4 @@
-import { Onboarding } from './Onboarding'
+import { Onboarding, SignedOut } from './Onboarding'
 import { Setup } from './Setup'
 import { useEffect, useRef } from 'preact/hooks'
 import { Caps, Spinner } from '../../src/design/components'
@@ -102,6 +102,8 @@ export function App() {
       </div>
     )
   }
+
+  if (state.setupCompleted === false && state.signedOut) return <SignedOut />
 
   if (state.setupCompleted === false) {
     return <><Onboarding state={state} />{pairOpen.value && <PairSheet state={state} />}</>
