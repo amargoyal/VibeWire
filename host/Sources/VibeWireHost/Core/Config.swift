@@ -126,6 +126,31 @@ enum Config {
     /// connect on mismatch rather than half-working.
     static let protocolVersion = 1
 
+    /// Where accounts live, for the one thing this host asks of them: is this
+    /// token real, and whose is it.
+    ///
+    /// The same project the web client signs into, and the same publishable key
+    /// — it grants nothing on its own, and this host only ever presents it
+    /// alongside a token someone else earned. Both are overridable so a fork or
+    /// a self-hosted GoTrue needs no patch, and clearing the URL turns the
+    /// account requirement into a setting that cannot be switched on.
+    static let accountServerURL: String = {
+        let stored = ProcessInfo.processInfo.environment["VIBEWIRE_ACCOUNT_URL"]
+            ?? "https://iqtuikhyqkythaffxuca.supabase.co"
+        return stored.hasSuffix("/") ? String(stored.dropLast()) : stored
+    }()
+
+    static let accountServerKey: String = ProcessInfo.processInfo
+        .environment["VIBEWIRE_ACCOUNT_KEY"]
+        ?? "sb_publishable_UdTwW-cDWfJ-TrhNtDEjMQ_qcSWlpP3"
+
+    /// Whether this build can check an account at all. A host that cannot must
+    /// not offer the switch, for the same reason the client does not draw a
+    /// control that cannot work.
+    static var accountsAvailable: Bool {
+        !accountServerURL.isEmpty && !accountServerKey.isEmpty
+    }
+
     static let keychainService = "com.vibewire.host.trust"
     static let pairingCodeLifetime: TimeInterval = 60
     static let nonceLifetime: TimeInterval = 30
