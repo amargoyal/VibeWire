@@ -51,7 +51,30 @@ The project now uses a Gmail SMTP sender in place of Resend's restricted test se
 
 Gmail is a personal mail service with sending limits and deliverability constraints. Move to a verified domain and transactional provider when usage grows. Verify both signup and returning-user emails after changing the sender.
 
-Google and Apple are optional and need credentials from Google and Apple plus those same redirect URLs. Until a provider is enabled, its button is not drawn.
+Google and Apple are optional. Until a provider is enabled, its button is not drawn, in the browser client and in Mac setup alike.
+
+### Provider redirect URLs
+
+Both providers return to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/auth/v1/callback`, and Supabase then returns to the page that asked. Mac setup asks from the host itself, so add `http://127.0.0.1:*/**` to Redirect URLs beside the published client. Without it, a Mac setup sign-in lands on the Site URL and is refused there.
+
+### Google
+
+1. In Google Cloud Console, configure the OAuth consent screen: External, app name `VibeWire`, authorized domains `amargoyal.github.io` and `iqtuikhyqkythaffxuca.supabase.co`, home page `https://amargoyal.github.io/VibeWire/`, privacy policy `https://amargoyal.github.io/VibeWire/privacy.html`, terms `https://amargoyal.github.io/VibeWire/terms.html`.
+2. Create an OAuth client ID of type Web application. Origin `https://amargoyal.github.io`, redirect URI the Supabase callback above.
+3. In Supabase, Authentication → Sign In / Providers → Google: enable it and paste the client ID and secret.
+4. Publish the consent screen. In Testing mode only listed test users can sign in. A logo sends the app through brand verification first.
+
+### Apple
+
+Needs a paid Apple Developer account.
+
+1. An App ID with Sign in with Apple enabled.
+2. A Services ID, for example `com.amargoyal.vibewire.web`, with Sign in with Apple configured: domain `iqtuikhyqkythaffxuca.supabase.co`, return URL the Supabase callback above. The Services ID is the client ID.
+3. A key with Sign in with Apple enabled. Download the `.p8` once and keep it out of the repository. Note its Key ID and the Team ID.
+4. Sign a client secret JWT with that key (ES256, `iss` the Team ID, `sub` the Services ID, `aud` `https://appleid.apple.com`).
+5. In Supabase, Authentication → Sign In / Providers → Apple: enable it, add the Services ID to Client IDs, and paste the JWT as the secret.
+
+Apple caps the client secret at six months. When it expires, Apple sign-in fails until a new JWT is signed from the same `.p8` and pasted into Supabase.
 
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` build the client against another project. `VIBEWIRE_ACCOUNT_URL` / `VIBEWIRE_ACCOUNT_KEY` do the same for either host. Clearing them leaves a build with no account screens and a requirement that cannot be switched on.
 
@@ -61,4 +84,4 @@ Google and Apple are optional and need credentials from Google and Apple plus th
 - Mac host: `swift build`.
 - Windows host: `npx tsc --noEmit`.
 - Live email round trip, against the real project: `POST /auth/v1/otp` returned 200, Resend reported the message delivered with the six digits in its subject, `POST /auth/v1/verify` with `type: "email"` returned a session, and the trigger had already written the `profiles` row. This historical check used the former Resend test sender. The Gmail migration requires a fresh delivery check.
-- Not yet exercised: a provider sign-in, and a phone refused by a host with the requirement on.
+- Not yet exercised: a live Google or Apple sign-in, in the browser client or through Mac setup, and a phone refused by a host with the requirement on.

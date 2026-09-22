@@ -33,6 +33,7 @@ import {
   CodeField,
   CornerTicks,
   Display,
+  LegalLinks,
   ScreenBody,
   SectionLabel,
   SheetDismiss,
@@ -366,6 +367,8 @@ export function Pairing() {
         {noScan ? <WayIn glyph={<QrGlyph />} title={noScan.fact} caption={noScan.caption} /> : null}
 
         <span class="spacer" style={{ minHeight: '16px' }} />
+
+        <LegalLinks style={{ marginBottom: '10px', flex: '0 0 auto' }} />
 
         <Caps
           size="var(--fs-9)"

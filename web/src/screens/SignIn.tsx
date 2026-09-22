@@ -37,6 +37,7 @@ import {
   CodeField,
   Display,
   FilledAction,
+  LegalLinks,
   OutlinedAction,
   ScreenBody,
   SectionLabel,
@@ -178,6 +179,8 @@ export function SignIn() {
           {errorText}
         </p>
       ) : null}
+
+      <LegalLinks style={{ marginTop: '28px', flex: '0 0 auto' }} />
 
       <div style={{ height: 'calc(24px + var(--safe-bottom))', flex: '0 0 auto' }} />
     </ScreenBody>

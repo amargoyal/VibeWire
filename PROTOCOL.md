@@ -413,6 +413,7 @@ GET  /v1/dashboard/events?since= claude messages, the same ones §5 sends the ph
 GET  /v1/dashboard/snapshot?display=&width=   one PNG frame — a screenshot, not the stream
 GET  /v1/dashboard/qr?kind=app|browser        the pairing QR, with the payload in a header
 POST /v1/dashboard/command      { "do": "…" }
+GET  /account/callback?flow=&code=   where Google or Apple returns the default browser, no key
 ```
 
 The key is 32 random bytes, base64url, minted at launch and held only in memory:
@@ -430,7 +431,14 @@ Commands: `pair.begin` `{name, reusable}`, `pair.end`, `device.revoke`
 `{deviceId}|{all}`, `device.sever` `{deviceId}`, `device.rename`
 `{deviceId, name}`, `display.select` `{displayIds, sideBySide}`, `capture.stop`,
 `setting.set` `{key, value}`, `transport.tunnel` `{on}`, `transport.refresh`,
-`permission.request` `{which}`, and `claude` carrying any §5 phone → host `sub`.
+`permission.request` `{which}`, `account.browser.begin` `{flow, url}`,
+`account.browser.take`, and `claude` carrying any §5 phone → host `sub`.
+
+`account.browser.begin` opens only the account server's own authorize URL in the
+default browser, because providers refuse to sign in inside an embedded web
+view. The callback keeps the code for the attempt whose `flow` matches, and
+`account.browser.take` hands it to the dashboard once, within ten minutes. The
+PKCE verifier stays in the dashboard, so the code alone is not a session.
 
 Everything routes through the paths the phone already uses, so the two surfaces
 cannot disagree: settings persist and retune the encoder identically, a revoke

@@ -382,12 +382,22 @@ export async function adoptFromUrl(): Promise<Session | null> {
       )
     }
     await records.remove(VERIFIER_RECORD).catch(() => undefined)
-    const response = await post('token?grant_type=pkce', { auth_code: code, code_verifier: verifier })
-    if (!response.ok) throw await failureFrom(response)
-    return adopt(sessionFrom((await response.json()) as Record<string, unknown>))
+    return exchangeProviderCode(code, verifier)
   }
 
   return null
+}
+
+/**
+ * Trades a provider's authorization code for a session, with the verifier the
+ * code's challenge was made from.
+ */
+export async function exchangeProviderCode(code: string, verifier: string): Promise<Session> {
+  const response = await post('token?grant_type=pkce', { auth_code: code, code_verifier: verifier })
+  if (!response.ok) throw await failureFrom(response)
+  const session = sessionFrom((await response.json()) as Record<string, unknown>)
+  await adopt(session)
+  return session
 }
 
 /** Whether a URL is worth handing to `adoptFromUrl` at all. */
@@ -475,21 +485,34 @@ export async function startProviderSignIn(provider: Provider): Promise<void> {
   const verifier = randomVerifier()
   await records.write(VERIFIER_RECORD, verifier)
 
-  const url = new URL(authUrl('authorize'))
-  url.searchParams.set('provider', provider)
-  url.searchParams.set('redirect_to', location.origin + location.pathname)
-  url.searchParams.set('code_challenge', await challengeFor(verifier))
-  url.searchParams.set('code_challenge_method', 's256')
-  location.assign(url.toString())
+  location.assign(await providerAuthorizeUrl(provider, location.origin + location.pathname, verifier))
 }
 
-function randomVerifier(): string {
+/**
+ * The account server's authorize URL for a provider, with the PKCE challenge
+ * for `verifier`. Whoever holds the verifier is the only one who can turn the
+ * code that comes back into a session.
+ */
+export async function providerAuthorizeUrl(
+  provider: Provider,
+  redirectTo: string,
+  verifier: string,
+): Promise<string> {
+  const url = new URL(authUrl('authorize'))
+  url.searchParams.set('provider', provider)
+  url.searchParams.set('redirect_to', redirectTo)
+  url.searchParams.set('code_challenge', await challengeFor(verifier))
+  url.searchParams.set('code_challenge_method', 's256')
+  return url.toString()
+}
+
+export function randomVerifier(): string {
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
   return base64Url(bytes)
 }
 
-async function challengeFor(verifier: string): Promise<string> {
+export async function challengeFor(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
   return base64Url(new Uint8Array(digest))
 }
