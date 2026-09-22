@@ -54,6 +54,16 @@ actor UpdateInstaller {
             case .failed: return "failed"
             }
         }
+
+        /// Built here rather than on the actor: a dictionary of `Any` cannot
+        /// leave an actor, and the stage itself is the only thing the window
+        /// needs to have crossed.
+        var wire: [String: Any] {
+            var payload: [String: Any] = ["stage": name]
+            if case .downloading(let fraction) = self, let fraction { payload["progress"] = fraction }
+            if case .failed(let reason) = self { payload["problem"] = reason }
+            return payload
+        }
     }
 
     static let shared = UpdateInstaller()
@@ -61,13 +71,6 @@ actor UpdateInstaller {
     private var stage: Stage = .idle
 
     func currentStage() -> Stage { stage }
-
-    var wire: [String: Any] {
-        var payload: [String: Any] = ["stage": stage.name]
-        if case .downloading(let fraction) = stage, let fraction { payload["progress"] = fraction }
-        if case .failed(let reason) = stage { payload["problem"] = reason }
-        return payload
-    }
 
     /// Whether this build can replace itself at all.
     ///
