@@ -25,3 +25,14 @@ test('invalid codes never create a session', async () => {
   await assert.rejects(account.verifyEmailCode('test@example.com', '000000'))
   assert.equal(account.session(), null)
 })
+
+test('verified email codes produce the token the Mac must verify', async () => {
+  globalThis.fetch = async (_url, init) => {
+    assert.deepEqual(JSON.parse(init.body), { type: 'email', email: 'test@example.com', token: '123456' })
+    return Response.json({ access_token: 'verified-token', refresh_token: 'refresh-token',
+      expires_in: 3600, user: { id: 'test-user', email: 'test@example.com' } })
+  }
+  const result = await account.verifyEmailCode('test@example.com', '123456')
+  assert.equal(result.accessToken, 'verified-token')
+  assert.equal(result.user.email, 'test@example.com')
+})
