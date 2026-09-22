@@ -58,7 +58,7 @@ actor DashboardService {
     private var hostIdCache: String?
     private var hostIdRefresh: Task<Void, Never>?
 
-    /// A Google or Apple sign-in the dashboard started in the default browser.
+    /// A Google sign-in the dashboard started in the default browser.
     ///
     /// Providers refuse to sign in inside an embedded web view, so setup hands
     /// the page to the real browser and waits here for the code to come back.
