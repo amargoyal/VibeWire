@@ -830,6 +830,24 @@ actor DashboardService {
             UserDefaults.standard.removeObject(forKey: "vibewire.account.signedOut")
             return .json(200, ["ok": true])
 
+        case "account.signOut":
+            // Signing out of the Mac takes every device with it: a phone paired
+            // under one account must not keep controlling this computer once
+            // that account has left. Permissions and settings stay.
+            do {
+                _ = try await router.dashboardRevoke(deviceId: nil, all: true)
+            } catch {
+                return .error(500, "revoke_failed", extra: ["detail": "\(error)"])
+            }
+            await refreshTrustNow()
+            await pairing.endPairing()
+            await router.dashboardReleaseAccount()
+            browserSignIn = nil
+            UserDefaults.standard.set(false, forKey: "vibewire.setup.completed.v2")
+            UserDefaults.standard.removeObject(forKey: "vibewire.account.email")
+            UserDefaults.standard.set(true, forKey: "vibewire.account.signedOut")
+            return .json(200, ["ok": true])
+
         case "account.browser.begin":
             // Only the account server's own authorize page may be opened, so a
             // dashboard request cannot point the default browser anywhere else.
