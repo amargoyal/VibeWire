@@ -1,3 +1,21 @@
+# Mac onboarding update
+
+The Mac window now opens as a dedicated four-stage setup flow: Welcome, Permissions, Connect your phone, Your account. The dashboard is unavailable until setup completes. Sidebar links, menu pane requests, keyboard shortcuts and URL fragments cannot dismiss the flow.
+
+Both macOS permissions must be granted. Phone pairing can be done now or later. The final step requires email verification through Supabase, creating an account for a new address or signing in an existing one. The Mac independently verifies the returned access token before saving `vibewire.setup.completed.v2` in UserDefaults. Closing or restarting before completion does not mark setup done. Existing installations complete this new flow once.
+
+Completed setup works offline on subsequent launches. Browser account requirements for remote connections remain a separate host setting.
+
+## Regression checks
+
+Run `npm run build:all --prefix web`, `swift build --package-path host`, `npm test --prefix host-electron`, and `node --test web/dashboard/test/account.test.mjs` from the repository root.
+
+For visual checks, run `npm run dev:dashboard --prefix web`. The development-only `/test/index.html#settings` fixture must still show onboarding. `?permissions#settings` permits progression to the account screen. `?complete&permissions#settings` displays settings with long values and all update actions. Check 1040 × 680 and 1360 × 900 for horizontal overflow.
+
+---
+
+## Previous onboarding notes
+
 # Device setup
 
 The activation target is a real first connection: see the computer’s desktop on the phone, move its pointer, and click. A completed explanation is not a completed connection.
