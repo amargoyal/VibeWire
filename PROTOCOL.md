@@ -440,6 +440,11 @@ view. The callback keeps the code for the attempt whose `flow` matches, and
 `account.browser.take` hands it to the dashboard once, within ten minutes. The
 PKCE verifier stays in the dashboard, so the code alone is not a session.
 
+`account.signOut` revokes every paired device, closes any open pairing code,
+releases the account claim, and marks setup incomplete. Until someone signs in
+again the window shows only the sign-in screen, and `pair.begin` answers
+`409 signed_out`.
+
 Everything routes through the paths the phone already uses, so the two surfaces
 cannot disagree: settings persist and retune the encoder identically, a revoke
 severs the socket within the same second, and Claude's output is fanned to the
