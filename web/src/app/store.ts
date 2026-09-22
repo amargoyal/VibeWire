@@ -21,6 +21,7 @@ import {
 } from '../net/account'
 import { rememberHost, rememberThisBrowser } from '../net/accountSync'
 import { accountsConfigured } from '../net/supabase'
+import { pullPrefs } from './prefs'
 import { LinkMonitor } from '../net/linkMonitor'
 import {
   describe,
@@ -520,6 +521,9 @@ export class Store {
     })
     await loadAccount().catch(() => null)
     this.account.value = accountSession()?.user ?? null
+    // A session that was already here brings its preferences with it, in the
+    // background: nothing on the first screen waits for a database.
+    if (this.account.value) void pullPrefs().catch(() => undefined)
 
     if (!urlCarriesAccount()) return
     try {
@@ -547,6 +551,7 @@ export class Store {
     await Promise.all([
       rememberThisBrowser(Identity.deviceName(), navigator.platform || '', paired?.deviceId ?? null),
       paired ? rememberHost(paired) : Promise.resolve(),
+      pullPrefs(),
     ]).catch(() => undefined)
   }
 
