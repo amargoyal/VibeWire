@@ -158,6 +158,35 @@ class ConfigStore {
     return Log.verbose
   }
 
+  /**
+   * Where accounts live, for the one thing this host asks of them: is this
+   * token real, and whose is it.
+   *
+   * The same project the web client signs into, and the same publishable key —
+   * it grants nothing on its own, and this host only ever presents it alongside
+   * a token someone else earned. Both are overridable so a fork or a
+   * self-hosted GoTrue needs no patch, and clearing the URL turns the account
+   * requirement into a setting that cannot be switched on.
+   */
+  get accountServerURL(): string {
+    const stored =
+      this.state.env.VIBEWIRE_ACCOUNT_URL ?? 'https://iqtuikhyqkythaffxuca.supabase.co'
+    return stored.replace(/\/+$/, '')
+  }
+
+  get accountServerKey(): string {
+    return this.state.env.VIBEWIRE_ACCOUNT_KEY ?? 'sb_publishable_UdTwW-cDWfJ-TrhNtDEjMQ_qcSWlpP3'
+  }
+
+  /**
+   * Whether this build can check an account at all. A host that cannot must not
+   * offer the switch, for the same reason the client does not draw a control
+   * that cannot work.
+   */
+  get accountsAvailable(): boolean {
+    return this.accountServerURL.length > 0 && this.accountServerKey.length > 0
+  }
+
   get configDir(): string {
     return this.state.configDir
   }
