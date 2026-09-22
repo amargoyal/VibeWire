@@ -1,6 +1,8 @@
 # Accounts
 
-The activation target is unchanged: see the computer's desktop on the phone, move its pointer, click. An account is not on the path to that and never blocks it. What an account adds is memory that outlives a browser's site data, and one optional answer to a question pairing cannot answer — *who* is holding the phone.
+Mac setup requires a verified account as its final step. The host remembers completion, so normal launches remain available offline. Remote browser account enforcement is a separate setting. The email-code flow below serves both sign-in and account creation.
+
+For the phone client, the activation target is unchanged: see the computer's desktop on the phone, move its pointer, click. An account is not on the path to that and never blocks it. What an account adds is memory that outlives a browser's site data, and one optional answer to a question pairing cannot answer — *who* is holding the phone.
 
 ## Research and decisions
 
