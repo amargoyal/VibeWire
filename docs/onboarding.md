@@ -4,6 +4,8 @@ The Mac window now opens as a dedicated four-stage setup flow: Welcome, Permissi
 
 Both macOS permissions must be granted. Phone pairing can be done now or later. The final step requires email verification through Supabase, creating an account for a new address or signing in an existing one. Where the project has Google enabled, the same step offers it. It opens in the default browser and return to the Mac on `/account/callback`. The Mac independently verifies the returned access token before saving `vibewire.setup.completed.v2` in UserDefaults. Closing or restarting before completion does not mark setup done. Existing installations complete this new flow once.
 
+Settings has an Account section with the signed-in email and **Sign out**. Signing out asks once, then unpairs every device, releases the account claim and leaves only the sign-in screen. Permissions and app settings are kept. Pairing, from the window or the menu bar, is refused until someone signs in again.
+
 Completed setup works offline on subsequent launches. Browser account requirements for remote connections remain a separate host setting.
 
 ## Regression checks
