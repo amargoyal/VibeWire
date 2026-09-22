@@ -25,10 +25,23 @@ export class SocketConnection {
    *  frame is worthless; a growing queue is worse than worthless. */
   private readonly maxInFlightBinaryBytes = 4 * 1024 * 1024
 
+  /**
+   * The account this socket has proven, where one was asked for.
+   *
+   * A browser cannot put a header on a WebSocket, so the account arrives as the
+   * first message on the socket rather than on the upgrade — which is also the
+   * better place for it, since the alternative was an access token in a URL.
+   * Until it lands, a host that requires one answers nothing.
+   */
+  accountUserId: string | null = null
+
   constructor(
     private readonly ws: WebSocket,
     readonly deviceId: string,
     readonly deviceName: string,
+    /** Whether a browser opened this socket rather than the iPhone app. See
+     *  `HTTPServer.handleUpgrade` for how it is decided. */
+    readonly isBrowser: boolean = false,
   ) {}
 
   sendJSON(object: Payload): void {

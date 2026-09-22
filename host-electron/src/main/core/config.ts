@@ -60,6 +60,24 @@ export interface HostSettings {
    * version in the user agent, and nothing is ever installed by it.
    */
   checkForUpdates: boolean
+  /**
+   * Whether a browser has to be signed into a VibeWire account before this host
+   * will answer it.
+   *
+   * Off by default, and off is the honest default: pairing is already a key
+   * exchange this computer agreed to, and a device holding a trusted key got it
+   * by someone reading six digits off this screen. What this adds is a second,
+   * different question — who is at the other end — which matters when the host
+   * is reachable from the internet over a relay.
+   */
+  requireAccount: boolean
+  /**
+   * The account this computer belongs to, claimed by the first signed-in
+   * browser to connect while `requireAccount` is on and cleared when it is
+   * turned off. An owner that can be added silently is not an owner.
+   */
+  accountOwnerId: string | null
+  accountOwnerEmail: string | null
 }
 
 export const DEFAULT_SETTINGS: HostSettings = {
@@ -74,6 +92,9 @@ export const DEFAULT_SETTINGS: HostSettings = {
   port: 8787,
   webClientURL: null,
   checkForUpdates: true,
+  requireAccount: false,
+  accountOwnerId: null,
+  accountOwnerEmail: null,
 }
 
 function decodeSettings(raw: unknown): HostSettings {
@@ -93,6 +114,9 @@ function decodeSettings(raw: unknown): HostSettings {
   if (typeof record.port === 'number' && record.port > 0 && record.port < 65536) settings.port = record.port
   if (typeof record.webClientURL === 'string' && record.webClientURL) settings.webClientURL = record.webClientURL
   if (typeof record.checkForUpdates === 'boolean') settings.checkForUpdates = record.checkForUpdates
+  if (typeof record.requireAccount === 'boolean') settings.requireAccount = record.requireAccount
+  if (typeof record.accountOwnerId === 'string') settings.accountOwnerId = record.accountOwnerId
+  if (typeof record.accountOwnerEmail === 'string') settings.accountOwnerEmail = record.accountOwnerEmail
   return settings
 }
 
@@ -132,6 +156,35 @@ class ConfigStore {
 
   get verbose(): boolean {
     return Log.verbose
+  }
+
+  /**
+   * Where accounts live, for the one thing this host asks of them: is this
+   * token real, and whose is it.
+   *
+   * The same project the web client signs into, and the same publishable key —
+   * it grants nothing on its own, and this host only ever presents it alongside
+   * a token someone else earned. Both are overridable so a fork or a
+   * self-hosted GoTrue needs no patch, and clearing the URL turns the account
+   * requirement into a setting that cannot be switched on.
+   */
+  get accountServerURL(): string {
+    const stored =
+      this.state.env.VIBEWIRE_ACCOUNT_URL ?? 'https://iqtuikhyqkythaffxuca.supabase.co'
+    return stored.replace(/\/+$/, '')
+  }
+
+  get accountServerKey(): string {
+    return this.state.env.VIBEWIRE_ACCOUNT_KEY ?? 'sb_publishable_UdTwW-cDWfJ-TrhNtDEjMQ_qcSWlpP3'
+  }
+
+  /**
+   * Whether this build can check an account at all. A host that cannot must not
+   * offer the switch, for the same reason the client does not draw a control
+   * that cannot work.
+   */
+  get accountsAvailable(): boolean {
+    return this.accountServerURL.length > 0 && this.accountServerKey.length > 0
   }
 
   get configDir(): string {

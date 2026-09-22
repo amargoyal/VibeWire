@@ -16,6 +16,7 @@ import {
   type Payload,
   type SettingValue,
 } from '../net/wireProtocol'
+import { AccountVerifier } from '../pairing/accountVerifier'
 import { strictBase64 } from '../pairing/ed25519'
 import { PairError, PairingService } from '../pairing/pairingService'
 import { TrustStore, type TrustedDevice } from '../pairing/trustStore'
@@ -23,6 +24,16 @@ import type { HostPlatform } from '../platform/hostPlatform'
 import type { SystemServices } from '../system/systemServices'
 import { Telemetry, telemetryWire } from '../system/telemetry'
 import { TransportManager, transportWire } from '../transport/transportManager'
+
+/**
+ * How long a socket has to present an account before it is closed.
+ *
+ * Long enough for the client's own token refresh, which is one request to the
+ * account server and happens while the socket is opening. Short enough that a
+ * browser which will never present one is told so rather than left looking at
+ * a connection that never does anything.
+ */
+const ACCOUNT_GRACE_MS = 8000
 
 /** Something that answers `/dashboard/*` and `/v1/dashboard/*`, or declines. */
 export interface DashboardRoutes {
@@ -67,6 +78,7 @@ export class HostRouter implements Router {
   private readonly web: WebAssets | null
   private readonly trust: TrustStore
   private readonly pairing: PairingService
+  private readonly accounts = new AccountVerifier()
   private readonly capture: CaptureHost
   private readonly input: InputRouter
   private readonly system: SystemServices
@@ -230,6 +242,9 @@ export class HostRouter implements Router {
         deviceId: result.device.id,
         pairedAt: result.device.pairedAt.toISOString(),
         protocol: Config.protocolVersion,
+        // So the browser knows, before its first socket, that the end of setup
+        // is a sign-in it has to do rather than one it is being offered.
+        requiresAccount: Config.accountsAvailable && this.settings.requireAccount,
       })
     } catch (error) {
       if (error instanceof PairError) {
@@ -315,8 +330,15 @@ export class HostRouter implements Router {
           wakeOnLan: this.system.canWakeOverNetwork(),
         },
         conditions: this.platform.conditions(),
+        // Said on every hello, not only to newly paired devices: a browser
+        // paired last week learns about the requirement at the same moment as
+        // one paired a second ago.
+        requiresAccount:
+          Config.accountsAvailable && socket.isBrowser && this.settings.requireAccount,
       }),
     )
+
+    this.startAccountGrace(socket)
 
     await this.pushDisplays(socket)
     this.pushStatus(socket)
@@ -359,6 +381,21 @@ export class HostRouter implements Router {
   }
 
   private async dispatch(message: Inbound, socket: SocketConnection): Promise<void> {
+    // The account, where one is offered, is answered before anything else: it
+    // is the message that decides whether the rest may be answered at all, and
+    // it arrives on a socket that has already proven its key.
+    if (message.t === 'account') {
+      await this.handleAccount(message.token, socket)
+      return
+    }
+
+    if (this.accountGateCloses(socket)) {
+      // Not an ack and not silence. A client refused here has somewhere to go
+      // — its sign-in screen — and it only knows that if the refusal says so.
+      socket.sendJSON(Outbound.error('account_required', this.accountRefusalText(), false))
+      return
+    }
+
     switch (message.t) {
       case 'ping':
         socket.sendJSON(Outbound.pong(message.tMicros))
@@ -491,6 +528,104 @@ export class HostRouter implements Router {
     }
   }
 
+  // MARK: The account gate
+
+  /**
+   * Whether this socket is being refused for want of an account right now.
+   */
+  private accountGateCloses(socket: SocketConnection): boolean {
+    if (!Config.accountsAvailable) return false
+    // The iPhone app holds a key in the Secure Enclave and has no account to
+    // present. Holding it to this setting would turn the switch into a way to
+    // lock yourself out of your own phone.
+    if (!socket.isBrowser) return false
+    if (!this.settings.requireAccount) return false
+    return socket.accountUserId === null
+  }
+
+  /** The sentence the client puts on its sign-in screen. */
+  private accountRefusalText(): string {
+    return `${this.platform.machine.hostName()} is set to accept only signed-in browsers. Sign in to use it.`
+  }
+
+  /**
+   * An account offered by a client, checked and then either adopted or refused.
+   *
+   * The first signed-in browser to arrive while the requirement is on claims
+   * this computer. That is a real decision and it is written to the settings
+   * file, so the second account gets a refusal rather than a share.
+   */
+  private async handleAccount(token: string, socket: SocketConnection): Promise<void> {
+    if (!Config.accountsAvailable) return
+    const required = this.settings.requireAccount
+
+    const account = await this.accounts.verify(token)
+    if (!account) {
+      Log.info('net', 'account token was not confirmed by the account server')
+      if (required) {
+        socket.sendJSON(
+          Outbound.error(
+            'account_required',
+            'This computer could not confirm that sign-in. Sign in again, or check that the computer is online.',
+            true,
+          ),
+        )
+        socket.close(4003, 'account not confirmed')
+      }
+      return
+    }
+
+    if (!required) {
+      socket.accountUserId = account.id
+      return
+    }
+
+    const owner = this.settings.accountOwnerId
+    if (owner === null) {
+      this.settings.accountOwnerId = account.id
+      this.settings.accountOwnerEmail = account.email
+      Config.saveSettings(this.settings)
+      Log.info('net', 'this host now belongs to the account that just signed in')
+      socket.accountUserId = account.id
+      socket.sendJSON(this.settingsPayload())
+      return
+    }
+
+    if (owner !== account.id) {
+      Log.warn('net', 'refused a socket signed into another account')
+      socket.sendJSON(
+        Outbound.error(
+          'account_required',
+          `${this.platform.machine.hostName()} belongs to a different VibeWire account. Sign in with the account that set it up, or turn the requirement off on the computer.`,
+          false,
+        ),
+      )
+      socket.close(4003, 'another account owns this host')
+      return
+    }
+
+    socket.accountUserId = account.id
+  }
+
+  /**
+   * Closes a socket that never presented the account this host asked for.
+   *
+   * Started when the socket opens rather than checked on the next message,
+   * because a client that is refused sends nothing: it would sit on an open
+   * socket with no picture and no explanation.
+   */
+  private startAccountGrace(socket: SocketConnection): void {
+    if (!Config.accountsAvailable || !socket.isBrowser) return
+    if (!this.settings.requireAccount) return
+    setTimeout(() => {
+      if (socket.accountUserId !== null) return
+      if (!this.settings.requireAccount) return
+      if (this.activeSocket !== socket) return
+      socket.sendJSON(Outbound.error('account_required', this.accountRefusalText(), false))
+      socket.close(4003, 'no account presented')
+    }, ACCOUNT_GRACE_MS)
+  }
+
   // MARK: Hub actions
 
   private async performHubAction(action: HubAction, socket: SocketConnection): Promise<void> {
@@ -544,6 +679,19 @@ export class HostRouter implements Router {
     else if (key === 'requireBiometricEachSession' && value.kind === 'bool') s.requireBiometricEachSession = value.value
     else if (key === 'relayOverInternet' && value.kind === 'bool') s.relayOverInternet = value.value
     else if (key === 'checkForUpdates' && value.kind === 'bool') s.checkForUpdates = value.value
+    else if (key === 'requireAccount' && value.kind === 'bool') {
+      s.requireAccount = value.value
+      // Turning it off releases the computer. Keeping the owner would mean a
+      // switch that is off still decides who may use this machine the next
+      // time it is on, which is not what off means.
+      if (!value.value) {
+        s.accountOwnerId = null
+        s.accountOwnerEmail = null
+      }
+      // Nothing decided under the old rule may survive the change: a cached
+      // "yes" would keep a socket alive for up to a minute after the switch.
+      this.accounts.forgetEverything()
+    }
     else if (key === 'quality' && value.kind === 'string') s.quality = value.value === '1080' || value.value === '720' || value.value === '540' ? value.value : 'auto'
     else Log.debug('app', `ignoring unknown setting ${key}`)
 
@@ -567,6 +715,12 @@ export class HostRouter implements Router {
       naturalScrolling: this.settings.naturalScrolling,
       requireBiometricEachSession: this.settings.requireBiometricEachSession,
       relayOverInternet: this.settings.relayOverInternet,
+      requireAccount: this.settings.requireAccount,
+      accountsAvailable: Config.accountsAvailable,
+      // The owner's address is deliberately absent. This payload reaches a
+      // browser the moment its socket opens, before it has presented an
+      // account — so a phone that will be refused must not be told whose
+      // computer refused it.
       hostVersion: Config.hostVersion,
     }
   }

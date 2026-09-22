@@ -40,6 +40,7 @@ final class HostRouter: Router, @unchecked Sendable {
     /// Reserved session id standing for "the live one", not a transcript file.
     static let liveSessionId = "vibewire-live-session"
     private let transport: TransportManager
+    private let accounts = AccountVerifier()
     private let state: Guarded<State>
 
     /// The built web client, when there is one. Resolved once at launch — see
@@ -260,6 +261,12 @@ final class HostRouter: Router, @unchecked Sendable {
                 "deviceId": result.device.id,
                 "pairedAt": ISO8601DateFormatter().string(from: result.device.pairedAt),
                 "protocol": Config.protocolVersion,
+                // So the browser knows, before its first socket, that the end
+                // of setup is a sign-in it has to do rather than one it is
+                // being offered. The alternative was pairing, connecting, and
+                // being turned away — the same destination, one refusal later.
+                "requiresAccount": Config.accountsAvailable
+                    && state.read { $0.settings.requireAccount },
             ])
         } catch PairingService.PairError.lockedOut(let retryAfter) {
             Log.info(.net, "pair rejected 429 too_many_attempts, retry in \(retryAfter)s")
@@ -360,6 +367,9 @@ final class HostRouter: Router, @unchecked Sendable {
         await pairing.noteSocketOpened(deviceId: device.id)
 
         let hostId = (try? await trust.hostId()) ?? ""
+        let requiresAccount = Config.accountsAvailable
+            && socket.isBrowser
+            && state.read { $0.settings.requireAccount }
         socket.sendJSON(Outbound.hello(
             hostId: hostId,
             hostName: Config.machineName,
@@ -370,8 +380,14 @@ final class HostRouter: Router, @unchecked Sendable {
                 "accessibility": InputInjector.hasAccessibilityPermission(),
                 "claude": ProcessInfo.processInfo.environment["VIBEWIRE_DISABLE_CLAUDE"] != "1",
                 "wakeOnLan": system.canWakeOverNetwork(),
-            ]
+            ],
+            // Said on every hello, not only to newly paired devices: a browser
+            // paired last week learns about the requirement at the same moment
+            // as one paired a second ago.
+            requiresAccount: requiresAccount
         ))
+
+        startAccountGrace(for: socket)
 
         await pushDisplays(to: socket)
         await pushStatus(to: socket)
@@ -413,6 +429,28 @@ final class HostRouter: Router, @unchecked Sendable {
 
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     private func dispatch(_ message: InboundMessage, id: String?, socket: SocketConnection) async {
+        // The account, where one is offered, is answered before anything else:
+        // it is the message that decides whether the rest may be answered at
+        // all, and it arrives on a socket that has already proven its key.
+        if case .account(let token) = message {
+            await handleAccount(token: token, socket: socket)
+            if let id { socket.sendJSON(Outbound.ack(id)) }
+            return
+        }
+
+        if accountGateCloses(socket) {
+            // Not an ack and not silence. A client that is refused here has
+            // somewhere to go — its sign-in screen — and it only knows that if
+            // the refusal says so.
+            socket.sendJSON(Outbound.error(
+                "account_required",
+                accountRefusalText(),
+                retriable: false,
+                id: id
+            ))
+            return
+        }
+
         switch message {
         case .ping(let tMicros, let sequence, let rttMillis):
             socket.sendJSON(Outbound.pong(tMicros: tMicros))
@@ -548,9 +586,120 @@ final class HostRouter: Router, @unchecked Sendable {
         case .setting(let key, let value):
             await applySetting(key: key, value: value)
             socket.sendJSON(settingsPayload())
+
+        case .account:
+            // Answered above, before the gate. Listed here only because the
+            // compiler counts cases and this one must not fall into a default
+            // that silently drops a message.
+            break
         }
 
         if let id { socket.sendJSON(Outbound.ack(id)) }
+    }
+
+    // MARK: The account gate
+
+    /// How long a socket has to present an account before it is closed.
+    ///
+    /// Long enough for the client's own token refresh, which is one request to
+    /// the account server and happens while the socket is opening. Short enough
+    /// that a browser which will never present one is told so rather than left
+    /// looking at a connection that never does anything.
+    private static let accountGrace: TimeInterval = 8
+
+    /// Whether this socket is being refused for want of an account right now.
+    private func accountGateCloses(_ socket: SocketConnection) -> Bool {
+        guard Config.accountsAvailable else { return false }
+        // The iPhone app holds a key in the Secure Enclave and has no account
+        // to present. Holding it to this setting would turn the switch into a
+        // way to lock yourself out of your own phone.
+        guard socket.isBrowser else { return false }
+        guard state.read({ $0.settings.requireAccount }) else { return false }
+        return socket.accountUserId == nil
+    }
+
+    /// The sentence the client puts on its sign-in screen.
+    private func accountRefusalText() -> String {
+        "\(Config.machineName) is set to accept only signed-in browsers. Sign in to use it."
+    }
+
+    /// An account offered by a client, checked and then either adopted or
+    /// refused.
+    ///
+    /// The first signed-in browser to arrive while the requirement is on claims
+    /// this computer. That is a real decision and it is written to the settings
+    /// file, so the second account gets a refusal rather than a share — an
+    /// owner that can be added silently is not an owner.
+    private func handleAccount(token: String, socket: SocketConnection) async {
+        guard Config.accountsAvailable else { return }
+        let required = state.read { $0.settings.requireAccount }
+
+        guard let account = await accounts.verify(token: token) else {
+            Log.info(.net, "account token was not confirmed by the account server")
+            if required {
+                socket.sendJSON(Outbound.error(
+                    "account_required",
+                    "This computer could not confirm that sign-in. Sign in again, or check that the computer is online.",
+                    retriable: true
+                ))
+                socket.close(code: 4003, reason: "account not confirmed")
+            }
+            return
+        }
+
+        // Claimed or compared, in one pass, so two sockets arriving together
+        // cannot each see an unclaimed host and claim it.
+        enum Verdict { case adopted, matched, refused }
+        var updated: HostSettings?
+        let verdict = state.withLock { current -> Verdict in
+            guard current.settings.requireAccount else { return .matched }
+            guard let owner = current.settings.accountOwnerId else {
+                current.settings.accountOwnerId = account.id
+                current.settings.accountOwnerEmail = account.email
+                updated = current.settings
+                return .adopted
+            }
+            return owner == account.id ? .matched : .refused
+        }
+
+        switch verdict {
+        case .refused:
+            Log.warn(.net, "refused a socket signed into another account")
+            socket.sendJSON(Outbound.error(
+                "account_required",
+                "\(Config.machineName) belongs to a different VibeWire account. Sign in with the account that set it up, or turn the requirement off on the computer.",
+                retriable: false
+            ))
+            socket.close(code: 4003, reason: "another account owns this host")
+        case .adopted:
+            if let updated {
+                Config.saveSettings(updated)
+                Log.info(.net, "this host now belongs to the account that just signed in")
+            }
+            socket.noteAccount(account.id)
+            socket.sendJSON(settingsPayload())
+        case .matched:
+            socket.noteAccount(account.id)
+        }
+    }
+
+    /// Closes a socket that never presented the account this host asked for.
+    ///
+    /// Started when the socket opens rather than checked on the next message,
+    /// because a client that is refused sends nothing: it would sit on an open
+    /// socket with no picture and no explanation, which is the shape of failure
+    /// this product refuses to ship.
+    private func startAccountGrace(for socket: SocketConnection) {
+        guard Config.accountsAvailable, socket.isBrowser else { return }
+        guard state.read({ $0.settings.requireAccount }) else { return }
+        Task { [weak socket] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.accountGrace * 1_000_000_000))
+            guard let socket, socket.accountUserId == nil else { return }
+            guard state.read({ $0.settings.requireAccount }) else { return }
+            guard state.read({ $0.activeSocket === socket }) else { return }
+            socket.sendJSON(Outbound.error("account_required", accountRefusalText(), retriable: false))
+            socket.close(code: 4003, reason: "no account presented")
+        }
     }
 
     // MARK: Streaming
@@ -915,6 +1064,15 @@ final class HostRouter: Router, @unchecked Sendable {
                 current.settings.relayOverInternet = on
             case ("checkForUpdates", .bool(let on)):
                 current.settings.checkForUpdates = on
+            case ("requireAccount", .bool(let on)):
+                current.settings.requireAccount = on
+                // Turning it off releases the computer. Keeping the owner would
+                // mean a switch that is off still decides who may use this
+                // machine the next time it is on, which is not what off means.
+                if !on {
+                    current.settings.accountOwnerId = nil
+                    current.settings.accountOwnerEmail = nil
+                }
             case ("quality", .string(let raw)):
                 current.settings.quality = HostSettings.QualityLadder(rawValue: raw) ?? .auto
             default:
@@ -928,6 +1086,11 @@ final class HostRouter: Router, @unchecked Sendable {
             naturalScrolling: updated.naturalScrolling
         )
         Config.saveSettings(updated)
+
+        // Nothing decided under the old rule may survive the change: a cached
+        // "yes" for an account that no longer owns this host would keep a
+        // socket alive for up to a minute after the switch moved.
+        if key == "requireAccount" { await accounts.forgetEverything() }
 
         // The relay toggle has a side effect beyond persistence.
         if updated.relayOverInternet {
@@ -951,6 +1114,12 @@ final class HostRouter: Router, @unchecked Sendable {
                 "requireBiometricEachSession": current.settings.requireBiometricEachSession,
                 "relayOverInternet": current.settings.relayOverInternet,
                 "checkForUpdates": current.settings.checkForUpdates,
+                "requireAccount": current.settings.requireAccount,
+                "accountsAvailable": Config.accountsAvailable,
+                // The owner's address is deliberately absent. This payload is
+                // sent to a browser the moment its socket opens, which is
+                // before it has presented an account — so a phone that will be
+                // refused must not be told whose computer refused it.
                 "hostVersion": Config.hostVersion,
             ]
         }

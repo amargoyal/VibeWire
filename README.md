@@ -104,6 +104,31 @@ Settings → **Check for a newer VibeWire** turns the check off. It is one
 request to `api.github.com`, carrying nothing but the version in the user
 agent.
 
+## Accounts
+
+Nothing on the path to a first picture needs one. Pairing is a key exchange, and
+the browser client asks about an account only at the end of setup, once the
+pointer has already moved. Skipping is an answer and is remembered.
+
+What an account carries is a directory: the computers you have paired with, the
+browsers you have signed in from, and the keyboard bar you built. It never
+carries a key, a pairing code, a frame, a clipboard or a Claude transcript, so a
+phone restored from it still has six digits to type.
+
+Signing in is a six-digit code by email. The same email holds a link, and Google
+and Apple appear where the project has them enabled.
+
+The host has one related setting, off by default: **Require a signed-in
+browser**, in the pairing sheet and in Settings. On, this computer answers only
+browsers signed into the account that owns it — the first account to sign in
+claims it, and turning the setting off releases it. The iPhone app is
+unaffected: its key lives in the Secure Enclave and it has no account to
+present.
+
+`docs/accounts.md` covers what the Supabase project still needs configured, and
+the `VITE_SUPABASE_*` and `VIBEWIRE_ACCOUNT_*` overrides for pointing a build at
+a different one.
+
 ## Scanned the QR and nothing loaded
 
 The address on the QR is a private one, and a phone that cannot reach it shows

@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { store } from '../app/store'
 import type { HostPlatform } from '../net/identity'
 import { BROWSER_RESERVED, keyboardLocked } from '../app/keymap'
+import { pushPrefs } from '../app/prefs'
 import {
   Caps,
   Caret,
@@ -70,6 +71,9 @@ function writeCombos(combos: string[][], platform: HostPlatform): void {
   } catch {
     /* storage refused; the row still works for this tab */
   }
+  // And up to the account, where there is one. The bar is the one thing here a
+  // person builds by hand, so it is the one thing worth surviving a browser.
+  void pushPrefs().catch(() => undefined)
 }
 
 /** ⌘S ⌘Z ⌘⇧Z ⌘K ⌃C on a Mac. On a PC the chord key is Ctrl, so the interrupt

@@ -218,6 +218,9 @@ src/
   net/
     identity.ts         Ed25519, IndexedDB, the paired-host record
     hostClient.ts       pair, challenge, socket, backoff, input queue, ping
+    account.ts          GoTrue by hand: email codes, the link, provider sign-in
+    accountSync.ts      the account's directory of hosts, browsers, preferences
+    supabase.ts         which account server, overridable at build time
     endpoint.ts         address parsing and the mixed-content verdict
     linkMonitor.ts      which radio, when the browser will say
   video/
@@ -228,7 +231,7 @@ src/
     components.tsx      Caps, Readout, Panel, KeyCap, PrimaryAction, …
     markdown.tsx        Claude's answers, no innerHTML anywhere
   screens/
-    Pairing · Home · Remote · ControlHub · KeyboardBar · Settings ·
+    Pairing · SignIn · Home · Remote · ControlHub · KeyboardBar · Settings ·
     ClaudePanel · Diff · VideoSurface
 ```
 

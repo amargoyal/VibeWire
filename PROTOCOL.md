@@ -154,7 +154,7 @@ Requests carrying `id` get exactly one reply with the same `id`.
 
 | `t` | Meaning | Feeds screen |
 |---|---|---|
-| `hello` | host name, version, capabilities, permission status | 02A header |
+| `hello` | host name, version, capabilities, permission status, `requiresAccount` | 02A header |
 | `status` | awake/asleep, `displaysAsleep`, rtt, loss, downMbps, jitter, 60 s rtt history | 02A–02D condition card |
 | `displays` | id, name, width, height, hz, isBuiltIn, selected | 02A–02D display list, 03A tabs |
 | `transport` | `direct`/`relay`, path detail, peer latency, relay name | 02A, 02D, 07A toggle |
@@ -237,6 +237,7 @@ How a phone reaches a Windows host, with nothing installed on the phone:
 | `claude` | see §5 | 06A/06B/06C |
 | `revoke` | `{ deviceId }` or `{ all: true }` | 07A/07B |
 | `setting` | `{ key, value }` | 07A |
+| `account` | `{ token }`, the client's account access token | 17 |
 | `ping` | `{ tMicros }` | rtt sampling |
 
 `drag.count` is the click the button goes down on, and it is optional — absent or
@@ -246,6 +247,42 @@ every event of the drag, down through move to up, because AppKit reads the click
 count off each event and a drag that changes it mid-gesture stops being a
 double-click. Additive, still `protocolVersion = 1`: a client that never sends
 the field behaves exactly as before.
+
+### 4.1 Accounts
+
+A host may be set to answer only browsers signed into the VibeWire account that
+owns it. Off by default, and additive: `protocolVersion` stays `1`, an older
+host never sends `requiresAccount`, and an older client never sends `account`.
+
+`hello.requiresAccount` is a boolean, sent on every hello rather than only to a
+newly paired device, so a browser paired last week learns about the requirement
+at the same moment as one paired a second ago.
+
+`account` carries an access token issued by the account server named in the
+host's configuration. It travels as a socket message, not as a query parameter
+on the upgrade: a browser cannot set a header on a WebSocket, and the remaining
+alternative would have put a live token in every log between here and the
+relay. It is sent once per socket, immediately after the socket opens, and only
+when the client has a session.
+
+The host answers it in one of three ways, and answers nothing else until it
+has:
+
+| Situation | What the host does |
+|---|---|
+| Token confirmed, no owner recorded | Writes this account as the owner and answers normally |
+| Token confirmed, matches the owner | Answers normally |
+| Token confirmed, a different account owns the host | `error` with code `account_required`, then closes `4003` |
+| Token not confirmed | `error` with code `account_required` and `retriable: true`, then closes `4003` |
+| No `account` within 8 seconds | `error` with code `account_required`, then closes `4003` |
+
+`account_required` is the one refusal a client can act on: it means the sign-in
+screen, not a banner. Verification is a `GET /auth/v1/user` against the account
+server — asking the issuer, rather than checking a signature, so a revoked
+session stops working — and is cached for a minute.
+
+The requirement governs browser clients. The iPhone app authenticates with a
+key in the Secure Enclave and has no account to present.
 
 ## 5. Claude sub-protocol
 

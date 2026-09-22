@@ -307,6 +307,16 @@ export const Identity = {
 
 // MARK: - Small helpers
 
+/**
+ * The same per-origin record store the signing key lives in, for anything else
+ * that has to survive a reload without being readable by another origin.
+ *
+ * Exported rather than duplicated: a second IndexedDB database would open a
+ * second connection, fail separately in private browsing, and give the account
+ * a different answer to "is storage available here" than the key store has.
+ */
+export const records = { read, write, remove }
+
 export function base64(bytes: Uint8Array): string {
   let text = ''
   for (const byte of bytes) text += String.fromCharCode(byte)

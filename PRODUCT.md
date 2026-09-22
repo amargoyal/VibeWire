@@ -14,7 +14,9 @@ Where the browser cannot do what the phone does, the web client states the diffe
 
 One user today: the author, a developer who runs Claude Code and other work on a Mac and wants that Mac in hand while away from the desk — on a couch, in bed, in transit, on a phone that may be on cellular or on a Tailscale path with no Wi-Fi at all.
 
-A public iOS release is possible later but is not committed. The consequence for design is a quality bar, not an audience change: every surface is built to look and behave like a shipping product, so a later App Store decision needs no rework. Device-specific onboarding is now in scope: a working host setup checklist and optional, replayable browser/iPhone guides. Public release remains undecided; setup must not invent accounts, distribution promises, or service guarantees.
+A public iOS release is possible later but is not committed. The consequence for design is a quality bar, not an audience change: every surface is built to look and behave like a shipping product, so a later App Store decision needs no rework. Device-specific onboarding is now in scope: a working host setup checklist and optional, replayable browser/iPhone guides. Public release remains undecided; setup must not invent distribution promises or service guarantees.
+
+Accounts are now in scope, with a narrow brief. Pairing stays a key exchange and is never a login, and every screen up to and including the first frame works signed out. An account is offered once, at the end of setup, and is remembered as answered either way; it carries a directory — the computers paired with, the browsers signed in from, the keyboard bar — and never a key, a code, a frame or a transcript. A host may be set to require one, off by default. `docs/accounts.md` is the reasoning and the remaining project configuration.
 
 ## Product Purpose
 

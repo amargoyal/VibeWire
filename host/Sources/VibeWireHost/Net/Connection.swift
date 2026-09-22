@@ -150,10 +150,17 @@ final class ClientConnection: @unchecked Sendable {
             """
             send(Data(handshake.utf8))
 
+            // A browser cannot put a header on a WebSocket upgrade, so it
+            // authenticates in the query string; the iPhone app sets headers.
+            // That difference is the only place a host can tell the two apart,
+            // and the account requirement governs browsers alone.
+            let isBrowser = request.header("x-vibewire-signature") == nil
+
             let socket = SocketConnection(
                 connection: connection,
                 deviceId: device.id,
-                deviceName: device.name
+                deviceName: device.name,
+                isBrowser: isBrowser
             )
             self.socket = socket
             mode = .webSocket
@@ -245,10 +252,35 @@ final class SocketConnection: @unchecked Sendable {
     private var inFlightBinaryBytes = 0
     private let maxInFlightBinaryBytes = 4 * 1024 * 1024
 
-    init(connection: NWConnection, deviceId: String?, deviceName: String) {
+    /// The account this socket has proven, where one was asked for.
+    ///
+    /// A browser cannot put a header on a WebSocket, so the account arrives as
+    /// the first message on the socket rather than on the upgrade — which is
+    /// also the better place for it, since the alternative was an access token
+    /// in a URL. Until it lands, a host that requires one answers nothing.
+    private var accountUserIdValue: String?
+
+    /// Whether this socket was opened by a browser rather than by the iPhone
+    /// app. See `ClientConnection.handleUpgrade` for how it is decided.
+    let isBrowser: Bool
+
+    init(connection: NWConnection, deviceId: String?, deviceName: String, isBrowser: Bool = false) {
         self.connection = connection
         self.deviceId = deviceId
         self.deviceName = deviceName
+        self.isBrowser = isBrowser
+    }
+
+    var accountUserId: String? {
+        sendLock.lock()
+        defer { sendLock.unlock() }
+        return accountUserIdValue
+    }
+
+    func noteAccount(_ userId: String?) {
+        sendLock.lock()
+        accountUserIdValue = userId
+        sendLock.unlock()
     }
 
     func sendJSON(_ object: [String: Any]) {

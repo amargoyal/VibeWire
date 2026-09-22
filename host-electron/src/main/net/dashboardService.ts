@@ -282,6 +282,11 @@ export class DashboardService {
       requireBiometricEachSession: settings.requireBiometricEachSession,
       relayOverInternet: settings.relayOverInternet,
       checkForUpdates: settings.checkForUpdates,
+      requireAccount: settings.requireAccount,
+      accountsAvailable: Config.accountsAvailable,
+      // The window on this computer may say whose account owns it. The phone
+      // may not — see `settingsPayload` in the router.
+      accountOwnerEmail: settings.accountOwnerEmail ?? '',
       targetFps: settings.targetFps,
       port: settings.port,
       webClientURL: settings.webClientURL ?? '',

@@ -10,6 +10,18 @@ import { batch, computed, signal } from '@preact/signals'
 
 import { HostClient, type ConnectionState, type ControlMessage } from '../net/hostClient'
 import { Identity, type HostPlatform, type KeyStorage, type PairedHost } from '../net/identity'
+import {
+  adoptFromUrl,
+  loadAccount,
+  onAccountChange,
+  session as accountSession,
+  signOut,
+  urlCarriesAccount,
+  type AccountUser,
+} from '../net/account'
+import { rememberHost, rememberThisBrowser } from '../net/accountSync'
+import { accountsConfigured } from '../net/supabase'
+import { pullPrefs } from './prefs'
 import { LinkMonitor } from '../net/linkMonitor'
 import {
   describe,
@@ -148,7 +160,17 @@ export interface ChangedFile {
   removed: number
 }
 
-export type Route = 'pairing' | 'home' | 'remote'
+/**
+ * `signin` sits between pairing and home rather than in front of pairing.
+ *
+ * The thing this product does is show a computer on a phone, and an account is
+ * not needed for any of it — the handshake is a key exchange, not a login. So
+ * the account is asked for at the end of setup, once the wire is proven and the
+ * person has something to lose by clearing site data, and it can be skipped.
+ * The exception is a host that has been set to require one, which refuses the
+ * socket and sends the client back here with a reason.
+ */
+export type Route = 'pairing' | 'signin' | 'home' | 'remote'
 
 /**
  * What is presented *over* the route. One value, because two stacked sheets over
@@ -219,6 +241,9 @@ function firstLine(text: string): string {
   return line.length > 48 ? `${line.slice(0, 47)}…` : line
 }
 
+/** Where "the account was offered and answered" is remembered. */
+const ACCOUNT_INVITE_KEY = 'vibewire.account-invite.v1'
+
 export class Store {
   // Navigation
   route = signal<Route>('pairing')
@@ -230,6 +255,21 @@ export class Store {
    *  image on the clipboard unprompted, so it is shown rather than pocketed. */
   screenshot = signal<string | null>(null)
   showSessionPicker = signal(false)
+
+  // Account
+  /** Who is signed in here, or null. Null is a working state, not an error. */
+  account = signal<AccountUser | null>(null)
+  /** Whether this build has an account server to talk to at all. */
+  readonly accountsAvailable = accountsConfigured
+  /**
+   * Whether the host on the other end refuses this browser until it is signed
+   * in. Set from `hello`, and again from the refusal itself, because a client
+   * that was paired before the host's owner turned the setting on learns it at
+   * the moment it is turned away.
+   */
+  accountRequired = signal(false)
+  /** Why the host turned this browser away, when it did. */
+  accountRefusal = signal<string | null>(null)
 
   // Connection
   pairedHost = signal<PairedHost | null>(null)
@@ -421,6 +461,9 @@ export class Store {
       hostRecord: (host) => {
         this.pairedHost.value = host
       },
+      requiresAccount: (required) => {
+        this.accountRequired.value = required
+      },
     })
 
     // A radio change is the one event that says "everything you knew about how
@@ -453,6 +496,7 @@ export class Store {
   // MARK: Lifecycle
 
   async load(): Promise<void> {
+    await this.loadAccountState()
     const paired = await Identity.loadPairedHost().catch(() => null)
     batch(() => {
       this.pairedHost.value = paired
@@ -463,6 +507,96 @@ export class Store {
       if (paired?.platform) this.platform.value = paired.platform
     })
     await this.connectIfPaired()
+  }
+
+  /**
+   * Reads whatever account this browser already has, and whatever one the URL
+   * just brought back with it.
+   *
+   * Runs before the paired host is read, so the first paint knows whether to
+   * put a name in the corner. It never blocks on the network: a stored session
+   * is adopted as-is and refreshed the first time a token is actually spent.
+   */
+  private async loadAccountState(): Promise<void> {
+    if (!this.accountsAvailable) return
+    onAccountChange((session) => {
+      this.account.value = session?.user ?? null
+    })
+    await loadAccount().catch(() => null)
+    this.account.value = accountSession()?.user ?? null
+    // A session that was already here brings its preferences with it, in the
+    // background: nothing on the first screen waits for a database.
+    if (this.account.value) void pullPrefs().catch(() => undefined)
+
+    if (!urlCarriesAccount()) return
+    try {
+      const adopted = await adoptFromUrl()
+      if (adopted) {
+        this.account.value = adopted.user
+        this.note(`Signed in as ${adopted.user.email ?? 'this account'}.`)
+        void this.rememberAccountContext()
+      }
+    } catch (error) {
+      this.banner.value = { text: (error as Error).message }
+    }
+  }
+
+  /**
+   * Writes this browser and this computer into the account's directory.
+   *
+   * Best effort by design, and quiet: it is a convenience for a future phone,
+   * and an account server that cannot be reached must not be able to interrupt
+   * a session that is working.
+   */
+  async rememberAccountContext(): Promise<void> {
+    if (!this.account.value) return
+    const paired = this.pairedHost.value
+    await Promise.all([
+      rememberThisBrowser(Identity.deviceName(), navigator.platform || '', paired?.deviceId ?? null),
+      paired ? rememberHost(paired) : Promise.resolve(),
+      pullPrefs(),
+    ]).catch(() => undefined)
+  }
+
+  /**
+   * Whether the end of setup should offer an account.
+   *
+   * Asked once. A person who skipped it has answered the question, and asking
+   * again on the next pairing would make the answer meaningless — Settings is
+   * where they say yes later, and the host can still insist on its own behalf.
+   */
+  private shouldInviteSignIn(): boolean {
+    if (!this.accountsAvailable || this.account.value) return false
+    try {
+      return localStorage.getItem(ACCOUNT_INVITE_KEY) == null
+    } catch {
+      // Blocked storage means the invitation cannot be remembered as declined.
+      // Offering it once per pairing is the smaller annoyance of the two.
+      return true
+    }
+  }
+
+  /** Records that the invitation was answered, either way. */
+  noteSignInAnswered(): void {
+    try {
+      localStorage.setItem(ACCOUNT_INVITE_KEY, 'answered')
+    } catch {
+      /* Nothing is lost that this browser could have kept. */
+    }
+  }
+
+  /** Ends the account session. The pairing, which is a different thing, stays. */
+  async signOutAccount(): Promise<void> {
+    await signOut()
+    this.account.value = null
+    // A host that requires an account has just lost its reason to answer this
+    // browser, and saying so here is better than the socket saying it later.
+    if (this.accountRequired.value) {
+      this.disconnect()
+      this.route.value = 'signin'
+    } else {
+      this.note('Signed out. This browser is still paired.')
+    }
   }
 
   async connectIfPaired(): Promise<void> {
@@ -525,9 +659,16 @@ export class Store {
       batch(() => {
         this.pairedHost.value = paired
         this.hostName.value = paired.hostName
-        this.route.value = 'home'
+        // The last step of setup, and usually the first optional one: the wire
+        // is proven by the time this is asked, so a person who says no keeps
+        // everything they came for. Where the host has said it requires an
+        // account, the same screen is the way in rather than an offer, and it
+        // is shown whether or not the offer was already declined once.
+        const required = this.accountRequired.value && !this.account.value
+        this.route.value = required || this.shouldInviteSignIn() ? 'signin' : 'home'
       })
       await this.client.connect(paired)
+      void this.rememberAccountContext()
       return null
     } catch (error) {
       return (error as Error).message
@@ -802,6 +943,11 @@ export class Store {
           this.hostOS.value = str(payload['os']) ?? ''
           this.hostBuild.value = str(payload['osBuild']) ?? ''
           this.capabilities.value = (payload['capabilities'] as Record<string, boolean>) ?? {}
+          // A host that requires an account says so on every hello, so a client
+          // paired before the setting was turned on learns it at the same moment
+          // as one paired after.
+          this.accountRequired.value = bool(payload['requiresAccount'], false)
+          if (!this.accountRequired.value) this.accountRefusal.value = null
           if (platform === 'macos' && this.capabilities.value['screenRecording'] === false) {
             this.banner.value = {
                 text: 'Screen Recording is off on the Mac. Grant it in System Settings.',
@@ -1002,15 +1148,29 @@ export class Store {
         this.receiveClaude(payload)
         break
 
-      case 'error':
+      case 'error': {
+        const message = str(payload['message']) ?? `${this.HostNoun} reported an error.`
+        // The one refusal that is not a fault and has somewhere to go. A banner
+        // over Home would be a dead end: the socket is about to close and the
+        // only thing that changes the answer is on the sign-in screen.
+        if (str(payload['code']) === 'account_required') {
+          batch(() => {
+            this.accountRequired.value = true
+            this.accountRefusal.value = message
+            this.route.value = 'signin'
+          })
+          this.disconnect()
+          break
+        }
         this.banner.value = {
-          text: str(payload['message']) ?? `${this.HostNoun} reported an error.`,
+          text: message,
           // The host marks its own errors: a capture that failed is worth trying
           // again, a refused request is not. Both used to read identically and
           // offer nothing.
           retriable: payload['retriable'] === true,
         }
         break
+      }
 
       default:
         break

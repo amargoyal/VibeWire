@@ -172,6 +172,12 @@ export interface SettingsFact {
   requireBiometricEachSession: boolean
   relayOverInternet: boolean
   checkForUpdates: boolean
+  /** Whether a browser must be signed into a VibeWire account to connect. */
+  requireAccount: boolean
+  /** Whether this build has an account server to check one against. */
+  accountsAvailable: boolean
+  /** The account that claimed this computer, or empty before one has. */
+  accountOwnerEmail: string
   targetFps: number
   port: number
   webClientURL: string

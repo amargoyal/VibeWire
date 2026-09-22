@@ -143,6 +143,23 @@ export function Settings({ state }: { state: Facts }) {
                 void send({ do: 'setting.set', key: 'requireBiometricEachSession', value: on }),
             }}
           />
+          {settings.accountsAvailable ? (
+            <Row
+              label="Require a signed-in browser"
+              value={
+                !settings.requireAccount
+                  ? 'PAIRING ALONE IS ENOUGH'
+                  : settings.accountOwnerEmail
+                    ? `THIS COMPUTER BELONGS TO ${settings.accountOwnerEmail.toUpperCase()}`
+                    : 'THE NEXT ACCOUNT TO SIGN IN CLAIMS THIS COMPUTER'
+              }
+              toggle={{
+                on: settings.requireAccount,
+                onChange: (on) =>
+                  void send({ do: 'setting.set', key: 'requireAccount', value: on }),
+              }}
+            />
+          ) : null}
           <Row
             label="Paired devices"
             value={

@@ -51,6 +51,26 @@ struct HostSettings: Codable, Sendable {
     /// newer VibeWire has been published. One request, no identifiers beyond
     /// the version in the user agent, and nothing is ever installed by it.
     var checkForUpdates: Bool = true
+    /// Whether a browser has to be signed into a VibeWire account before this
+    /// host will answer it.
+    ///
+    /// Off by default, and off is the honest default: pairing is already a key
+    /// exchange this machine agreed to, and a device that holds a trusted key
+    /// got it by someone reading six digits off this screen. What this adds is a
+    /// second, different question — *who* is at the other end — which matters
+    /// when the host is reachable from the internet over a relay and the phone
+    /// it was paired with can be borrowed, lost, or handed over.
+    ///
+    /// It applies to browser clients. The iPhone app authenticates with a key in
+    /// the Secure Enclave and has no account to present.
+    var requireAccount: Bool = false
+    /// The account this host belongs to, claimed by the first signed-in browser
+    /// to connect while `requireAccount` is on, and cleared when it is turned
+    /// off. Everything else is refused, including a second account of the same
+    /// person's — which is the point: an account that can be added silently is
+    /// not a restriction.
+    var accountOwnerId: String?
+    var accountOwnerEmail: String?
 
     static let `default` = HostSettings()
 
@@ -89,6 +109,10 @@ struct HostSettings: Codable, Sendable {
         webClientURL = try container.decodeIfPresent(String.self, forKey: .webClientURL)
         checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates)
             ?? fallback.checkForUpdates
+        requireAccount = try container.decodeIfPresent(Bool.self, forKey: .requireAccount)
+            ?? fallback.requireAccount
+        accountOwnerId = try container.decodeIfPresent(String.self, forKey: .accountOwnerId)
+        accountOwnerEmail = try container.decodeIfPresent(String.self, forKey: .accountOwnerEmail)
     }
 }
 
@@ -101,6 +125,31 @@ enum Config {
     /// Bumped when the wire protocol changes incompatibly. The phone refuses to
     /// connect on mismatch rather than half-working.
     static let protocolVersion = 1
+
+    /// Where accounts live, for the one thing this host asks of them: is this
+    /// token real, and whose is it.
+    ///
+    /// The same project the web client signs into, and the same publishable key
+    /// — it grants nothing on its own, and this host only ever presents it
+    /// alongside a token someone else earned. Both are overridable so a fork or
+    /// a self-hosted GoTrue needs no patch, and clearing the URL turns the
+    /// account requirement into a setting that cannot be switched on.
+    static let accountServerURL: String = {
+        let stored = ProcessInfo.processInfo.environment["VIBEWIRE_ACCOUNT_URL"]
+            ?? "https://iqtuikhyqkythaffxuca.supabase.co"
+        return stored.hasSuffix("/") ? String(stored.dropLast()) : stored
+    }()
+
+    static let accountServerKey: String = ProcessInfo.processInfo
+        .environment["VIBEWIRE_ACCOUNT_KEY"]
+        ?? "sb_publishable_UdTwW-cDWfJ-TrhNtDEjMQ_qcSWlpP3"
+
+    /// Whether this build can check an account at all. A host that cannot must
+    /// not offer the switch, for the same reason the client does not draw a
+    /// control that cannot work.
+    static var accountsAvailable: Bool {
+        !accountServerURL.isEmpty && !accountServerKey.isEmpty
+    }
 
     static let keychainService = "com.vibewire.host.trust"
     static let pairingCodeLifetime: TimeInterval = 60

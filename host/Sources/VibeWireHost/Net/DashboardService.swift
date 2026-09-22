@@ -403,6 +403,11 @@ actor DashboardService {
                 "requireBiometricEachSession": settings.requireBiometricEachSession,
                 "relayOverInternet": settings.relayOverInternet,
                 "checkForUpdates": settings.checkForUpdates,
+                "requireAccount": settings.requireAccount,
+                "accountsAvailable": Config.accountsAvailable,
+                // The window on this computer may say whose account owns it.
+                // The phone may not — see `settingsPayload`.
+                "accountOwnerEmail": settings.accountOwnerEmail ?? "",
                 "targetFps": settings.targetFps,
                 "port": Int(settings.port),
                 "webClientURL": settings.webClientURL ?? "",
