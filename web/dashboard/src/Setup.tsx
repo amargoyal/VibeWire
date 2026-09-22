@@ -76,6 +76,16 @@ export function Setup({ state }: { state: Facts }) {
         <p style={{ color: live && state.encoder.capturing && state.link.attached ? 'var(--ns-green)' : 'var(--ns-text-secondary)' }} role="status">{!live ? 'Waiting for the host to answer.' : state.encoder.capturing && state.link.attached ? 'A device is connected and the host is sending video.' : paired ? 'Paired. Open View on your phone to test the picture and controls.' : 'Waiting for your first paired device.'}</p>
         <details><summary>Using your phone away from home</summary><p>Same Wi-Fi is the simplest first connection. For another network, configure Tailscale on both devices, or enable Relay over the internet in Transport. A relay address can change; scan a fresh pairing QR when needed. Test on cellular before leaving the computer.</p><button class="setup__button" onClick={() => { pane.value = 'transport' }}>Open Transport</button></details>
       </div></li>
+      {state.settings?.accountsAvailable && <li><span class="setup__number">4</span><div>
+        <h2>{state.settings.requireAccount ? 'A sign-in is required here' : 'Decide who may use this computer'}</h2>
+        <p>Pairing is enough by default: a browser holding a key this computer agreed to is answered. You can ask for more — that the browser also be signed into a VibeWire account, which is worth doing when this computer is reachable over the relay and the phone it was paired with can be lost or lent.</p>
+        <p class="setup__hint">{state.settings.requireAccount
+          ? state.settings.accountOwnerEmail
+            ? `Only browsers signed in as ${state.settings.accountOwnerEmail} are answered. The iPhone app is unaffected.`
+            : 'The first account to sign in claims this computer. Every other browser is then refused. The iPhone app is unaffected.'
+          : 'No account is asked for. Turning this on does not unpair anything.'}</p>
+        <button class="setup__button" disabled={!live} onClick={() => void send({ do: 'setting.set', key: 'requireAccount', value: !state.settings?.requireAccount })}>{state.settings.requireAccount ? 'Stop requiring a sign-in' : 'Require a signed-in browser'}</button>
+      </div></li>}
     </ol>
     <button class="setup__button setup__button--quiet" onClick={() => { pane.value = 'overview' }}>Go to overview</button>
     <p class="setup__hint">You can return to Setup guide at any time.</p>
