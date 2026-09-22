@@ -824,6 +824,7 @@ actor DashboardService {
                   account.email != nil
             else { return .error(401, "account_verification_failed") }
             UserDefaults.standard.set(true, forKey: "vibewire.setup.completed.v2")
+            UserDefaults.standard.set(account.email, forKey: "vibewire.account.email")
             return .json(200, ["ok": true])
 
         case "account.browser.begin":
