@@ -8,7 +8,7 @@
 
 import type { ComponentChildren, JSX, RefObject } from 'preact'
 import type { HostPlatform } from '../net/identity'
-import { useEffect, useRef } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 // MARK: - Condition
 
@@ -419,6 +419,116 @@ export function Spinner({
       aria-label="Working"
       style={{ width: `${size}px`, height: `${size}px`, color, flex: '0 0 auto' }}
     />
+  )
+}
+
+/**
+ * Six boxes over one field.
+ *
+ * The pairing code and the sign-in code are the same act — read digits off
+ * something else, type them once — so they are the same mark, and this is the
+ * only copy of it. A box per input would break paste and backspace; one
+ * transparent field owns the keyboard and the boxes are a rendering of what is
+ * in it.
+ *
+ * `onComplete` fires on the render where the field fills, not on a submit
+ * button, because there is nothing left to decide once the last digit lands.
+ */
+export function CodeField({
+  value,
+  onInput,
+  onComplete,
+  label,
+  length = 6,
+  height = 84,
+  // A token rather than a pixel count, so the reader's own text size still
+  // moves the digits. That is the whole reason this app never sets a px font.
+  digitSize = 'var(--fs-30)',
+  caretHeight = 30,
+  autoFocus = false,
+}: {
+  value: string
+  onInput: (digits: string) => void
+  onComplete: (digits: string) => void
+  label: string
+  length?: number
+  height?: number
+  digitSize?: string
+  caretHeight?: number
+  autoFocus?: boolean
+}) {
+  const field = useRef<HTMLInputElement | null>(null)
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    if (autoFocus) field.current?.focus()
+  }, [autoFocus])
+
+  return (
+    <div style={{ position: 'relative', flex: '0 0 auto' }}>
+      <input
+        ref={field}
+        value={value}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={length}
+        aria-label={label}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onInput={(event) => {
+          const filtered = (event.currentTarget.value.match(/\d/g) ?? []).join('').slice(0, length)
+          onInput(filtered)
+          if (filtered.length === length) onComplete(filtered)
+        }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          opacity: 0.01,
+          zIndex: 1,
+          // Off-screen would stop iOS scrolling it into view; transparent and in
+          // place keeps the caret where the boxes are.
+          letterSpacing: '2em',
+        }}
+      />
+      <div class="row" style={{ gap: '8px', pointerEvents: 'none' }} aria-hidden="true">
+        {Array.from({ length }, (_, index) => {
+          const active = index === Math.min(value.length, length - 1) && focused
+          const filled = value[index] != null
+          return (
+            <div
+              key={index}
+              style={{
+                // A maximum, not a fixed width. Six boxes and five 8px gaps have
+                // to fit inside the gutter on the narrowest phone this app
+                // targets, and a fixed row overflowed the app's very first screen.
+                flex: '1 1 0',
+                minWidth: 0,
+                height: `${height}px`,
+                borderRadius: 'var(--radius-control)',
+                background: active
+                  ? 'color-mix(in srgb, var(--ns-accent) 12%, transparent)'
+                  : filled
+                    ? 'var(--ns-raised-2)'
+                    : 'var(--ns-raised)',
+                boxShadow: active ? 'inset 0 0 0 1.5px var(--ns-accent)' : undefined,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {filled ? (
+                <span class="mono" style={{ fontSize: digitSize }}>
+                  {value[index]}
+                </span>
+              ) : active ? (
+                <Caret height={caretHeight} />
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
