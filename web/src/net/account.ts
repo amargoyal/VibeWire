@@ -448,7 +448,7 @@ function scrubUrl(names: string[]): void {
 
 // MARK: - Google and Apple
 
-export type Provider = 'google' | 'apple'
+export type Provider = 'google'
 
 /**
  * Which providers this project actually has switched on.

@@ -7,7 +7,7 @@ import { accountsConfigured } from '../../src/net/supabase'
 import { ApiError, command } from './api'
 import { facts, pane } from './store'
 
-const PROVIDER_NAME: Record<Provider, string> = { google: 'Google', apple: 'Apple' }
+const PROVIDER_NAME: Record<Provider, string> = { google: 'Google' }
 
 export function AccountStep() {
   const [email, setEmail] = useState('')
