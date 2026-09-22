@@ -268,6 +268,8 @@ actor DashboardService {
             "dashboardBundle": dashboardBundle(),
         ]
 
+        payload["setupCompleted"] = UserDefaults.standard.bool(forKey: "vibewire.setup.completed.v2")
+
         payload["permissions"] = [
             "screenRecording": screenRecording,
             "accessibility": accessibility,
