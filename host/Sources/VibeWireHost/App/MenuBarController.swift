@@ -238,6 +238,12 @@ final class MenuBarController: NSObject {
     ///
     /// Shared with `--pair`, which wants exactly this and nothing else.
     func beginPairing() async {
+        // A signed-out Mac pairs nothing until someone signs back in; the
+        // window it opens instead is the sign-in screen.
+        guard !UserDefaults.standard.bool(forKey: "vibewire.account.signedOut") else {
+            dashboard?.show()
+            return
+        }
         let code = await pairing.beginPairing()
         Log.info(.app, "pairing open — code \(code.value) (rotates in \(Int(Config.pairingCodeLifetime))s)")
         dashboard?.show(pane: "pair")
