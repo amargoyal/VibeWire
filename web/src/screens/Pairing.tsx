@@ -30,7 +30,7 @@ import { store } from '../app/store'
 import {
   Announce,
   Caps,
-  Caret,
+  CodeField,
   CornerTicks,
   Display,
   ScreenBody,
@@ -77,7 +77,6 @@ export function Pairing() {
   const [exchanging, setExchanging] = useState(false)
   const [steps, setSteps] = useState(INITIAL_STEPS)
   const [errorText, setErrorText] = useState<string | null>(null)
-  const [focused, setFocused] = useState(false)
   const [pasting, setPasting] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [editingTarget, setEditingTarget] = useState(false)
@@ -86,7 +85,6 @@ export function Pairing() {
   // rest are what this browser falls back to when the Mac is answering somewhere
   // it is not standing.
   const [alternates, setAlternates] = useState<string[]>([])
-  const field = useRef<HTMLInputElement | null>(null)
   // A paste can deliver six digits more than once, and the field submits the
   // moment it holds six. Pairing twice burns the code: the second attempt arrives
   // after the first has consumed it, and the host answers `code_expired` for a
@@ -293,70 +291,15 @@ export function Pairing() {
 
         {/* A single field owns the keyboard; the six boxes are only a rendering of
             its contents. That keeps paste and delete behaving the way they do
-            everywhere else. */}
-        <div style={{ position: 'relative', marginTop: '34px', flex: '0 0 auto' }}>
-          <input
-            ref={field}
+            everywhere else. The same mark reads the sign-in code, so it lives in
+            the component set rather than here. */}
+        <div style={{ marginTop: '34px', flex: '0 0 auto' }}>
+          <CodeField
             value={digits}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            aria-label="Pairing code, six digits"
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onInput={(event) => {
-              const filtered = (event.currentTarget.value.match(/\d/g) ?? []).join('').slice(0, 6)
-              setDigits(filtered)
-              if (filtered.length === 6) void submit(filtered)
-            }}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              opacity: 0.01,
-              zIndex: 1,
-              // Off-screen would stop iOS scrolling it into view; transparent and in
-              // place keeps the caret where the boxes are.
-              letterSpacing: '2em',
-            }}
+            label="Pairing code, six digits"
+            onInput={setDigits}
+            onComplete={(filled) => void submit(filled)}
           />
-          <div class="row" style={{ gap: '8px', pointerEvents: 'none' }} aria-hidden="true">
-            {[0, 1, 2, 3, 4, 5].map((index) => {
-              const active = index === Math.min(digits.length, 5) && focused
-              const filled = digits[index] != null
-              return (
-                <div
-                  key={index}
-                  style={{
-                    // A maximum, not a fixed width. Six boxes and five 8px gaps have
-                    // to fit inside the gutter on the narrowest phone this app
-                    // targets, and a fixed row overflowed the app's very first screen.
-                    flex: '1 1 0',
-                    minWidth: 0,
-                    height: '84px',
-                    borderRadius: 'var(--radius-control)',
-                    background: active
-                      ? 'color-mix(in srgb, var(--ns-accent) 12%, transparent)'
-                      : filled
-                        ? 'var(--ns-raised-2)'
-                        : 'var(--ns-raised)',
-                    boxShadow: active ? 'inset 0 0 0 1.5px var(--ns-accent)' : undefined,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {filled ? (
-                    <span class="mono" style={{ fontSize: 'var(--fs-30)' }}>
-                      {digits[index]}
-                    </span>
-                  ) : active ? (
-                    <Caret height={30} />
-                  ) : null}
-                </div>
-              )
-            })}
-          </div>
         </div>
 
         <div class="row" style={{ gap: '9px', marginTop: '16px', flex: '0 0 auto' }}>
