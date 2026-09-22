@@ -9,18 +9,25 @@ import Foundation
 /// have no reason to visit. So the host asks once at launch and every six
 /// hours after, and the window says so.
 ///
-/// It does not install anything. This build is signed with a development
-/// certificate and is not notarized, so a downloader that replaced the
-/// application with whatever it fetched would be asking for trust that nothing
-/// here can check. The prompt opens the release page and the reader drags the
-/// new copy over the old one, which is the same act they already performed
-/// once and the one macOS is able to verify.
+/// It also installs, on a Mac, and `UpdateInstaller` is where that happens.
+/// The old note here said a downloader would be asking for trust nothing could
+/// check, because this build is signed with a development certificate and is
+/// not notarized. That was true of a downloader that ran whatever it fetched.
+/// The installer does not: it takes the checksum from the release, and it
+/// refuses any application whose code signature is not the same identity as
+/// the one currently running. An attacker who could satisfy both already holds
+/// the signing key, at which point the release page was never safer.
 actor UpdateCheck {
     struct Verdict: Sendable, Equatable {
         var current: String
         var latest: String?
         var url: String?
         var available: Bool = false
+        /// The disk image for this release and the file listing its checksum,
+        /// as GitHub named them. Absent on a release that published neither,
+        /// which is what stops the installer offering to install nothing.
+        var downloadURL: String?
+        var checksumsURL: String?
         var checkedAt: Date?
         /// Why the last check did not produce an answer, or nil.
         var problem: String?
@@ -34,6 +41,9 @@ actor UpdateCheck {
             ]
             payload["latest"] = latest
             payload["url"] = url
+            // Whether this release can be installed in place, which is a
+            // different question from whether one exists.
+            payload["installable"] = downloadURL != nil && checksumsURL != nil
             payload["problem"] = problem
             payload["checkedAt"] = checkedAt.map(ISO8601DateFormatter().string(from:))
             return payload
@@ -92,11 +102,17 @@ actor UpdateCheck {
 
             let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
             let page = body["html_url"] as? String ?? Self.releasesPage
+            let assets = body["assets"] as? [[String: Any]] ?? []
+            func asset(matching test: (String) -> Bool) -> String? {
+                assets.first { test(($0["name"] as? String ?? "").lowercased()) }?["browser_download_url"] as? String
+            }
             cached = Verdict(
                 current: Config.hostVersion,
                 latest: latest,
                 url: page,
                 available: Self.isNewer(latest, than: Config.hostVersion),
+                downloadURL: asset { $0.hasSuffix(".dmg") },
+                checksumsURL: asset { $0 == "sha256sums.txt" },
                 checkedAt: Date(),
                 problem: nil,
                 enabled: true

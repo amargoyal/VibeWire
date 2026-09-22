@@ -92,13 +92,26 @@ The browser QR points at whichever of these the phone can actually use:
 ## Updates
 
 The host asks GitHub whether a newer release exists, at launch and every six
-hours, and says so in its window. **Download** opens the release page.
+hours, and says so in its window.
 
-It never installs anything. The Mac build is signed with a development
-certificate and is not notarized, and the Windows installers are not
-code-signed, so nothing here can verify what a self-updater would be about to
-run. Replacing the app is the same act you already performed once: drag the new
-copy over the old one, or run the new installer. Quit VibeWire first.
+On a Mac, **Update and restart** does the whole thing: it downloads the disk
+image from the release, checks it against the `SHA256SUMS.txt` published beside
+it, checks that the application inside carries the same code-signing identity,
+team and bundle identifier as the copy running, copies it next to the installed
+app, quits, swaps the two, and opens the new one. If the second move fails the
+first is undone, so the worst case is the version you already had, still
+installed. Nothing is replaced until both checks pass.
+
+Two checks rather than Gatekeeper, because the Mac build is signed with a
+development certificate and is not notarized. A download that does not match
+the release's own checksum is refused, and so is one signed by anybody else.
+Whoever could pass both already holds the signing key, and a reader in that
+position was never protected by being sent to a web page instead.
+
+The button says **Open release** instead where the host cannot replace itself:
+a build running from a checkout, from a read-only volume, or from anywhere its
+user cannot write. Windows still points at the release page; its installer is
+the thing that replaces it.
 
 Settings → **Check for a newer VibeWire** turns the check off. It is one
 request to `api.github.com`, carrying nothing but the version in the user

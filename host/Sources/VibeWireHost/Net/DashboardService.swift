@@ -371,7 +371,12 @@ actor DashboardService {
         // Asked of GitHub at most every six hours, and served from the cache
         // here: a window that polls once a second must not turn into a client
         // of someone else's API.
-        payload["update"] = await UpdateCheck.shared.verdict().wire
+        var update = await UpdateCheck.shared.verdict().wire
+        // Merged rather than nested: the window draws one line about updates,
+        // and whether an install is halfway through it is part of that line.
+        for (key, value) in await UpdateInstaller.shared.currentStage().wire { update[key] = value }
+        update["canInstall"] = UpdateInstaller.canInstallInPlace
+        payload["update"] = update
         Task { await UpdateCheck.shared.refreshIfStale() }
 
         payload["transport"] = status.wire
@@ -829,6 +834,16 @@ actor DashboardService {
 
         case "update.check":
             await UpdateCheck.shared.refresh()
+            return .json(200, ["ok": true])
+
+        case "update.install":
+            // Started, not awaited. The install ends by quitting this process,
+            // and a request that waited for that would be a request whose
+            // reply can never be written.
+            guard UpdateInstaller.canInstallInPlace else {
+                return .error(409, "not_installable")
+            }
+            Task { await UpdateInstaller.shared.install() }
             return .json(200, ["ok": true])
 
         case "settings.open":
