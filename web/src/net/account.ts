@@ -446,7 +446,7 @@ function scrubUrl(names: string[]): void {
   }
 }
 
-// MARK: - Google and Apple
+// MARK: - Google
 
 export type Provider = 'google'
 
