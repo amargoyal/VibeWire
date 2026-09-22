@@ -100,7 +100,7 @@ export function AccountStep() {
   }
   return <section class="setup-account">
     <h2>Sign in or create an account</h2>
-    <p>One email, one code. New to VibeWire? We’ll create your account when you verify your email.</p>
+    <p>{available.length > 0 ? 'Use an email code, or continue with ' + available.map(p => PROVIDER_NAME[p]).join(' or ') + '.' : 'One email, one code.'} New to VibeWire? We’ll create your account the first time you sign in.</p>
     {!accountsConfigured ? <p role="alert">Account sign-in is not configured in this build. Install a configured VibeWire release to finish setup.</p> :
       <form onSubmit={submit} class="setup-account__form">
         <label htmlFor="setup-email">Email address</label>
