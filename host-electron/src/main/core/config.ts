@@ -60,6 +60,24 @@ export interface HostSettings {
    * version in the user agent, and nothing is ever installed by it.
    */
   checkForUpdates: boolean
+  /**
+   * Whether a browser has to be signed into a VibeWire account before this host
+   * will answer it.
+   *
+   * Off by default, and off is the honest default: pairing is already a key
+   * exchange this computer agreed to, and a device holding a trusted key got it
+   * by someone reading six digits off this screen. What this adds is a second,
+   * different question — who is at the other end — which matters when the host
+   * is reachable from the internet over a relay.
+   */
+  requireAccount: boolean
+  /**
+   * The account this computer belongs to, claimed by the first signed-in
+   * browser to connect while `requireAccount` is on and cleared when it is
+   * turned off. An owner that can be added silently is not an owner.
+   */
+  accountOwnerId: string | null
+  accountOwnerEmail: string | null
 }
 
 export const DEFAULT_SETTINGS: HostSettings = {
@@ -74,6 +92,9 @@ export const DEFAULT_SETTINGS: HostSettings = {
   port: 8787,
   webClientURL: null,
   checkForUpdates: true,
+  requireAccount: false,
+  accountOwnerId: null,
+  accountOwnerEmail: null,
 }
 
 function decodeSettings(raw: unknown): HostSettings {
@@ -93,6 +114,9 @@ function decodeSettings(raw: unknown): HostSettings {
   if (typeof record.port === 'number' && record.port > 0 && record.port < 65536) settings.port = record.port
   if (typeof record.webClientURL === 'string' && record.webClientURL) settings.webClientURL = record.webClientURL
   if (typeof record.checkForUpdates === 'boolean') settings.checkForUpdates = record.checkForUpdates
+  if (typeof record.requireAccount === 'boolean') settings.requireAccount = record.requireAccount
+  if (typeof record.accountOwnerId === 'string') settings.accountOwnerId = record.accountOwnerId
+  if (typeof record.accountOwnerEmail === 'string') settings.accountOwnerEmail = record.accountOwnerEmail
   return settings
 }
 
