@@ -757,6 +757,17 @@ actor DashboardService {
         func bool(_ key: String) -> Bool? { body[key] as? Bool }
 
         switch verb {
+        case "setup.complete":
+            guard DisplayCatalog.hasScreenRecordingPermission(),
+                  InputInjector.hasAccessibilityPermission()
+            else { return .error(409, "permissions_required") }
+            guard let token = string("accessToken"),
+                  let account = await AccountVerifier().verify(token: token),
+                  account.email != nil
+            else { return .error(401, "account_verification_failed") }
+            UserDefaults.standard.set(true, forKey: "vibewire.setup.completed.v2")
+            return .json(200, ["ok": true])
+
         case "pair.begin":
             let code = await pairing.beginPairing(
                 name: string("name"),
