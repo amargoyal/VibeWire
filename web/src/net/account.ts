@@ -334,7 +334,7 @@ const VERIFIER_RECORD = 'account-pkce-verifier'
  *    are in the fragment, which never left the device — it is not sent with the
  *    request — and they are cleared out of the address bar as soon as they are
  *    read, so a shared screenshot of the URL bar is not a shared session.
- *  - `?code=…`, from Google or Apple, which is exchanged with the verifier this
+ *  - `?code=…`, from Google, which is exchanged with the verifier this
  *    browser kept before it left.
  *
  * `?error=…` arrives too, and is reported rather than swallowed: an origin
