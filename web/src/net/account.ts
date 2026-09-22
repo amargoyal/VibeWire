@@ -382,12 +382,22 @@ export async function adoptFromUrl(): Promise<Session | null> {
       )
     }
     await records.remove(VERIFIER_RECORD).catch(() => undefined)
-    const response = await post('token?grant_type=pkce', { auth_code: code, code_verifier: verifier })
-    if (!response.ok) throw await failureFrom(response)
-    return adopt(sessionFrom((await response.json()) as Record<string, unknown>))
+    return exchangeProviderCode(code, verifier)
   }
 
   return null
+}
+
+/**
+ * Trades a provider's authorization code for a session, with the verifier the
+ * code's challenge was made from.
+ */
+export async function exchangeProviderCode(code: string, verifier: string): Promise<Session> {
+  const response = await post('token?grant_type=pkce', { auth_code: code, code_verifier: verifier })
+  if (!response.ok) throw await failureFrom(response)
+  const session = sessionFrom((await response.json()) as Record<string, unknown>)
+  await adopt(session)
+  return session
 }
 
 /** Whether a URL is worth handing to `adoptFromUrl` at all. */
