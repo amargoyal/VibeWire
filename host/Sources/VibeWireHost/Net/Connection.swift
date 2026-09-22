@@ -245,10 +245,30 @@ final class SocketConnection: @unchecked Sendable {
     private var inFlightBinaryBytes = 0
     private let maxInFlightBinaryBytes = 4 * 1024 * 1024
 
+    /// The account this socket has proven, where one was asked for.
+    ///
+    /// A browser cannot put a header on a WebSocket, so the account arrives as
+    /// the first message on the socket rather than on the upgrade — which is
+    /// also the better place for it, since the alternative was an access token
+    /// in a URL. Until it lands, a host that requires one answers nothing.
+    private var accountUserIdValue: String?
+
     init(connection: NWConnection, deviceId: String?, deviceName: String) {
         self.connection = connection
         self.deviceId = deviceId
         self.deviceName = deviceName
+    }
+
+    var accountUserId: String? {
+        sendLock.lock()
+        defer { sendLock.unlock() }
+        return accountUserIdValue
+    }
+
+    func noteAccount(_ userId: String?) {
+        sendLock.lock()
+        accountUserIdValue = userId
+        sendLock.unlock()
     }
 
     func sendJSON(_ object: [String: Any]) {
