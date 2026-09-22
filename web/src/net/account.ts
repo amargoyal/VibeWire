@@ -19,7 +19,7 @@
  *    lands back here with tokens in the fragment, which is what `adoptFromUrl`
  *    reads. A mail client that opens the link in its own in-app browser signs
  *    that browser in and not this one, which is why the code is offered first.
- *  - **Google or Apple.** Only where the project has the provider enabled and
+ *  - **Google.** Only where the project has the provider enabled and
  *    only where this origin is in the redirect allowlist; `providers()` asks
  *    rather than assuming, so a button that cannot work is not drawn.
  *
