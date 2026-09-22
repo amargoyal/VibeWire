@@ -285,20 +285,35 @@ export async function signOut(): Promise<void> {
  * same email still works, which is why it is the thing the screen asks for.
  */
 export async function sendEmailCode(email: string): Promise<void> {
-  const response = await post('otp', {
+  // The redirect is a query parameter on this endpoint, not a body field. Sent
+  // as a body field it is accepted, ignored, and the link in the email then
+  // lands on the project's Site URL instead of on the page that asked.
+  const redirect = encodeURIComponent(location.origin + location.pathname)
+  const response = await post(`otp?redirect_to=${redirect}`, {
     email,
     create_user: true,
+    // GoTrue reads this object for its own anti-abuse fields (a captcha token,
+    // where one is configured). Absent, some versions refuse the request.
     gotrue_meta_security: {},
-    data: {},
-    options: {},
-    email_redirect_to: location.origin + location.pathname,
   })
   if (!response.ok) throw await failureFrom(response)
 }
 
-/** Exchanges the six digits for a session. */
+/**
+ * Exchanges the six digits for a session.
+ *
+ * Tried as `email` and then as `signup`. The same six digits mean one of two
+ * things depending on whether this address had an account a minute ago, and the
+ * client cannot know which — `create_user` is what makes that not matter, and
+ * this is the other half of it. Without the second attempt, the very first
+ * sign-in of every new account failed with "Token has expired or is invalid"
+ * about a code that was correct.
+ */
 export async function verifyEmailCode(email: string, code: string): Promise<Session> {
-  const response = await post('verify', { type: 'email', email, token: code })
+  let response = await post('verify', { type: 'email', email, token: code })
+  if (!response.ok && (response.status === 400 || response.status === 403)) {
+    response = await post('verify', { type: 'signup', email, token: code })
+  }
   if (!response.ok) throw await failureFrom(response)
   const session = sessionFrom((await response.json()) as Record<string, unknown>)
   await adopt(session)
