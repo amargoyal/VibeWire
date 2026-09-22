@@ -453,9 +453,9 @@ export type Provider = 'google'
 /**
  * Which providers this project actually has switched on.
  *
- * Asked rather than assumed. Enabling Google or Apple needs credentials from
- * Google or Apple and a redirect URL this deployment controls; until that is
- * done the buttons would be two ways to reach an error page, and this client's
+ * Asked rather than assumed. Enabling Google needs credentials from Google and
+ * a redirect URL this deployment controls; until that is done the button would
+ * be a way to reach an error page, and this client's
  * rule everywhere else is that a control which cannot work is not drawn.
  */
 export async function providers(): Promise<Provider[]> {
