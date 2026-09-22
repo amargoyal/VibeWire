@@ -285,6 +285,23 @@ export function SectionLabel({
   )
 }
 
+/**
+ * The privacy policy and terms, as two quiet links.
+ *
+ * Relative, like every asset here, so they resolve on GitHub Pages and on the
+ * host's own server alike. Google's consent screen checks that the home page
+ * links to the privacy policy, which is why the first screen carries them.
+ */
+export function LegalLinks({ style }: { style?: JSX.CSSProperties }) {
+  return (
+    <Caps size="var(--fs-9)" tracking="0.14em" color="var(--ns-text-faint)" style={style}>
+      <a href="./privacy.html" style={{ color: 'inherit' }}>PRIVACY</a>
+      {' · '}
+      <a href="./terms.html" style={{ color: 'inherit' }}>TERMS</a>
+    </Caps>
+  )
+}
+
 // MARK: - Indicators
 
 /**
