@@ -17,6 +17,12 @@ export function AccountStep() {
     return () => clearTimeout(timer)
   }, [cooldown])
   const [verified, setVerified] = useState<Session | null>(null)
+  async function finish(session: Session) {
+    setVerified(session)
+    await command({ do: 'setup.complete', accessToken: session.accessToken })
+    pane.value = 'overview'
+    if (facts.value) facts.value = { ...facts.value, setupCompleted: true }
+  }
   async function submit(event: Event) {
     event.preventDefault()
     if (busy) return
@@ -29,10 +35,7 @@ export function AccountStep() {
         setCooldown(60)
       } else {
         const session = (verified && verified.expiresAt > Date.now() / 1000 ? verified : null) ?? await verifyEmailCode(email.trim(), code.trim())
-        setVerified(session)
-        await command({ do: 'setup.complete', accessToken: session.accessToken })
-        pane.value = 'overview'
-        if (facts.value) facts.value = { ...facts.value, setupCompleted: true }
+        await finish(session)
       }
     } catch (problem) {
       setError(problem instanceof ApiError
