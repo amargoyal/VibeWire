@@ -298,7 +298,7 @@ body,
 
 .settings-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 22px;
   align-items: start;
 }
@@ -503,3 +503,14 @@ body,
   .onboarding__progress { gap: 12px; margin-bottom: 24px; }
   .onboarding__main section { min-height: 0; }
 }
+
+.settings-grid > * { min-width: 0; }
+.settings-row > .stack { flex: 1; }
+.settings-value { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.settings-row--control { flex-wrap: wrap; }
+.settings-row--control > .stack { flex-basis: 100%; }
+.settings-row--control > .spacer { display: none; }
+.settings-control { width: min(100%, 280px); min-width: 0; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 10px; max-width: 100%; }
+.settings-actions > div { max-width: 100%; }
+.settings-grid .kv { min-width: 0; overflow-wrap: anywhere; }
