@@ -51,7 +51,7 @@ The project now uses a Gmail SMTP sender in place of Resend's restricted test se
 
 Gmail is a personal mail service with sending limits and deliverability constraints. Move to a verified domain and transactional provider when usage grows. Verify both signup and returning-user emails after changing the sender.
 
-Google and Apple are optional. Until a provider is enabled, its button is not drawn, in the browser client and in Mac setup alike.
+Google is optional. Until it is enabled, its button is not drawn, in the browser client and in Mac setup alike. Apple is not offered: it needs a paid Apple Developer account.
 
 ### Provider redirect URLs
 
