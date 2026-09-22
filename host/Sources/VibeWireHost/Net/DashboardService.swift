@@ -795,6 +795,18 @@ actor DashboardService {
             await MainActor.run { _ = NSWorkspace.shared.open(target) }
             return .json(200, ["ok": true])
 
+        case "account.browser.take":
+            guard let pending = browserSignIn else { return .error(404, "no_browser_sign_in") }
+            if Date().timeIntervalSince(pending.startedAt) > 600 {
+                browserSignIn = nil
+                return .error(410, "browser_sign_in_expired")
+            }
+            guard let outcome = pending.outcome else { return .json(200, ["ok": true, "pending": true]) }
+            browserSignIn = nil
+            var payload: [String: Any] = ["ok": true]
+            payload.merge(outcome) { current, _ in current }
+            return .json(200, payload)
+
         case "pair.begin":
             let code = await pairing.beginPairing(
                 name: string("name"),
