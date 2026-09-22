@@ -53,6 +53,10 @@ Gmail is a personal mail service with sending limits and deliverability constrai
 
 Google and Apple are optional. Until a provider is enabled, its button is not drawn, in the browser client and in Mac setup alike.
 
+### Provider redirect URLs
+
+Both providers return to Supabase at `https://iqtuikhyqkythaffxuca.supabase.co/auth/v1/callback`, and Supabase then returns to the page that asked. Mac setup asks from the host itself, so add `http://127.0.0.1:*/**` to Redirect URLs beside the published client. Without it, a Mac setup sign-in lands on the Site URL and is refused there.
+
 `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` build the client against another project. `VIBEWIRE_ACCOUNT_URL` / `VIBEWIRE_ACCOUNT_KEY` do the same for either host. Clearing them leaves a build with no account screens and a requirement that cannot be switched on.
 
 ## Validation
