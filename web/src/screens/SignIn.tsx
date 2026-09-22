@@ -33,6 +33,7 @@ import {
 } from '../net/account'
 import {
   Caps,
+  Card,
   CodeField,
   Display,
   FilledAction,
@@ -242,6 +243,8 @@ function Address({
           : `An account carries the list of computers you have paired with, the browsers you use, and your keyboard bar between them. Clearing site data or picking up a second phone stops costing you the setup you just did.`}
       </p>
 
+      {required ? null : <Keeps />}
+
       {refusal ? (
         <p
           class="wrap"
@@ -347,6 +350,77 @@ function Address({
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * What an account is actually for, as three facts rather than a paragraph.
+ *
+ * The value of signing in is not obvious here and cannot be assumed: the
+ * product has already worked without one by the time this screen appears. So
+ * the screen states what is kept, in the reader's own terms — the computers,
+ * the browsers, the bar they built — and not one word about "syncing".
+ */
+function Keeps() {
+  const rows: [string, string][] = [
+    ['⌘', 'The computers you have paired with, by name and address'],
+    ['◍', 'The browsers you are signed in from'],
+    ['⌨', 'The keyboard bar you built, on every phone you use'],
+  ]
+
+  return (
+    <div style={{ marginTop: '22px', flex: '0 0 auto' }}>
+      <Card style={{ padding: '4px 16px' }}>
+        <div class="stack">
+          {rows.map(([glyph, text], index) => (
+            <div
+              key={glyph}
+              class="row row--top"
+              style={{
+                gap: '14px',
+                paddingBlock: '14px',
+                borderTop: index === 0 ? 'none' : '1px solid var(--ns-hairline)',
+              }}
+            >
+              <span
+                class="mono"
+                aria-hidden="true"
+                style={{
+                  flex: '0 0 auto',
+                  width: '22px',
+                  fontSize: 'var(--fs-13)',
+                  color: 'var(--ns-accent)',
+                  lineHeight: 1.5,
+                }}
+              >
+                {glyph}
+              </span>
+              <span
+                class="wrap"
+                style={{
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  fontSize: 'var(--fs-13)',
+                  lineHeight: 1.5,
+                  color: 'var(--ns-text-secondary)',
+                }}
+              >
+                {text}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Caps
+        size="var(--fs-9)"
+        tracking="0.14em"
+        color="var(--ns-text-faint)"
+        style={{ marginTop: '12px', lineHeight: 1.7 }}
+      >
+        {'NEVER A KEY, A CODE, A PICTURE OR A TRANSCRIPT.\nSIGNING IN DOES NOT PAIR ANYTHING.'}
+      </Caps>
+    </div>
   )
 }
 
