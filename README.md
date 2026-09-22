@@ -217,7 +217,13 @@ devices, and the host's own key — sealed with DPAPI on Windows.
 
 Run `host/package-dmg.sh` on a Mac with Xcode, Node/npm and Python 3.9+. It builds
 both web surfaces, compiles the host for Apple silicon and Intel, verifies the
-bundle and produces `host/build/VibeWire-<version>-mac-universal.dmg`. The DMG
-opens in icon view with VibeWire beside an Applications shortcut. Packaging does
-not install or launch the app. Developer ID signing and notarization are required
+bundle and produces `host/build/VibeWire-<version>-mac-universal.dmg`. Packaging
+does not install or launch the app.
+
+The window the DMG opens is drawn, not exported: `host/Tools/DMGBackground.swift`
+is compiled against the app's own `WaveMark` and `Palette` and renders the
+background at 1x and 2x, which `tiffutil` combines into the multi-resolution TIFF
+Finder reads. The mark on the installer and the mark in the menu bar are one
+path, so neither can drift from the other, and a checked-in PNG cannot go stale
+the next time either changes. The volume carries the app's icon too. Developer ID signing and notarization are required
 separately for a distribution that passes Gatekeeper by default.
