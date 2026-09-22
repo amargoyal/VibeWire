@@ -1,6 +1,6 @@
 {
   "name": "vibewire-host-electron",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "description": "VibeWire host for Windows, in Electron. Runs on a Mac for development.",
   "main": "dist/main.js",
