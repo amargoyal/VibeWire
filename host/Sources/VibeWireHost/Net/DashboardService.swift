@@ -873,6 +873,9 @@ actor DashboardService {
             return .json(200, payload)
 
         case "pair.begin":
+            guard !UserDefaults.standard.bool(forKey: "vibewire.account.signedOut") else {
+                return .error(409, "signed_out")
+            }
             let code = await pairing.beginPairing(
                 name: string("name"),
                 reusable: bool("reusable") ?? false
