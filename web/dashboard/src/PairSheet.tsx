@@ -188,6 +188,14 @@ export function PairSheet({ state }: { state: Facts }) {
                 ? 'REUSABLE · THE CODE SURVIVES A SUCCESSFUL PAIR AND KEEPS ROTATING UNTIL THIS SHEET CLOSES · ANY DEVICE THAT READS IT IN TIME PAIRS'
                 : 'ONE TIME · THE FIRST DEVICE TO USE THE CODE SPENDS IT · THE NAME ABOVE OVERRIDES WHAT THE DEVICE CALLS ITSELF'}
             </Caps>
+
+            {/* The second question this sheet can answer, and the moment to ask
+                it: a code is about to be read by a browser, and this decides
+                whether holding that code is by itself enough to use this
+                computer. It is a host setting, so it is written now rather than
+                carried with the code — a device paired a week ago is held to
+                the same rule. */}
+            <AccountRequirement state={state} />
             <FilledAction
               title="Show a code"
               tint="var(--ns-accent)"
@@ -544,6 +552,55 @@ function QrCard({
           {available && !failed ? blurb : (unavailableReason ?? blurb)}
         </span>
       </div>
+    </div>
+  )
+}
+
+/**
+ * "Pairing alone, or pairing and a sign-in", asked where pairing happens.
+ *
+ * Absent where this host has no account server to check against, for the same
+ * reason the phone does not draw a control that cannot work. The owner is not
+ * chosen here: the first account to sign in while this is on claims the
+ * computer, which keeps the decision with the person holding the phone rather
+ * than with whoever is standing at the keyboard.
+ */
+function AccountRequirement({ state }: { state: Facts }) {
+  const settings = state.settings
+  if (!settings?.accountsAvailable) return null
+  const required = settings.requireAccount
+
+  return (
+    <div class="stack" style={{ gap: 10 }}>
+      <div class="row" style={{ gap: 10 }}>
+        <Caps size="var(--fs-9)" style={{ flex: '1 1 auto', minWidth: 0 }}>
+          WHO MAY USE THIS COMPUTER
+        </Caps>
+        <div style={{ width: 300, flex: '0 0 auto' }}>
+          <Segmented
+            label="Whether a browser must also be signed in"
+            selection={required ? 'account' : 'pairing'}
+            options={[
+              { value: 'pairing', label: 'PAIRING ONLY' },
+              { value: 'account', label: 'ALSO SIGN IN' },
+            ]}
+            onSelect={(value) =>
+              void send({
+                do: 'setting.set',
+                key: 'requireAccount',
+                value: value === 'account',
+              })
+            }
+          />
+        </div>
+      </div>
+      <Caps size="var(--fs-9)" style={{ lineHeight: 1.6 }}>
+        {required
+          ? settings.accountOwnerEmail
+            ? `ALSO SIGN IN · ONLY BROWSERS SIGNED IN AS ${settings.accountOwnerEmail.toUpperCase()} ARE ANSWERED · THE iPHONE APP IS UNAFFECTED`
+            : 'ALSO SIGN IN · THE FIRST ACCOUNT TO SIGN IN CLAIMS THIS COMPUTER · EVERY OTHER BROWSER IS THEN REFUSED · THE iPHONE APP IS UNAFFECTED'
+          : 'PAIRING ONLY · A BROWSER HOLDING A TRUSTED KEY IS ANSWERED · NO ACCOUNT IS ASKED FOR'}
+      </Caps>
     </div>
   )
 }
