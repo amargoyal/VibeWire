@@ -434,6 +434,12 @@ Commands: `pair.begin` `{name, reusable}`, `pair.end`, `device.revoke`
 `permission.request` `{which}`, `account.browser.begin` `{flow, url}`,
 `account.browser.take`, and `claude` carrying any §5 phone → host `sub`.
 
+`account.browser.begin` opens only the account server's own authorize URL in the
+default browser, because providers refuse to sign in inside an embedded web
+view. The callback keeps the code for the attempt whose `flow` matches, and
+`account.browser.take` hands it to the dashboard once, within ten minutes. The
+PKCE verifier stays in the dashboard, so the code alone is not a session.
+
 Everything routes through the paths the phone already uses, so the two surfaces
 cannot disagree: settings persist and retune the encoder identically, a revoke
 severs the socket within the same second, and Claude's output is fanned to the
