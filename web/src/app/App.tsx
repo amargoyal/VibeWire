@@ -54,11 +54,18 @@ export function App() {
   useEffect(() => watchTabCondition(), [])
 
   useEffect(() => {
-    store.holdForPairingLink(location.search, location.hash)
-    void store.load().then(() => setReady(true))
     // `?host=…&port=…&code=…` on this page's own URL is the browser's stand-in for
-    // the `vibewire://pair` link behind the Mac's QR.
-    void store.handlePairingParams(location.search, location.hash)
+    // the `vibewire://pair` link behind the Mac's QR. Read now, because signing
+    // in rewrites the address bar while the account loads.
+    const { search, hash } = location
+    store.holdForPairingLink(search, hash)
+    void store.load().then(() => {
+      setReady(true)
+      // Followed once the stored pairing has been read, not beside it. Run
+      // together, the read could land last and put the old pairing back over
+      // the one the link had just made.
+      void store.handlePairingParams(search, hash)
+    })
   }, [])
 
   useEffect(() => {
