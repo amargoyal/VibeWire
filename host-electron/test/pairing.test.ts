@@ -76,3 +76,13 @@ test('a malformed public key is refused after the code was accepted', async () =
   )
   assert.equal(pairing.currentProgress().codeAcceptedAt !== null, true)
 })
+
+test('a device that pairs twice keeps one row and its id', async () => {
+  const { pairing, trust } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  const first = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
+  const second = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
+  assert.equal(second.device.id, first.device.id)
+  assert.equal((await trust.all()).length, 1)
+  assert.equal(pairing.currentProgress().deviceId, first.device.id)
+})
