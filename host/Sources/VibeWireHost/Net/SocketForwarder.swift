@@ -182,6 +182,7 @@ final class SocketForwarder {
                 pump(from: source, to: sink)
                 done.leave()
             }
+            thread.name = "vibewire.forwarder.pump"
             thread.qualityOfService = .userInitiated
             thread.start()
         }
