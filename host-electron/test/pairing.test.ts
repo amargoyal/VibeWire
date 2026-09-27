@@ -115,3 +115,10 @@ test('rows left by earlier pairings of the same key fold into the next one', asy
   const result = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
   assert.deepEqual((await trust.all()).map((device) => device.id), [result.device.id])
 })
+
+test('two devices with their own keys still get a row each', async () => {
+  const { pairing, trust } = harness()
+  await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', publicKeyFromSeed(generateSeed()))
+  await pairing.pair(pairing.beginPairing().value, 'Tablet', 'browser', publicKeyFromSeed(generateSeed()))
+  assert.equal((await trust.all()).length, 2)
+})
