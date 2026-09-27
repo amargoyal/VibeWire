@@ -780,24 +780,12 @@ export class Store {
     // pairing that happens from cellular already knows the way home.
     const alternates = normaliseOrigins((parameters.get('alt') ?? '').split(','))
 
-    const paired = this.pairedHost.value
-    if (paired) {
-      // Already paired. Two cases, and the difference matters.
-      //
-      // Same address: a stale link in history, or a reload. Ignore it — pairing again
-      // would tear down a working session and burn a code that has since rotated.
-      if (paired.origin === endpoint.origin) return
-
-      // Different address: the Mac moved, and scanning the QR again is exactly what
-      // anyone would do about it. Follow it rather than trading keys — the key and the
-      // device id do not depend on where the Mac is, and this is the fix for a
-      // Cloudflare quick tunnel whose hostname changes on every host restart.
-      const problem = await this.repoint(endpoint)
-      if (!problem && alternates.length > 0) this.client.learn(alternates)
-      this.banner.value = problem ? { text: problem } : null
-      return
-    }
-
+    // Paired already or not, a code in the link is paired with. Somebody
+    // pointed a camera at the Mac on purpose, and its step list is waiting on
+    // this browser: ignoring the link left the list at nothing, with the code
+    // still live. The host keeps one row per key, so this refreshes the row
+    // rather than adding one, and the address that answered replaces the
+    // stored one, which also covers a Mac that moved.
     const failure = await this.completePairing(endpoint, code, alternates)
     if (failure) this.banner.value = { text: failure }
   }
