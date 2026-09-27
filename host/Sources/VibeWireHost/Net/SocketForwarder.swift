@@ -99,6 +99,7 @@ final class SocketForwarder {
             }
         }
         guard client >= 0 else { return }
+        Self.setOption(client, SOL_SOCKET, SO_NOSIGPIPE, 1)
 
         queue.async { [targetPort] in
             guard let upstream = Self.connectLoopback(port: targetPort) else {
