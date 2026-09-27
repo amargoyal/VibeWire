@@ -123,9 +123,10 @@ actor TrustStore {
 
     func add(_ device: TrustedDevice) async throws {
         var devices = try await loadDevices()
+        let again = devices[device.id] != nil
         devices[device.id] = device
         try await persist(devices)
-        Log.info(.net, "paired device \(device.name) (\(device.id))")
+        Log.info(.net, "\(again ? "paired again" : "paired device") \(device.name) (\(device.id))")
     }
 
     func touch(id: String) async {
