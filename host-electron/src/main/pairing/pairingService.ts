@@ -246,7 +246,7 @@ export class PairingService {
       name: resolvedName,
       kind: deviceKind,
       publicKey: Buffer.from(publicKey),
-      pairedAt: new Date(this.now()),
+      pairedAt: existing?.pairedAt ?? new Date(this.now()),
       lastSeenAt: new Date(this.now()),
     }
     try {
