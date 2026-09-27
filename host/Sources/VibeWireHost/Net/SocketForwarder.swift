@@ -26,6 +26,10 @@ import Darwin
 final class SocketForwarder {
     private let listenPort: UInt16
     private let targetPort: UInt16
+    /// Serial on purpose. A concurrent queue draws from the same capped pool of
+    /// GCD threads as everything else in the process, and once that pool is
+    /// used up the accept handler never runs: the phone's connection sits in
+    /// the backlog and its page spins while the Mac looks idle.
     private let queue = DispatchQueue(label: "vibewire.forwarder")
 
     private var listenSocket: Int32 = -1
