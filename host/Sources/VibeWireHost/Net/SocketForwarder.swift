@@ -132,8 +132,7 @@ final class SocketForwarder {
             return nil
         }
 
-        var yes: Int32 = 1
-        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, socklen_t(MemoryLayout<Int32>.size))
+        setOption(fd, IPPROTO_TCP, TCP_NODELAY, 1)
         return fd
     }
 
