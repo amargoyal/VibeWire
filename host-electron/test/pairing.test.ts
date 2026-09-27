@@ -105,3 +105,13 @@ test('a name typed for this pairing still wins over the stored one', async () =>
   const second = await pairing.pair(pairing.beginPairing('Desk').value, 'iPhone', 'browser', key)
   assert.equal(second.device.name, 'Desk')
 })
+
+test('rows left by earlier pairings of the same key fold into the next one', async () => {
+  const { pairing, trust } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  for (const id of ['older-1', 'older-2']) {
+    await trust.add({ id, name: 'Phone', kind: 'browser', publicKey: key, pairedAt: new Date(0), lastSeenAt: null })
+  }
+  const result = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
+  assert.deepEqual((await trust.all()).map((device) => device.id), [result.device.id])
+})
