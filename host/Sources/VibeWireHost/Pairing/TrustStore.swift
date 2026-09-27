@@ -113,6 +113,14 @@ actor TrustStore {
         try await loadDevices()[id]
     }
 
+    /// The device already trusted with this key, if any. The key is what a
+    /// device proves it holds, so a second pairing with it is the same device.
+    func device(publicKey: Data) async throws -> TrustedDevice? {
+        try await loadDevices().values
+            .filter { $0.publicKey == publicKey }
+            .max { $0.pairedAt < $1.pairedAt }
+    }
+
     func add(_ device: TrustedDevice) async throws {
         var devices = try await loadDevices()
         devices[device.id] = device
