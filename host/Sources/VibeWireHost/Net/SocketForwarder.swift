@@ -143,7 +143,7 @@ final class SocketForwarder {
     /// read/write loop, which is the simplest thing that cannot lose a partial
     /// write, and there is exactly one pair of them per connected phone.
     private static func splice(_ a: Int32, _ b: Int32) {
-        let done = DispatchGroup()
+        let running = Guarded(2)
         let shutdownOnce = Guarded(false)
 
         func teardown() {
@@ -177,19 +177,19 @@ final class SocketForwarder {
         }
 
         for (source, sink) in [(a, b), (b, a)] {
-            done.enter()
             let thread = Thread {
                 pump(from: source, to: sink)
-                done.leave()
+                let last = running.withLock { count -> Bool in
+                    count -= 1
+                    return count == 0
+                }
+                guard last else { return }
+                close(a)
+                close(b)
             }
             thread.name = "vibewire.forwarder.pump"
             thread.qualityOfService = .userInitiated
             thread.start()
-        }
-
-        done.notify(queue: .global()) {
-            close(a)
-            close(b)
         }
     }
 }
