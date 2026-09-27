@@ -14,6 +14,7 @@ import {
   adoptFromUrl,
   loadAccount,
   onAccountChange,
+  scrubUrl,
   session as accountSession,
   signOut,
   urlCarriesAccount,
@@ -754,6 +755,10 @@ export class Store {
 
     const code = parameters.get('code')
     if (!code) return
+    // Read once, then gone from the address bar. Left there, a reload or a
+    // bookmark followed the link again with a code the Mac had long since spent
+    // or rotated, and reported a failure about a pairing that had worked.
+    scrubUrl(['code', 'host', 'port', 'origin', 'alt'])
     if (code.length !== 6 || !/^\d{6}$/.test(code)) {
       this.banner.value = { text: 'That pairing link does not carry a six-digit code.' }
       return
