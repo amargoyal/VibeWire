@@ -753,9 +753,14 @@ export class Store {
     // bookmark followed the link again with a code the Mac had long since spent
     // or rotated, and reported a failure about a pairing that had worked.
     scrubUrl(['code', 'host', 'port', 'origin', 'alt'])
+    const failure = await this.followPairingLink(code, parameters)
+    if (failure) this.banner.value = { text: failure }
+  }
+
+  /** One pairing link, followed. Returns what went wrong, or null. */
+  private async followPairingLink(code: string, parameters: URLSearchParams): Promise<string | null> {
     if (code.length !== 6 || !/^\d{6}$/.test(code)) {
-      this.banner.value = { text: 'That pairing link does not carry a six-digit code.' }
-      return
+      return 'That pairing link does not carry a six-digit code.'
     }
 
     const address = parameters.get('origin') ?? parameters.get('host') ?? location.origin
@@ -764,8 +769,7 @@ export class Store {
       const port = Number(parameters.get('port') ?? 8787)
       endpoint = parseEndpoint(address, Number.isFinite(port) ? port : 8787)
     } catch (error) {
-      this.banner.value = { text: (error as Error).message }
-      return
+      return (error as Error).message
     }
 
     // `alt` is the Mac's other addresses, comma-separated. Usually absent — the
@@ -780,8 +784,7 @@ export class Store {
     // still live. The host keeps one row per key, so this refreshes the row
     // rather than adding one, and the address that answered replaces the
     // stored one, which also covers a Mac that moved.
-    const failure = await this.completePairing(endpoint, code, alternates)
-    if (failure) this.banner.value = { text: failure }
+    return this.completePairing(endpoint, code, alternates)
   }
 
   /**
