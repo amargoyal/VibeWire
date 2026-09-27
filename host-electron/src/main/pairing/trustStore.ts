@@ -117,9 +117,10 @@ export class TrustStore {
 
   async add(device: TrustedDevice): Promise<void> {
     const devices = await this.loadDevices()
+    const again = devices.has(device.id)
     devices.set(device.id, device)
     await this.persist(devices)
-    Log.info('net', `paired device ${device.name} (${device.id})`)
+    Log.info('net', `${again ? 'paired again' : 'paired device'} ${device.name} (${device.id})`)
   }
 
   async touch(id: string): Promise<void> {
