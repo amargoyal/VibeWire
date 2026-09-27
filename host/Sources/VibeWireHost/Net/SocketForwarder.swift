@@ -173,7 +173,7 @@ final class SocketForwarder {
         let running = Guarded(2)
         let shutdownOnce = Guarded(false)
 
-        func teardown() {
+        @Sendable func teardown() {
             let first = shutdownOnce.withLock { closed -> Bool in
                 if closed { return false }
                 closed = true
@@ -184,7 +184,7 @@ final class SocketForwarder {
             shutdown(b, SHUT_RDWR)
         }
 
-        func pump(from source: Int32, to sink: Int32) {
+        @Sendable func pump(from source: Int32, to sink: Int32) {
             let size = 64 * 1024
             let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
             defer { buffer.deallocate() }
