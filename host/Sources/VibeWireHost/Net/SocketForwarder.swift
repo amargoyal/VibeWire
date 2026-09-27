@@ -26,7 +26,7 @@ import Darwin
 final class SocketForwarder {
     private let listenPort: UInt16
     private let targetPort: UInt16
-    private let queue = DispatchQueue(label: "vibewire.forwarder", attributes: .concurrent)
+    private let queue = DispatchQueue(label: "vibewire.forwarder")
 
     private var listenSocket: Int32 = -1
     private var acceptSource: DispatchSourceRead?
