@@ -776,6 +776,10 @@ export class Store {
     } finally {
       this.followingPairingLink = false
     }
+    // A link that failed, a stale one from history say, leaves the stored
+    // pairing as it was, and that connects now as it would have without the
+    // link. After a link that worked, this finds the socket already open.
+    await this.connectIfPaired()
   }
 
   /** One pairing link, followed. Returns what went wrong, or null. */
