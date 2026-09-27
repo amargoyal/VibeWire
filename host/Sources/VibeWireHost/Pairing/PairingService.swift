@@ -240,8 +240,12 @@ actor PairingService {
             ?? (deviceName.isEmpty ? nil : deviceName)
             ?? "Device"
 
+        // A device that scans again keeps its row. Every pairing used to add a
+        // new one, so a phone scanned twice showed up twice in the list.
+        let existing = try? await trust.device(publicKey: publicKey)
+
         let device = TrustedDevice(
-            id: UUID().uuidString,
+            id: existing?.id ?? UUID().uuidString,
             name: resolvedName,
             kind: deviceKind,
             publicKey: publicKey,
