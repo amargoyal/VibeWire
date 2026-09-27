@@ -86,3 +86,22 @@ test('a device that pairs twice keeps one row and its id', async () => {
   assert.equal((await trust.all()).length, 1)
   assert.equal(pairing.currentProgress().deviceId, first.device.id)
 })
+
+test('a repeat pairing keeps a name given on the host and the first pairing date', async () => {
+  const { pairing, trust, clock } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  const first = await pairing.pair(pairing.beginPairing().value, 'iPhone', 'browser', key)
+  await trust.rename(first.device.id, 'Bedside')
+  clock.advance(60_000)
+  const second = await pairing.pair(pairing.beginPairing().value, 'iPhone', 'browser', key)
+  assert.equal(second.device.name, 'Bedside')
+  assert.equal(second.device.pairedAt.getTime(), first.device.pairedAt.getTime())
+})
+
+test('a name typed for this pairing still wins over the stored one', async () => {
+  const { pairing } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  await pairing.pair(pairing.beginPairing().value, 'iPhone', 'browser', key)
+  const second = await pairing.pair(pairing.beginPairing('Desk').value, 'iPhone', 'browser', key)
+  assert.equal(second.device.name, 'Desk')
+})
