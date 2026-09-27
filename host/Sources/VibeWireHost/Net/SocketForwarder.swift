@@ -176,8 +176,15 @@ final class SocketForwarder {
             teardown()
         }
 
-        DispatchQueue.global(qos: .userInitiated).async(group: done) { pump(from: a, to: b) }
-        DispatchQueue.global(qos: .userInitiated).async(group: done) { pump(from: b, to: a) }
+        for (source, sink) in [(a, b), (b, a)] {
+            done.enter()
+            let thread = Thread {
+                pump(from: source, to: sink)
+                done.leave()
+            }
+            thread.qualityOfService = .userInitiated
+            thread.start()
+        }
 
         done.notify(queue: .global()) {
             close(a)
