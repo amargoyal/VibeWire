@@ -133,6 +133,7 @@ final class SocketForwarder {
         }
 
         setOption(fd, IPPROTO_TCP, TCP_NODELAY, 1)
+        setOption(fd, SOL_SOCKET, SO_NOSIGPIPE, 1)
         return fd
     }
 
