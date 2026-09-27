@@ -137,6 +137,15 @@ final class SocketForwarder {
         return fd
     }
 
+    /// Sets one integer socket option, and says so when the kernel refuses it.
+    private static func setOption(_ fd: Int32, _ level: Int32, _ name: Int32, _ value: Int32) {
+        var value = value
+        guard setsockopt(fd, level, name, &value, socklen_t(MemoryLayout<Int32>.size)) != 0 else {
+            return
+        }
+        Log.warn(.net, "front door could not set socket option \(name): \(String(cString: strerror(errno)))")
+    }
+
     /// Copies bytes both ways until either end goes quiet, then closes both.
     ///
     /// Two dedicated threads rather than dispatch sources: the pump is a blocking
