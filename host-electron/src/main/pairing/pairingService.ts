@@ -237,9 +237,10 @@ export class PairingService {
     // one, so a phone scanned twice showed up twice in the list.
     const existing = await this.trust.deviceWithKey(publicKey).catch(() => null)
 
-    // The name typed at the host wins, then the one the device reports about
-    // itself, then a last resort that is at least not empty.
-    const resolvedName = typedName ?? (deviceName ? deviceName : null) ?? 'Device'
+    // The name typed at the host wins, then the name the row already has, which
+    // may be a rename made there, then the one the device reports about itself,
+    // then a last resort that is at least not empty.
+    const resolvedName = typedName ?? existing?.name ?? (deviceName ? deviceName : null) ?? 'Device'
     const device: TrustedDevice = {
       id: existing?.id ?? TrustStore.newDeviceId(),
       name: resolvedName,
