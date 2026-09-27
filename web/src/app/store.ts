@@ -746,13 +746,7 @@ export class Store {
    * served by another keeps working.
    */
   async handlePairingParams(search: string, hash: string): Promise<void> {
-    const parameters = new URLSearchParams(search || '')
-    if (hash.startsWith('#')) {
-      for (const [key, value] of new URLSearchParams(hash.slice(1))) {
-        if (!parameters.has(key)) parameters.set(key, value)
-      }
-    }
-
+    const parameters = pairingParameters(search, hash)
     const code = parameters.get('code')
     if (!code) return
     // Read once, then gone from the address bar. Left there, a reload or a
@@ -1881,6 +1875,17 @@ export class Store {
  * port is the right guess: it is the port this browser is already talking to
  * this Mac on.
  */
+/** A pairing link's parameters, from the query or, failing that, the fragment. */
+function pairingParameters(search: string, hash: string): URLSearchParams {
+  const parameters = new URLSearchParams(search || '')
+  if (hash.startsWith('#')) {
+    for (const [key, value] of new URLSearchParams(hash.slice(1))) {
+      if (!parameters.has(key)) parameters.set(key, value)
+    }
+  }
+  return parameters
+}
+
 function candidateOrigins(
   payload: Record<string, unknown>,
   transport: TransportStatus,
