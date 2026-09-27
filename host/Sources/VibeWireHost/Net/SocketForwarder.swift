@@ -103,6 +103,7 @@ final class SocketForwarder {
         Self.setOption(client, SOL_SOCKET, SO_KEEPALIVE, 1)
         Self.setOption(client, IPPROTO_TCP, TCP_KEEPALIVE, 15)
         Self.setOption(client, IPPROTO_TCP, TCP_KEEPINTVL, 5)
+        Self.setOption(client, IPPROTO_TCP, TCP_KEEPCNT, 3)
 
         queue.async { [targetPort] in
             guard let upstream = Self.connectLoopback(port: targetPort) else {
