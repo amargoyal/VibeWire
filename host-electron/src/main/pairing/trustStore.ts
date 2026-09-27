@@ -102,6 +102,19 @@ export class TrustStore {
     return (await this.loadDevices()).get(id) ?? null
   }
 
+  /**
+   * The device already trusted with this key, if any. The key is what a device
+   * proves it holds, so a second pairing with it is the same device.
+   */
+  async deviceWithKey(publicKey: Buffer): Promise<TrustedDevice | null> {
+    let newest: TrustedDevice | null = null
+    for (const device of (await this.loadDevices()).values()) {
+      if (!device.publicKey.equals(publicKey)) continue
+      if (!newest || device.pairedAt > newest.pairedAt) newest = device
+    }
+    return newest
+  }
+
   async add(device: TrustedDevice): Promise<void> {
     const devices = await this.loadDevices()
     devices.set(device.id, device)
