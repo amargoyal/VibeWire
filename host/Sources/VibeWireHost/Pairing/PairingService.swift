@@ -255,7 +255,7 @@ actor PairingService {
             name: resolvedName,
             kind: deviceKind,
             publicKey: publicKey,
-            pairedAt: Date(),
+            pairedAt: existing?.pairedAt ?? Date(),
             lastSeenAt: Date()
         )
         do {
