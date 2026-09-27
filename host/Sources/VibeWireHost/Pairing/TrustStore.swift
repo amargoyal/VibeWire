@@ -124,9 +124,19 @@ actor TrustStore {
     func add(_ device: TrustedDevice) async throws {
         var devices = try await loadDevices()
         let again = devices[device.id] != nil
+        // Rows left by a device that paired more than once before it kept its
+        // row. It holds one key and uses this id from now on, so nothing will
+        // authenticate as the others again, and they only clutter the list.
+        let older = devices
+            .filter { $0.value.publicKey == device.publicKey && $0.key != device.id }
+            .map(\.key)
+        for id in older { devices.removeValue(forKey: id) }
         devices[device.id] = device
         try await persist(devices)
         Log.info(.net, "\(again ? "paired again" : "paired device") \(device.name) (\(device.id))")
+        if !older.isEmpty {
+            Log.info(.net, "folded \(older.count) older row(s) for \(device.name) into \(device.id)")
+        }
     }
 
     func touch(id: String) async {
