@@ -234,15 +234,21 @@ actor PairingService {
         else { throw PairError.badPublicKey }
         progress.keysExchangedAt = Date()
 
-        // The name typed at the Mac wins, then the one the device reports about
-        // itself, then a last resort that is at least not empty.
-        let resolvedName = assignedName
-            ?? (deviceName.isEmpty ? nil : deviceName)
-            ?? "Device"
+        // Read before the lookup below suspends, so another call cannot change
+        // it underneath this one.
+        let typedName = assignedName
 
         // A device that scans again keeps its row. Every pairing used to add a
         // new one, so a phone scanned twice showed up twice in the list.
         let existing = try? await trust.device(publicKey: publicKey)
+
+        // The name typed at the Mac wins, then the name the row already has,
+        // which may be a rename made there, then the one the device reports
+        // about itself, then a last resort that is at least not empty.
+        let resolvedName = typedName
+            ?? existing?.name
+            ?? (deviceName.isEmpty ? nil : deviceName)
+            ?? "Device"
 
         let device = TrustedDevice(
             id: existing?.id ?? UUID().uuidString,
