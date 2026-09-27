@@ -54,6 +54,7 @@ export function App() {
   useEffect(() => watchTabCondition(), [])
 
   useEffect(() => {
+    store.holdForPairingLink(location.search, location.hash)
     void store.load().then(() => setReady(true))
     // `?host=…&port=…&code=…` on this page's own URL is the browser's stand-in for
     // the `vibewire://pair` link behind the Mac's QR.

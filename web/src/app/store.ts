@@ -600,9 +600,26 @@ export class Store {
     }
   }
 
+  /**
+   * Whether this page was opened by a pairing link that has not been followed
+   * yet.
+   *
+   * The stored pairing does not connect while it is. A socket opened with the
+   * old record first is one the Mac's step list ignores, so its last step never
+   * ticked; and where the Mac had revoked that key, as signing out of it does,
+   * the refusal unpaired this browser in the middle of the pairing that was
+   * about to replace it.
+   */
+  private followingPairingLink = false
+
+  /** Called before `load`, so the stored pairing waits for the link. */
+  holdForPairingLink(search: string, hash: string): void {
+    this.followingPairingLink = Boolean(pairingParameters(search, hash).get('code'))
+  }
+
   async connectIfPaired(): Promise<void> {
     const paired = this.pairedHost.value
-    if (!paired) return
+    if (!paired || this.followingPairingLink) return
     await this.client.connect(paired)
     // Re-report on every connect; the host does not persist it.
     this.send({
@@ -753,8 +770,12 @@ export class Store {
     // bookmark followed the link again with a code the Mac had long since spent
     // or rotated, and reported a failure about a pairing that had worked.
     scrubUrl(['code', 'host', 'port', 'origin', 'alt'])
-    const failure = await this.followPairingLink(code, parameters)
-    if (failure) this.banner.value = { text: failure }
+    try {
+      const failure = await this.followPairingLink(code, parameters)
+      if (failure) this.banner.value = { text: failure }
+    } finally {
+      this.followingPairingLink = false
+    }
   }
 
   /** One pairing link, followed. Returns what went wrong, or null. */
