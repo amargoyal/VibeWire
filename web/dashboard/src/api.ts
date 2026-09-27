@@ -60,7 +60,7 @@ export function fetchState<T>(): Promise<T> {
 }
 
 export function fetchEvents<T>(since: number): Promise<T> {
-  return request<T>(`events?since=${since}`)
+  return request<T>(`events?since=${since}`, { signal: AbortSignal.timeout(POLL_TIMEOUT_MS) })
 }
 
 /** Fire-and-report. Callers surface the failure; none of them retry blindly. */
