@@ -141,7 +141,14 @@ final class SocketForwarder {
     ///
     /// Two dedicated threads rather than dispatch sources: the pump is a blocking
     /// read/write loop, which is the simplest thing that cannot lose a partial
-    /// write, and there is exactly one pair of them per connected phone.
+    /// write, and there is exactly one pair of them per open connection.
+    ///
+    /// Threads of their own, not blocks on a global queue. GCD caps the threads
+    /// it will park in blocking calls at 64 per process, and a browser holds its
+    /// keep-alive connections open while idle, so 32 of them used to fill the
+    /// pool. Every connection after that was accepted by the kernel and never
+    /// answered: the phone spun, the pairing steps never ticked, and only a
+    /// restart of the app let anything in again.
     private static func splice(_ a: Int32, _ b: Int32) {
         let running = Guarded(2)
         let shutdownOnce = Guarded(false)
