@@ -168,6 +168,11 @@ causes, in the order they happen:
    pairing window lists every address this machine is on; the phone has to be
    on one of them.
 
+If the first scan worked and a later one spins while the pairing steps never
+tick, `node web/front-door-check.mjs` says whether the host is still taking new
+connections. Hosts before this check existed stopped doing so once enough idle
+connections had piled up, and only a restart let anything in again.
+
 ## Building the Windows host
 
 On any machine with Node 22:
