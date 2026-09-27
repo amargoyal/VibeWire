@@ -229,11 +229,19 @@ export class PairingService {
     if (!isValidPublicKey(publicKey)) throw new PairError('badPublicKey')
     this.progress.keysExchangedAt = this.now()
 
+    // Read before the lookup below suspends, so another call cannot change it
+    // underneath this one.
+    const typedName = this.assignedName
+
+    // A device that scans again keeps its row. Every pairing used to add a new
+    // one, so a phone scanned twice showed up twice in the list.
+    const existing = await this.trust.deviceWithKey(publicKey).catch(() => null)
+
     // The name typed at the host wins, then the one the device reports about
     // itself, then a last resort that is at least not empty.
-    const resolvedName = this.assignedName ?? (deviceName ? deviceName : null) ?? 'Device'
+    const resolvedName = typedName ?? (deviceName ? deviceName : null) ?? 'Device'
     const device: TrustedDevice = {
-      id: TrustStore.newDeviceId(),
+      id: existing?.id ?? TrustStore.newDeviceId(),
       name: resolvedName,
       kind: deviceKind,
       publicKey: Buffer.from(publicKey),
