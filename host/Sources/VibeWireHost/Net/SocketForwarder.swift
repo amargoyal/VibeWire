@@ -100,6 +100,12 @@ final class SocketForwarder {
         }
         guard client >= 0 else { return }
         Self.setOption(client, SOL_SOCKET, SO_NOSIGPIPE, 1)
+        // A phone that locks, leaves the Wi-Fi or drops off the tailnet sends
+        // no FIN, and nothing crosses an idle keep-alive connection, so without
+        // probes its two pump threads would wait on it until the app quits.
+        // These give up on a silent peer about 30 seconds after it went quiet.
+        // The `NWListener` has keepalive of its own, but its peer is this
+        // forwarder on loopback, which always answers.
         Self.setOption(client, SOL_SOCKET, SO_KEEPALIVE, 1)
         Self.setOption(client, IPPROTO_TCP, TCP_KEEPALIVE, 15)
         Self.setOption(client, IPPROTO_TCP, TCP_KEEPINTVL, 5)
