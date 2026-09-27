@@ -430,7 +430,7 @@ async function fetchUser(token: string): Promise<AccountUser> {
 }
 
 /** Takes the named parameters out of both the query and the fragment. */
-function scrubUrl(names: string[]): void {
+export function scrubUrl(names: string[]): void {
   try {
     const url = new URL(location.href)
     const hash = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : '')
