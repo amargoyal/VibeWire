@@ -673,6 +673,7 @@ final class HostRouter: Router, @unchecked Sendable {
         switch verdict {
         case .refused:
             Log.warn(.net, "refused a socket signed into another account")
+            socket.noteAccountRefused()
             socket.sendJSON(Outbound.error(
                 "account_required",
                 "\(Config.machineName) belongs to a different VibeWire account. Sign in with the account that set it up, or turn the requirement off on the computer.",
