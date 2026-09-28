@@ -254,6 +254,13 @@ final class HostRouter: Router, @unchecked Sendable {
                 publicKey: publicKey
             )
             Log.info(.net, "pair accepted: \(deviceName) (\(deviceKind)) as \(result.device.id)")
+            // A device that pairs again while its socket is still open keeps that
+            // socket rather than opening another, so no new one will arrive to
+            // tick the last step. The step is about a socket this device's key
+            // has signed for, and one already has.
+            if server?.connectedDeviceIds.contains(result.device.id) == true {
+                await pairing.noteSocketOpened(deviceId: result.device.id)
+            }
             return .json(200, [
                 "hostId": result.hostId,
                 "hostName": result.hostName,
