@@ -270,6 +270,58 @@ final class Tab: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
 
     var address: String { view.url?.absoluteString ?? "" }
 
+    /// Runs script in the page and waits for the promise it returns.
+    func run(_ script: String, _ arguments: [String: Any] = [:]) async throws -> Any? {
+        try await view.callAsyncJavaScript(script, arguments: arguments, contentWorld: .page)
+    }
+
+    /// Leaves a signed-in session where the client keeps one, as a sign-in
+    /// that ends in a redirect back to the page would.
+    func storeSession(token: String, email: String) async throws {
+        _ = try await run("""
+        const session = {
+          accessToken: token, refreshToken: 'refresh-' + token,
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          user: { id: token, email, displayName: null },
+        }
+        await new Promise((resolve, reject) => {
+          const open = indexedDB.open('vibewire', 1)
+          open.onupgradeneeded = () => open.result.createObjectStore('identity')
+          open.onerror = () => reject(open.error)
+          open.onsuccess = () => {
+            const write = open.result.transaction('identity', 'readwrite')
+            write.objectStore('identity').put(session, 'account-session')
+            write.oncomplete = () => { open.result.close(); resolve(null) }
+            write.onerror = () => reject(write.error)
+          }
+        })
+        """, ["token": token, "email": email])
+    }
+
+    /// Signs in with an email code through the sign-in screen itself: types the
+    /// address, presses the button, types the code.
+    func signInWithCode(email: String, code: String) async throws {
+        _ = try await run("""
+        const type = (field, value) => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, value)
+          field.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+        const until = async (find) => {
+          for (let tries = 0; tries < 60; tries++) {
+            const found = find()
+            if (found) return found
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+          throw new Error('the sign-in screen did not show what was expected')
+        }
+        type(await until(() => document.querySelector('input[type=email]')), email)
+        const send = await until(() => [...document.querySelectorAll('button')]
+          .find((button) => /send me a code/i.test(button.textContent || '')))
+        send.click()
+        type(await until(() => document.querySelector('input[aria-label="Sign-in code, six digits"]')), code)
+        """, ["email": email, "code": code])
+    }
+
     func close() {
         view.navigationDelegate = nil
         view.configuration.userContentController.removeScriptMessageHandler(forName: "console")
@@ -327,6 +379,23 @@ final class Run {
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
         return await condition()
+    }
+
+    /// Waits for `condition`, then checks it keeps holding for `seconds`. A
+    /// screen that appears and is taken away again passes `eventually` and
+    /// fails this.
+    func holds(_ seconds: Double, _ condition: () async -> Bool) async -> Bool {
+        guard await eventually(10, condition) else { return false }
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if !(await condition()) { return false }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return true
+    }
+
+    func settings() async -> [String: Any] {
+        ((try? await host.state())?["settings"] as? [String: Any]) ?? [:]
     }
 
     func pairing() async -> [String: Any] {
@@ -482,6 +551,76 @@ func main(dashboard: String) async -> Int32 {
         run.check(app.deviceId == appDevice, "the Mac keeps the app's device")
         run.check(await run.devices().count == before + 3, "the Mac still lists the app once")
         app.disconnect()
+
+        // Needs a host and a web build pointed at host/Tools/fake-account-server.mjs,
+        // which pairing-check.sh sets up and says so with this variable.
+        if ProcessInfo.processInfo.environment["VIRTUALPHONE_ACCOUNTS"] == "1" {
+            let asksForSignIn = "to know who you are"
+            try await host.command(["do": "setting.set", "key": "requireAccount", "value": true])
+            run.check(await run.settings()["requireAccount"] as? Bool == true, "the Mac requires a signed-in browser")
+
+            print("sign-in required, signing in ends in a reload")
+            let redirected = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await redirected.open(try await run.scan())
+            let redirectedDevice = await run.handshake("pairing before sign-in", on: redirected) ?? ""
+            run.check(await run.eventually(12) { await redirected.text().contains(asksForSignIn) },
+                      "the phone asks who you are")
+            try await redirected.storeSession(token: "test-owner", email: "owner@example.test")
+            try await redirected.reload()
+            run.check(await run.holds(12) {
+                let connected = await run.isConnected(redirectedDevice)
+                let asked = await redirected.text().contains(asksForSignIn)
+                return connected && !asked
+            }, "the phone gets in and stays in")
+            run.check(await run.settings()["accountOwnerEmail"] as? String == "owner@example.test",
+                      "the Mac belongs to that account")
+            redirected.close()
+
+            print("sign-in required, signing in with an email code")
+            let emailed = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await emailed.open(try await run.scan())
+            let emailedDevice = await run.handshake("pairing before sign-in", on: emailed) ?? ""
+            run.check(await run.eventually(12) { await emailed.text().contains(asksForSignIn) },
+                      "the phone asks who you are")
+            try await emailed.signInWithCode(email: "owner@example.test", code: "000001")
+            run.check(await run.holds(12) {
+                let connected = await run.isConnected(emailedDevice)
+                let asked = await emailed.text().contains(asksForSignIn)
+                return connected && !asked
+            }, "the phone gets in and stays in")
+            emailed.close()
+
+            print("sign-in required, signing in after the Mac gave up waiting")
+            let slow = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await slow.open(try await run.scan())
+            let slowDevice = await run.handshake("pairing before sign-in", on: slow) ?? ""
+            // The Mac closes a browser that has not signed in after eight
+            // seconds. Reading an email takes longer than that, so this is the
+            // usual order: refused first, signed in afterwards, on a new socket.
+            run.check(await run.eventually(15) { await slow.text().contains("accept only signed-in browsers") },
+                      "the Mac stops waiting and the phone says why")
+            try await slow.signInWithCode(email: "owner@example.test", code: "000001")
+            run.check(await run.holds(12) {
+                let connected = await run.isConnected(slowDevice)
+                let asked = await slow.text().contains(asksForSignIn)
+                return connected && !asked
+            }, "the phone gets in and stays in")
+            slow.close()
+
+            print("sign-in required, a different account")
+            let stranger = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await stranger.open(try await run.scan())
+            let strangerDevice = await run.handshake("pairing before sign-in", on: stranger) ?? ""
+            run.check(await run.eventually(12) { await stranger.text().contains(asksForSignIn) },
+                      "the phone asks who you are")
+            try await stranger.signInWithCode(email: "other@example.test", code: "000002")
+            run.check(await run.eventually(12) { await stranger.text().contains("belongs to a different VibeWire account") },
+                      "the phone is told the Mac belongs to someone else")
+            run.check(await run.holds(4) { !(await run.isConnected(strangerDevice)) }, "the phone is kept out")
+            stranger.close()
+
+            try await host.command(["do": "setting.set", "key": "requireAccount", "value": false])
+        }
         try await host.command(["do": "pair.end"])
     } catch {
         print("  FAIL  \(error)")

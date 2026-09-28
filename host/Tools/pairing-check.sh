@@ -2,46 +2,76 @@
 # Pairs a simulated phone with a throwaway Mac host and prints what each end saw.
 # The checks themselves are in VirtualPhone.swift.
 #
-#     host/Tools/pairing-check.sh
+#     host/Tools/pairing-check.sh             # the Mac host
+#     host/Tools/pairing-check.sh --windows   # the Windows host, run on this Mac
 #
 # The host it starts keeps its settings and devices in a temporary folder
 # (VIBEWIRE_CONFIG_DIR) with its trust in files there (VIBEWIRE_SECRET_STORE=file),
 # so the installed VibeWire, its devices and the login keychain are never touched.
-# It serves web/dist and listens on 8899 unless VIBEWIRE_CHECK_PORT says
-# otherwise. It may open its own setup window while it runs.
+# Accounts go to fake-account-server.mjs rather than the real project, and the web
+# client it serves is built into the temporary folder pointed at the same place,
+# so web/dist is left as it was. It listens on 8899 and 9955 unless
+# VIBEWIRE_CHECK_PORT and VIBEWIRE_CHECK_ACCOUNTS_PORT say otherwise. It may open
+# its own setup window while it runs.
 set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 repo=$(dirname "$here")
+target=mac
+if [ "${1:-}" = "--windows" ]; then target=windows; fi
 port=${VIBEWIRE_CHECK_PORT:-8899}
+accounts_port=${VIBEWIRE_CHECK_ACCOUNTS_PORT:-9955}
+accounts=http://127.0.0.1:$accounts_port
 work=$(mktemp -d "${TMPDIR:-/tmp}/vibewire-pairing-check.XXXXXX")
 host_pid=
+accounts_pid=
 
 finish() {
   if [ -n "$host_pid" ]; then kill "$host_pid" 2>/dev/null || true; fi
+  if [ -n "$accounts_pid" ]; then kill "$accounts_pid" 2>/dev/null || true; fi
   rm -rf "$work"
 }
 trap finish EXIT
 
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 echo "building"
-(cd "$repo/web" && npm run build >/dev/null)
-(cd "$here" && swift build >/dev/null)
+(cd "$repo/web" && npx tsc --noEmit &&
+  VITE_SUPABASE_URL="$accounts" VITE_SUPABASE_KEY=test \
+    npx vite build --outDir "$work/web" --emptyOutDir >/dev/null)
+if [ "$target" = windows ]; then
+  (cd "$repo/host-electron" && npm run build >/dev/null)
+  host_command() {
+    VIBEWIRE_SYNTHETIC_CAPTURE=1 exec "$repo/host-electron/node_modules/.bin/electron" "$repo/host-electron" \
+      --port "$port" --dashboard-url --no-tray
+  }
+else
+  (cd "$here" && swift build >/dev/null)
+  host_command() {
+    exec "$here/.build/debug/VibeWireHost" --port "$port" --dashboard-url
+  }
+fi
 xcrun swiftc -O "$here/Tools/VirtualPhone.swift" -o "$work/VirtualPhone"
+
+node "$here/Tools/fake-account-server.mjs" "$accounts_port" >"$work/accounts.log" 2>&1 &
+accounts_pid=$!
 
 VIBEWIRE_CONFIG_DIR="$work/config" \
 VIBEWIRE_SECRET_STORE=file \
-VIBEWIRE_WEB_ROOT="$repo/web/dist" \
+VIBEWIRE_WEB_ROOT="$work/web" \
+VIBEWIRE_ACCOUNT_URL="$accounts" \
+VIBEWIRE_ACCOUNT_KEY=test \
 VIBEWIRE_DISABLE_CLAUDE=1 \
 VIBEWIRE_VERBOSE=1 \
-  "$here/.build/debug/VibeWireHost" --port "$port" --dashboard-url >"$work/url" 2>"$work/host.log" &
+  host_command >"$work/url" 2>"$work/host.log" &
+# The function execs the host, so this is the host's own process and not a
+# shell around it, and killing it on the way out stops the host.
 host_pid=$!
 
 # The host writes its own key as it starts. One that did not write it into the
 # temporary folder is using some other folder, possibly the installed app's,
 # and nothing gets paired with it.
 tries=0
-until [ -s "$work/url" ] && [ -f "$work/config/host-identity.secret" ]; do
+until grep -q /dashboard/ "$work/url" 2>/dev/null && [ -f "$work/config/host-identity.secret" ]; do
   tries=$((tries + 1))
   if [ "$tries" -gt 60 ] || ! kill -0 "$host_pid" 2>/dev/null; then
     echo "the test host did not start in $work/config; stopping before anything pairs" >&2
@@ -52,8 +82,8 @@ until [ -s "$work/url" ] && [ -f "$work/config/host-identity.secret" ]; do
 done
 
 status=0
-"$work/VirtualPhone" "$(cat "$work/url")" || status=$?
+VIRTUALPHONE_ACCOUNTS=1 "$work/VirtualPhone" "$(grep -m1 /dashboard/ "$work/url")" || status=$?
 echo
 echo "host log"
-grep -E "pair (accepted|rejected)|paired|folded|revoked|handshake complete" "$work/host.log" || true
+grep -E "pair (accepted|rejected)|paired|folded|revoked|handshake complete|account|belongs" "$work/host.log" || true
 exit "$status"

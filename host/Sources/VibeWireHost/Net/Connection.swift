@@ -260,6 +260,10 @@ final class SocketConnection: @unchecked Sendable {
     /// in a URL. Until it lands, a host that requires one answers nothing.
     private var accountUserIdValue: String?
 
+    /// Set once the account this socket offered, or failed to offer in time,
+    /// has been turned away, so a message waiting at the gate stops waiting.
+    private var accountRefusedValue = false
+
     /// Whether this socket was opened by a browser rather than by the iPhone
     /// app. See `ClientConnection.handleUpgrade` for how it is decided.
     let isBrowser: Bool
@@ -280,6 +284,18 @@ final class SocketConnection: @unchecked Sendable {
     func noteAccount(_ userId: String?) {
         sendLock.lock()
         accountUserIdValue = userId
+        sendLock.unlock()
+    }
+
+    var accountRefused: Bool {
+        sendLock.lock()
+        defer { sendLock.unlock() }
+        return accountRefusedValue
+    }
+
+    func noteAccountRefused() {
+        sendLock.lock()
+        accountRefusedValue = true
         sendLock.unlock()
     }
 

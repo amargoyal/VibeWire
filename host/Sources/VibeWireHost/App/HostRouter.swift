@@ -445,7 +445,12 @@ final class HostRouter: Router, @unchecked Sendable {
             return
         }
 
-        if accountGateCloses(socket) {
+        // A signed-in browser sends its account as the socket opens, but checking
+        // it is a round trip to the account server, and the ping, link report and
+        // stream request sent alongside it arrive while that is in flight.
+        // Refusing those told a browser that had just signed in to sign in
+        // again, on every reconnect. They wait for the answer instead.
+        if accountGateCloses(socket), !(await accountSettles(socket)), accountGateCloses(socket) {
             // Not an ack and not silence. A client that is refused here has
             // somewhere to go — its sign-in screen — and it only knows that if
             // the refusal says so.
@@ -625,6 +630,20 @@ final class HostRouter: Router, @unchecked Sendable {
         return socket.accountUserId == nil
     }
 
+    /// Whether this socket's account was adopted, waiting for as much of its
+    /// grace as is left to find out. False once it was refused or the grace is
+    /// over, which is also the answer straight away for a socket that has been
+    /// open longer than that.
+    private func accountSettles(_ socket: SocketConnection) async -> Bool {
+        let deadline = socket.openedAt.addingTimeInterval(Self.accountGrace)
+        while Date() < deadline {
+            if socket.accountUserId != nil { return true }
+            if socket.accountRefused { return false }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return socket.accountUserId != nil
+    }
+
     /// The sentence the client puts on its sign-in screen.
     private func accountRefusalText() -> String {
         "\(Config.machineName) is set to accept only signed-in browsers. Sign in to use it."
@@ -644,6 +663,7 @@ final class HostRouter: Router, @unchecked Sendable {
         guard let account = await accounts.verify(token: token) else {
             Log.info(.net, "account token was not confirmed by the account server")
             if required {
+                socket.noteAccountRefused()
                 socket.sendJSON(Outbound.error(
                     "account_required",
                     "This computer could not confirm that sign-in. Sign in again, or check that the computer is online.",
@@ -672,6 +692,7 @@ final class HostRouter: Router, @unchecked Sendable {
         switch verdict {
         case .refused:
             Log.warn(.net, "refused a socket signed into another account")
+            socket.noteAccountRefused()
             socket.sendJSON(Outbound.error(
                 "account_required",
                 "\(Config.machineName) belongs to a different VibeWire account. Sign in with the account that set it up, or turn the requirement off on the computer.",
@@ -704,6 +725,7 @@ final class HostRouter: Router, @unchecked Sendable {
             guard let socket, socket.accountUserId == nil else { return }
             guard state.read({ $0.settings.requireAccount }) else { return }
             guard state.read({ $0.activeSocket === socket }) else { return }
+            socket.noteAccountRefused()
             socket.sendJSON(Outbound.error("account_required", accountRefusalText(), retriable: false))
             socket.close(code: 4003, reason: "no account presented")
         }

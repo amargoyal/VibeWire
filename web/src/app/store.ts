@@ -522,6 +522,11 @@ export class Store {
     if (!this.accountsAvailable) return
     onAccountChange((session) => {
       this.account.value = session?.user ?? null
+      // A sign-in that finishes while connected goes to the Mac on the socket
+      // already open. Reconnecting found that socket live and did nothing, so
+      // a Mac that requires an account closed it at the end of its grace and
+      // sent this browser back to the sign-in it had just completed.
+      if (session) this.client.offerAccount()
     })
     await loadAccount().catch(() => null)
     this.account.value = accountSession()?.user ?? null

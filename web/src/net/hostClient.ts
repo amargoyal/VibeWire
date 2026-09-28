@@ -554,6 +554,17 @@ export class HostClient {
   }
 
   /**
+   * Offers the account on the socket that is already open.
+   *
+   * For a sign-in that finishes while connected: the offer made as the socket
+   * opened went out signed out, and a host that requires an account would
+   * otherwise close this socket at the end of its grace for want of one.
+   */
+  offerAccount(): void {
+    void this.presentAccount(this.generation)
+  }
+
+  /**
    * Offers the account this browser is signed into, once per socket.
    *
    * Sent on the socket rather than as an upgrade parameter, because a browser

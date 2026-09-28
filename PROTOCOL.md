@@ -262,11 +262,14 @@ at the same moment as one paired a second ago.
 host's configuration. It travels as a socket message, not as a query parameter
 on the upgrade: a browser cannot set a header on a WebSocket, and the remaining
 alternative would have put a live token in every log between here and the
-relay. It is sent once per socket, immediately after the socket opens, and only
-when the client has a session.
+relay. It is sent immediately after the socket opens, and again on the same
+socket when a sign-in finishes while it is open, and only when the client has a
+session.
 
 The host answers it in one of three ways, and answers nothing else until it
-has:
+has. Messages that arrive first, a `ping` or the `link` report sent as the
+socket opens, wait for that answer rather than being refused, for as long as
+the 8 seconds below last:
 
 | Situation | What the host does |
 |---|---|
