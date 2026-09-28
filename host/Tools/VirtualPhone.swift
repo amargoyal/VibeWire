@@ -590,6 +590,23 @@ func main(dashboard: String) async -> Int32 {
             }, "the phone gets in and stays in")
             emailed.close()
 
+            print("sign-in required, signing in after the Mac gave up waiting")
+            let slow = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await slow.open(try await run.scan())
+            let slowDevice = await run.handshake("pairing before sign-in", on: slow) ?? ""
+            // The Mac closes a browser that has not signed in after eight
+            // seconds. Reading an email takes longer than that, so this is the
+            // usual order: refused first, signed in afterwards, on a new socket.
+            run.check(await run.eventually(15) { await slow.text().contains("accept only signed-in browsers") },
+                      "the Mac stops waiting and the phone says why")
+            try await slow.signInWithCode(email: "owner@example.test", code: "000001")
+            run.check(await run.holds(12) {
+                let connected = await run.isConnected(slowDevice)
+                let asked = await slow.text().contains(asksForSignIn)
+                return connected && !asked
+            }, "the phone gets in and stays in")
+            slow.close()
+
             print("sign-in required, a different account")
             let stranger = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
             try await stranger.open(try await run.scan())
