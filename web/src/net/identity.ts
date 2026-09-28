@@ -22,6 +22,17 @@
  */
 
 import { etc, getPublicKeyAsync, signAsync } from '@noble/ed25519'
+import { sha512 } from '@noble/hashes/sha2'
+
+// The fallback key below exists for browsers without WebCrypto Ed25519, and the
+// commonest of those has no WebCrypto at all: Safari on a plain-http page that
+// is not localhost, which is how a phone opens the Mac's own copy of this
+// client. noble's default SHA-512 calls WebCrypto too, so the fallback failed
+// at its first use with "crypto.subtle must be defined" and the phone could not
+// pair. It gets a SHA-512 of its own wherever WebCrypto is missing.
+if (!globalThis.crypto?.subtle) {
+  etc.sha512Async = async (...messages) => sha512(etc.concatBytes(...messages))
+}
 
 const DB_NAME = 'vibewire'
 const DB_VERSION = 1

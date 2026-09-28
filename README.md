@@ -221,6 +221,21 @@ a display, for a machine with no screen to capture.
 Configuration lives in `~/.config/vibewire/` on both platforms
 (`C:\Users\<you>\.config\vibewire\` on Windows): `config.json`, the paired
 devices, and the host's own key — sealed with DPAPI on Windows.
+`VIBEWIRE_CONFIG_DIR` moves that folder on both platforms, which is how a
+second host runs beside the installed one without touching its devices.
+
+## Checking pairing without a phone
+
+```
+host/Tools/pairing-check.sh
+```
+
+Starts a throwaway Mac host on port 8899 with its own folder and file-based
+trust, then plays the phone: it reads the Mac's QR out of the image the way a
+camera does, opens it in WebKit, scans again, reloads, follows an old link,
+scans after a revoke, and pairs the way the iPhone app does. Each check prints
+PASS or FAIL against what the Mac's step list and device list say. The
+installed VibeWire and the login keychain are left alone.
 
 ## Packaging a Mac release
 

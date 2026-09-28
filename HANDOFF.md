@@ -161,8 +161,8 @@ Verified this session: static serving, cache headers, CSP, hashed-asset fetch, s
 
 ### Gotchas found
 
-- The trust store is unreadable from a sandboxed shell: keychain reads time out after 45 s and `~/.config/vibewire/devices.secret` gives `EPERM` despite mode 600 and correct ownership. Both stores failing surfaces as `pair rejected 401 bad_code` with the real cause only in the host log — the `default:` catch in `handlePair` swallows a store failure into a wrong-code answer, which is a mislabel worth fixing.
-- `VIBEWIRE_SECRET_STORE=file` does not escape it: `homeDirectoryForCurrentUser` reads `getpwuid`, not `$HOME`, so overriding `HOME` does not move the file store.
+- The trust store is unreadable from a sandboxed shell: keychain reads time out after 45 s and `~/.config/vibewire/devices.secret` gives `EPERM` despite mode 600 and correct ownership. Later found: the `EPERM` was the file's complete data protection refusing access while the Mac was locked, not the sandbox. The file store now uses after-first-unlock, the keychain item's own rule. Both stores failing surfaces as `pair rejected 401 bad_code` with the real cause only in the host log — the `default:` catch in `handlePair` swallows a store failure into a wrong-code answer, which is a mislabel worth fixing.
+- `VIBEWIRE_SECRET_STORE=file` does not escape it: `homeDirectoryForCurrentUser` reads `getpwuid`, not `$HOME`, so overriding `HOME` does not move the file store. `VIBEWIRE_CONFIG_DIR` does move it now.
 - `Log` output is block-buffered when stdout is not a tty. Run the host under `script -q /dev/null` to read it live from a pipe.
 - The host answers every request with `Connection: keep-alive` regardless of what was asked, so a raw HTTP client waiting for `end` waits forever.
 - `--pair`'s rotation timer calls `endPairing()` as soon as the pairing window is not visible. Read the code from the log immediately; it is good for 60 s.

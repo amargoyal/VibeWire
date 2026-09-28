@@ -102,11 +102,35 @@ export class TrustStore {
     return (await this.loadDevices()).get(id) ?? null
   }
 
+  /**
+   * The device already trusted with this key, if any. The key is what a device
+   * proves it holds, so a second pairing with it is the same device.
+   */
+  async deviceWithKey(publicKey: Buffer): Promise<TrustedDevice | null> {
+    let newest: TrustedDevice | null = null
+    for (const device of (await this.loadDevices()).values()) {
+      if (!device.publicKey.equals(publicKey)) continue
+      if (!newest || device.pairedAt > newest.pairedAt) newest = device
+    }
+    return newest
+  }
+
   async add(device: TrustedDevice): Promise<void> {
     const devices = await this.loadDevices()
+    const again = devices.has(device.id)
+    // Rows left by a device that paired more than once before it kept its row.
+    // It holds one key and uses this id from now on, so nothing will
+    // authenticate as the others again, and they only clutter the list.
+    const older = [...devices.values()]
+      .filter((entry) => entry.publicKey.equals(device.publicKey) && entry.id !== device.id)
+      .map((entry) => entry.id)
+    for (const id of older) devices.delete(id)
     devices.set(device.id, device)
     await this.persist(devices)
-    Log.info('net', `paired device ${device.name} (${device.id})`)
+    Log.info('net', `${again ? 'paired again' : 'paired device'} ${device.name} (${device.id})`)
+    if (older.length > 0) {
+      Log.info('net', `folded ${older.length} older row(s) for ${device.name} into ${device.id}`)
+    }
   }
 
   async touch(id: string): Promise<void> {

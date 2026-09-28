@@ -239,10 +239,18 @@ enum Config {
         return candidate
     }
 
+    /// `VIBEWIRE_CONFIG_DIR` moves it, the same variable the Windows host
+    /// reads. That is what lets a second host run beside the installed one for
+    /// a test without reading or writing its settings, web copy or devices.
     static var configDirectory: URL {
-        let base = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config", isDirectory: true)
-            .appendingPathComponent("vibewire", isDirectory: true)
+        let base: URL
+        if let override = ProcessInfo.processInfo.environment["VIBEWIRE_CONFIG_DIR"], !override.isEmpty {
+            base = URL(fileURLWithPath: override, isDirectory: true)
+        } else {
+            base = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".config", isDirectory: true)
+                .appendingPathComponent("vibewire", isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }

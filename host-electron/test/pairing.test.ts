@@ -76,3 +76,49 @@ test('a malformed public key is refused after the code was accepted', async () =
   )
   assert.equal(pairing.currentProgress().codeAcceptedAt !== null, true)
 })
+
+test('a device that pairs twice keeps one row and its id', async () => {
+  const { pairing, trust } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  const first = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
+  const second = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
+  assert.equal(second.device.id, first.device.id)
+  assert.equal((await trust.all()).length, 1)
+  assert.equal(pairing.currentProgress().deviceId, first.device.id)
+})
+
+test('a repeat pairing keeps a name given on the host and the first pairing date', async () => {
+  const { pairing, trust, clock } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  const first = await pairing.pair(pairing.beginPairing().value, 'iPhone', 'browser', key)
+  await trust.rename(first.device.id, 'Bedside')
+  clock.advance(60_000)
+  const second = await pairing.pair(pairing.beginPairing().value, 'iPhone', 'browser', key)
+  assert.equal(second.device.name, 'Bedside')
+  assert.equal(second.device.pairedAt.getTime(), first.device.pairedAt.getTime())
+})
+
+test('a name typed for this pairing still wins over the stored one', async () => {
+  const { pairing } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  await pairing.pair(pairing.beginPairing().value, 'iPhone', 'browser', key)
+  const second = await pairing.pair(pairing.beginPairing('Desk').value, 'iPhone', 'browser', key)
+  assert.equal(second.device.name, 'Desk')
+})
+
+test('rows left by earlier pairings of the same key fold into the next one', async () => {
+  const { pairing, trust } = harness()
+  const key = publicKeyFromSeed(generateSeed())
+  for (const id of ['older-1', 'older-2']) {
+    await trust.add({ id, name: 'Phone', kind: 'browser', publicKey: key, pairedAt: new Date(0), lastSeenAt: null })
+  }
+  const result = await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', key)
+  assert.deepEqual((await trust.all()).map((device) => device.id), [result.device.id])
+})
+
+test('two devices with their own keys still get a row each', async () => {
+  const { pairing, trust } = harness()
+  await pairing.pair(pairing.beginPairing().value, 'Phone', 'browser', publicKeyFromSeed(generateSeed()))
+  await pairing.pair(pairing.beginPairing().value, 'Tablet', 'browser', publicKeyFromSeed(generateSeed()))
+  assert.equal((await trust.all()).length, 2)
+})

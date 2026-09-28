@@ -14,6 +14,7 @@ import {
   adoptFromUrl,
   loadAccount,
   onAccountChange,
+  scrubUrl,
   session as accountSession,
   signOut,
   urlCarriesAccount,
@@ -599,9 +600,26 @@ export class Store {
     }
   }
 
+  /**
+   * Whether this page was opened by a pairing link that has not been followed
+   * yet.
+   *
+   * The stored pairing does not connect while it is. A socket opened with the
+   * old record first is one the Mac's step list ignores, so its last step never
+   * ticked; and where the Mac had revoked that key, as signing out of it does,
+   * the refusal unpaired this browser in the middle of the pairing that was
+   * about to replace it.
+   */
+  private followingPairingLink = false
+
+  /** Called before `load`, so the stored pairing waits for the link. */
+  holdForPairingLink(search: string, hash: string): void {
+    this.followingPairingLink = Boolean(pairingParameters(search, hash).get('code'))
+  }
+
   async connectIfPaired(): Promise<void> {
     const paired = this.pairedHost.value
-    if (!paired) return
+    if (!paired || this.followingPairingLink) return
     await this.client.connect(paired)
     // Re-report on every connect; the host does not persist it.
     this.send({
@@ -745,18 +763,29 @@ export class Store {
    * served by another keeps working.
    */
   async handlePairingParams(search: string, hash: string): Promise<void> {
-    const parameters = new URLSearchParams(search || '')
-    if (hash.startsWith('#')) {
-      for (const [key, value] of new URLSearchParams(hash.slice(1))) {
-        if (!parameters.has(key)) parameters.set(key, value)
-      }
-    }
-
+    const parameters = pairingParameters(search, hash)
     const code = parameters.get('code')
     if (!code) return
+    // Read once, then gone from the address bar. Left there, a reload or a
+    // bookmark followed the link again with a code the Mac had long since spent
+    // or rotated, and reported a failure about a pairing that had worked.
+    scrubUrl(['code', 'host', 'port', 'origin', 'alt'])
+    try {
+      const failure = await this.followPairingLink(code, parameters)
+      if (failure) this.banner.value = { text: failure }
+    } finally {
+      this.followingPairingLink = false
+    }
+    // A link that failed, a stale one from history say, leaves the stored
+    // pairing as it was, and that connects now as it would have without the
+    // link. After a link that worked, this finds the socket already open.
+    await this.connectIfPaired()
+  }
+
+  /** One pairing link, followed. Returns what went wrong, or null. */
+  private async followPairingLink(code: string, parameters: URLSearchParams): Promise<string | null> {
     if (code.length !== 6 || !/^\d{6}$/.test(code)) {
-      this.banner.value = { text: 'That pairing link does not carry a six-digit code.' }
-      return
+      return 'That pairing link does not carry a six-digit code.'
     }
 
     const address = parameters.get('origin') ?? parameters.get('host') ?? location.origin
@@ -765,8 +794,7 @@ export class Store {
       const port = Number(parameters.get('port') ?? 8787)
       endpoint = parseEndpoint(address, Number.isFinite(port) ? port : 8787)
     } catch (error) {
-      this.banner.value = { text: (error as Error).message }
-      return
+      return (error as Error).message
     }
 
     // `alt` is the Mac's other addresses, comma-separated. Usually absent — the
@@ -775,26 +803,13 @@ export class Store {
     // pairing that happens from cellular already knows the way home.
     const alternates = normaliseOrigins((parameters.get('alt') ?? '').split(','))
 
-    const paired = this.pairedHost.value
-    if (paired) {
-      // Already paired. Two cases, and the difference matters.
-      //
-      // Same address: a stale link in history, or a reload. Ignore it — pairing again
-      // would tear down a working session and burn a code that has since rotated.
-      if (paired.origin === endpoint.origin) return
-
-      // Different address: the Mac moved, and scanning the QR again is exactly what
-      // anyone would do about it. Follow it rather than trading keys — the key and the
-      // device id do not depend on where the Mac is, and this is the fix for a
-      // Cloudflare quick tunnel whose hostname changes on every host restart.
-      const problem = await this.repoint(endpoint)
-      if (!problem && alternates.length > 0) this.client.learn(alternates)
-      this.banner.value = problem ? { text: problem } : null
-      return
-    }
-
-    const failure = await this.completePairing(endpoint, code, alternates)
-    if (failure) this.banner.value = { text: failure }
+    // Paired already or not, a code in the link is paired with. Somebody
+    // pointed a camera at the Mac on purpose, and its step list is waiting on
+    // this browser: ignoring the link left the list at nothing, with the code
+    // still live. The host keeps one row per key, so this refreshes the row
+    // rather than adding one, and the address that answered replaces the
+    // stored one, which also covers a Mac that moved.
+    return this.completePairing(endpoint, code, alternates)
   }
 
   /**
@@ -1888,6 +1903,17 @@ export class Store {
  * port is the right guess: it is the port this browser is already talking to
  * this Mac on.
  */
+/** A pairing link's parameters, from the query or, failing that, the fragment. */
+function pairingParameters(search: string, hash: string): URLSearchParams {
+  const parameters = new URLSearchParams(search || '')
+  if (hash.startsWith('#')) {
+    for (const [key, value] of new URLSearchParams(hash.slice(1))) {
+      if (!parameters.has(key)) parameters.set(key, value)
+    }
+  }
+  return parameters
+}
+
 function candidateOrigins(
   payload: Record<string, unknown>,
   transport: TransportStatus,
