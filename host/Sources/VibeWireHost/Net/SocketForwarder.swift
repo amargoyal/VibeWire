@@ -26,7 +26,11 @@ import Darwin
 final class SocketForwarder {
     private let listenPort: UInt16
     private let targetPort: UInt16
-    private let queue = DispatchQueue(label: "vibewire.forwarder", attributes: .concurrent)
+    /// Serial on purpose. A concurrent queue draws from the same capped pool of
+    /// GCD threads as everything else in the process, and once that pool is
+    /// used up the accept handler never runs: the phone's connection sits in
+    /// the backlog and its page spins while the Mac looks idle.
+    private let queue = DispatchQueue(label: "vibewire.forwarder")
 
     private var listenSocket: Int32 = -1
     private var acceptSource: DispatchSourceRead?
@@ -95,6 +99,17 @@ final class SocketForwarder {
             }
         }
         guard client >= 0 else { return }
+        Self.setOption(client, SOL_SOCKET, SO_NOSIGPIPE, 1)
+        // A phone that locks, leaves the Wi-Fi or drops off the tailnet sends
+        // no FIN, and nothing crosses an idle keep-alive connection, so without
+        // probes its two pump threads would wait on it until the app quits.
+        // These give up on a silent peer about 30 seconds after it went quiet.
+        // The `NWListener` has keepalive of its own, but its peer is this
+        // forwarder on loopback, which always answers.
+        Self.setOption(client, SOL_SOCKET, SO_KEEPALIVE, 1)
+        Self.setOption(client, IPPROTO_TCP, TCP_KEEPALIVE, 15)
+        Self.setOption(client, IPPROTO_TCP, TCP_KEEPINTVL, 5)
+        Self.setOption(client, IPPROTO_TCP, TCP_KEEPCNT, 3)
 
         queue.async { [targetPort] in
             guard let upstream = Self.connectLoopback(port: targetPort) else {
@@ -128,21 +143,37 @@ final class SocketForwarder {
             return nil
         }
 
-        var yes: Int32 = 1
-        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, socklen_t(MemoryLayout<Int32>.size))
+        setOption(fd, IPPROTO_TCP, TCP_NODELAY, 1)
+        setOption(fd, SOL_SOCKET, SO_NOSIGPIPE, 1)
         return fd
+    }
+
+    /// Sets one integer socket option, and says so when the kernel refuses it.
+    private static func setOption(_ fd: Int32, _ level: Int32, _ name: Int32, _ value: Int32) {
+        var value = value
+        guard setsockopt(fd, level, name, &value, socklen_t(MemoryLayout<Int32>.size)) != 0 else {
+            return
+        }
+        Log.warn(.net, "front door could not set socket option \(name): \(String(cString: strerror(errno)))")
     }
 
     /// Copies bytes both ways until either end goes quiet, then closes both.
     ///
     /// Two dedicated threads rather than dispatch sources: the pump is a blocking
     /// read/write loop, which is the simplest thing that cannot lose a partial
-    /// write, and there is exactly one pair of them per connected phone.
+    /// write, and there is exactly one pair of them per open connection.
+    ///
+    /// Threads of their own, not blocks on a global queue. GCD caps the threads
+    /// it will park in blocking calls at 64 per process, and a browser holds its
+    /// keep-alive connections open while idle, so 32 of them used to fill the
+    /// pool. Every connection after that was accepted by the kernel and never
+    /// answered: the phone spun, the pairing steps never ticked, and only a
+    /// restart of the app let anything in again.
     private static func splice(_ a: Int32, _ b: Int32) {
-        let done = DispatchGroup()
+        let running = Guarded(2)
         let shutdownOnce = Guarded(false)
 
-        func teardown() {
+        @Sendable func teardown() {
             let first = shutdownOnce.withLock { closed -> Bool in
                 if closed { return false }
                 closed = true
@@ -153,7 +184,7 @@ final class SocketForwarder {
             shutdown(b, SHUT_RDWR)
         }
 
-        func pump(from source: Int32, to sink: Int32) {
+        @Sendable func pump(from source: Int32, to sink: Int32) {
             let size = 64 * 1024
             let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
             defer { buffer.deallocate() }
@@ -172,12 +203,20 @@ final class SocketForwarder {
             teardown()
         }
 
-        DispatchQueue.global(qos: .userInitiated).async(group: done) { pump(from: a, to: b) }
-        DispatchQueue.global(qos: .userInitiated).async(group: done) { pump(from: b, to: a) }
-
-        done.notify(queue: .global()) {
-            close(a)
-            close(b)
+        for (source, sink) in [(a, b), (b, a)] {
+            let thread = Thread {
+                pump(from: source, to: sink)
+                let last = running.withLock { count -> Bool in
+                    count -= 1
+                    return count == 0
+                }
+                guard last else { return }
+                close(a)
+                close(b)
+            }
+            thread.name = "vibewire.forwarder.pump"
+            thread.qualityOfService = .userInitiated
+            thread.start()
         }
     }
 }

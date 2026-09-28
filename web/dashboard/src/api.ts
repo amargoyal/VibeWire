@@ -47,12 +47,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
+/**
+ * How long a poll may go unanswered before it is dropped.
+ *
+ * The pollers skip a tick while one is in flight, so a request that never
+ * settles stops that loop for good. Dropping it lets the next tick ask again.
+ */
+const POLL_TIMEOUT_MS = 10_000
+
 export function fetchState<T>(): Promise<T> {
-  return request<T>('state')
+  return request<T>('state', { signal: AbortSignal.timeout(POLL_TIMEOUT_MS) })
 }
 
 export function fetchEvents<T>(since: number): Promise<T> {
-  return request<T>(`events?since=${since}`)
+  return request<T>(`events?since=${since}`, { signal: AbortSignal.timeout(POLL_TIMEOUT_MS) })
 }
 
 /** Fire-and-report. Callers surface the failure; none of them retry blindly. */

@@ -10,7 +10,10 @@
  *
  * Both loops guard against overlap. A poll that is still in flight when the next
  * tick fires is not joined by a second one: on a Mac busy enough to make a
- * screenshot slow, that is how a poller turns into a queue.
+ * screenshot slow, that is how a poller turns into a queue. The flip side is
+ * that a poll which never settles would hold its loop shut, so each one is
+ * dropped after ten seconds and the next tick asks again. Without that, one
+ * request lost at the host's front door could leave the pairing steps frozen.
  */
 
 import { signal } from '@preact/signals'
