@@ -396,7 +396,16 @@ export class HostRouter implements Router {
       return
     }
 
-    if (this.accountGateCloses(socket)) {
+    // A signed-in browser sends its account as the socket opens, but checking it
+    // is a round trip to the account server, and the ping, link report and
+    // stream request sent alongside it arrive while that is in flight. Refusing
+    // those told a browser that had just signed in to sign in again, on every
+    // reconnect. They wait for the answer instead.
+    if (
+      this.accountGateCloses(socket) &&
+      !(await this.accountSettles(socket)) &&
+      this.accountGateCloses(socket)
+    ) {
       // Not an ack and not silence. A client refused here has somewhere to go
       // — its sign-in screen — and it only knows that if the refusal says so.
       socket.sendJSON(Outbound.error('account_required', this.accountRefusalText(), false))
@@ -548,6 +557,21 @@ export class HostRouter implements Router {
     if (!socket.isBrowser) return false
     if (!this.settings.requireAccount) return false
     return socket.accountUserId === null
+  }
+
+  /**
+   * Whether this socket's account was adopted, waiting for as much of its grace
+   * as is left to find out. False once it was refused or the grace is over,
+   * which is also the answer straight away for a socket open longer than that.
+   */
+  private async accountSettles(socket: SocketConnection): Promise<boolean> {
+    const deadline = socket.openedAt.getTime() + ACCOUNT_GRACE_MS
+    while (Date.now() < deadline) {
+      if (socket.accountUserId !== null) return true
+      if (socket.accountRefused) return false
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    return socket.accountUserId !== null
   }
 
   /** The sentence the client puts on its sign-in screen. */
