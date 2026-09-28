@@ -2,7 +2,8 @@
 # Pairs a simulated phone with a throwaway Mac host and prints what each end saw.
 # The checks themselves are in VirtualPhone.swift.
 #
-#     host/Tools/pairing-check.sh
+#     host/Tools/pairing-check.sh             # the Mac host
+#     host/Tools/pairing-check.sh --windows   # the Windows host, run on this Mac
 #
 # The host it starts keeps its settings and devices in a temporary folder
 # (VIBEWIRE_CONFIG_DIR) with its trust in files there (VIBEWIRE_SECRET_STORE=file),
@@ -16,6 +17,8 @@ set -eu
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 repo=$(dirname "$here")
+target=mac
+if [ "${1:-}" = "--windows" ]; then target=windows; fi
 port=${VIBEWIRE_CHECK_PORT:-8899}
 accounts_port=${VIBEWIRE_CHECK_ACCOUNTS_PORT:-9955}
 accounts=http://127.0.0.1:$accounts_port
@@ -35,7 +38,18 @@ echo "building"
 (cd "$repo/web" && npx tsc --noEmit &&
   VITE_SUPABASE_URL="$accounts" VITE_SUPABASE_KEY=test \
     npx vite build --outDir "$work/web" --emptyOutDir >/dev/null)
-(cd "$here" && swift build >/dev/null)
+if [ "$target" = windows ]; then
+  (cd "$repo/host-electron" && npm run build >/dev/null)
+  host_command() {
+    VIBEWIRE_SYNTHETIC_CAPTURE=1 exec "$repo/host-electron/node_modules/.bin/electron" "$repo/host-electron" \
+      --port "$port" --dashboard-url --no-tray
+  }
+else
+  (cd "$here" && swift build >/dev/null)
+  host_command() {
+    exec "$here/.build/debug/VibeWireHost" --port "$port" --dashboard-url
+  }
+fi
 xcrun swiftc -O "$here/Tools/VirtualPhone.swift" -o "$work/VirtualPhone"
 
 node "$here/Tools/fake-account-server.mjs" "$accounts_port" >"$work/accounts.log" 2>&1 &
@@ -48,14 +62,16 @@ VIBEWIRE_ACCOUNT_URL="$accounts" \
 VIBEWIRE_ACCOUNT_KEY=test \
 VIBEWIRE_DISABLE_CLAUDE=1 \
 VIBEWIRE_VERBOSE=1 \
-  "$here/.build/debug/VibeWireHost" --port "$port" --dashboard-url >"$work/url" 2>"$work/host.log" &
+  host_command >"$work/url" 2>"$work/host.log" &
+# The function execs the host, so this is the host's own process and not a
+# shell around it, and killing it on the way out stops the host.
 host_pid=$!
 
 # The host writes its own key as it starts. One that did not write it into the
 # temporary folder is using some other folder, possibly the installed app's,
 # and nothing gets paired with it.
 tries=0
-until [ -s "$work/url" ] && [ -f "$work/config/host-identity.secret" ]; do
+until grep -q /dashboard/ "$work/url" 2>/dev/null && [ -f "$work/config/host-identity.secret" ]; do
   tries=$((tries + 1))
   if [ "$tries" -gt 60 ] || ! kill -0 "$host_pid" 2>/dev/null; then
     echo "the test host did not start in $work/config; stopping before anything pairs" >&2
@@ -66,7 +82,7 @@ until [ -s "$work/url" ] && [ -f "$work/config/host-identity.secret" ]; do
 done
 
 status=0
-VIRTUALPHONE_ACCOUNTS=1 "$work/VirtualPhone" "$(cat "$work/url")" || status=$?
+VIRTUALPHONE_ACCOUNTS=1 "$work/VirtualPhone" "$(grep -m1 /dashboard/ "$work/url")" || status=$?
 echo
 echo "host log"
 grep -E "pair (accepted|rejected)|paired|folded|revoked|handshake complete|account|belongs" "$work/host.log" || true
