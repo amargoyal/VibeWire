@@ -601,6 +601,7 @@ export class HostRouter implements Router {
 
     if (owner !== account.id) {
       Log.warn('net', 'refused a socket signed into another account')
+      socket.accountRefused = true
       socket.sendJSON(
         Outbound.error(
           'account_required',
