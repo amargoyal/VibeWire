@@ -35,6 +35,10 @@ export class SocketConnection {
    */
   accountUserId: string | null = null
 
+  /** Set once the account this socket offered, or failed to offer in time, has
+   *  been turned away, so a message waiting at the gate stops waiting. */
+  accountRefused = false
+
   constructor(
     private readonly ws: WebSocket,
     readonly deviceId: string,
