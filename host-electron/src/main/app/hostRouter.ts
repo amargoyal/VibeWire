@@ -235,6 +235,13 @@ export class HostRouter implements Router {
     try {
       const result = await this.pairing.pair(code, deviceName, deviceKind, publicKey)
       Log.info('net', `pair accepted: ${deviceName} (${deviceKind}) as ${result.device.id}`)
+      // A device that pairs again while its socket is still open keeps that
+      // socket rather than opening another, so no new one will arrive to tick
+      // the last step. The step is about a socket this device's key has signed
+      // for, and one already has.
+      if (this.server?.connectedDeviceIds.has(result.device.id)) {
+        this.pairing.noteSocketOpened(result.device.id)
+      }
       return Response.json(200, {
         hostId: result.hostId,
         hostName: result.hostName,
