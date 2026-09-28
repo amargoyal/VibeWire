@@ -238,10 +238,16 @@ final class Run {
 
     /// Waits for the Mac's step list to reach its last step and returns the
     /// device it names.
-    func handshake(_ what: String) async -> String? {
+    func handshake(_ what: String, on tab: Tab) async -> String? {
         let reached = await eventually(20) { (await pairing()["step"] as? Int ?? 0) >= 4 }
         let state = await pairing()
         check(reached, "\(what): the Mac ticks all four steps", "stopped at \(state["step"] ?? 0)")
+        if !reached {
+            // What the person holding the phone would be looking at.
+            let text = await tab.text().split(whereSeparator: \.isNewline).prefix(12).joined(separator: " | ")
+            print("        phone at \(tab.address)")
+            print("        phone shows: \(text.isEmpty ? "nothing" : text)")
+        }
         return state["deviceId"] as? String
     }
 
@@ -273,7 +279,7 @@ func main(dashboard: String) async -> Int32 {
         let firstURL = try await run.scan()
         let first = Tab(store: phone)
         try await first.open(firstURL)
-        guard let deviceId = await run.handshake("first scan") else {
+        guard let deviceId = await run.handshake("first scan", on: first) else {
             print("  the first pairing never finished; nothing after it would mean anything")
             return Int32(run.failures + 1)
         }
@@ -286,7 +292,7 @@ func main(dashboard: String) async -> Int32 {
         let secondURL = try await run.scan()
         let second = Tab(store: phone)
         try await second.open(secondURL)
-        let again = await run.handshake("second scan")
+        let again = await run.handshake("second scan", on: second)
         run.check(again == deviceId, "the Mac keeps the same device", "was \(deviceId), now \(again ?? "none")")
         let rows = await run.devices().count - before
         run.check(rows == 1, "the Mac still lists one device for this phone", "\(rows) rows")
@@ -318,7 +324,7 @@ func main(dashboard: String) async -> Int32 {
         let revokedURL = try await run.scan()
         let revoked = Tab(store: phone)
         try await revoked.open(revokedURL)
-        let fresh = await run.handshake("scan after revoke")
+        let fresh = await run.handshake("scan after revoke", on: revoked)
         let revokedFailure = await run.shownFailure(revoked)
         run.check(revokedFailure == nil, "the page shows no failure", revokedFailure ?? "")
         run.check(await run.devices().count == before + 1, "the Mac lists the phone once")
@@ -331,7 +337,7 @@ func main(dashboard: String) async -> Int32 {
         let otherURL = try await run.scan()
         let otherTab = Tab(store: other)
         try await otherTab.open(otherURL)
-        let otherDevice = await run.handshake("a different phone")
+        let otherDevice = await run.handshake("a different phone", on: otherTab)
         run.check(otherDevice != nil && otherDevice != fresh, "the Mac gives it its own device")
         run.check(await run.devices().count == before + 2, "the Mac lists both phones")
         otherTab.close()
