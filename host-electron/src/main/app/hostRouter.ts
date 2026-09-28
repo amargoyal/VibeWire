@@ -630,6 +630,7 @@ export class HostRouter implements Router {
       if (socket.accountUserId !== null) return
       if (!this.settings.requireAccount) return
       if (this.activeSocket !== socket) return
+      socket.accountRefused = true
       socket.sendJSON(Outbound.error('account_required', this.accountRefusalText(), false))
       socket.close(4003, 'no account presented')
     }, ACCOUNT_GRACE_MS)
