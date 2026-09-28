@@ -706,6 +706,7 @@ final class HostRouter: Router, @unchecked Sendable {
             guard let socket, socket.accountUserId == nil else { return }
             guard state.read({ $0.settings.requireAccount }) else { return }
             guard state.read({ $0.activeSocket === socket }) else { return }
+            socket.noteAccountRefused()
             socket.sendJSON(Outbound.error("account_required", accountRefusalText(), retriable: false))
             socket.close(code: 4003, reason: "no account presented")
         }
