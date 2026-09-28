@@ -20,6 +20,7 @@
 
 import AppKit
 import CoreImage
+import CryptoKit
 import WebKit
 
 // MARK: - The Mac, through its dashboard API
@@ -102,6 +103,82 @@ enum Camera {
         return detector.features(in: image)
             .compactMap { ($0 as? CIQRCodeFeature)?.messageString }
             .first
+    }
+}
+
+// MARK: - The iPhone app
+
+/// What the iPhone app does with a scan, spoken the way
+/// `ios/VibeWire/Net/HostClient.swift` speaks it: one CryptoKit key kept across
+/// pairings, `POST /v1/pair`, then a socket signed in headers. Running this needs
+/// no app build and no simulator.
+final class AppClient: @unchecked Sendable {
+    private let key = Curve25519.Signing.PrivateKey()
+    private let session = URLSession(configuration: .ephemeral)
+    private var socket: URLSessionWebSocketTask?
+    private(set) var deviceId: String?
+    private(set) var origin: URL?
+
+    /// `vibewire://pair?host=…&port=…&code=…`, with `origin` when it is the relay.
+    func pair(link: String) async throws {
+        guard let components = URLComponents(string: link), components.scheme == "vibewire" else {
+            throw Failure("not an app pairing link: \(link)")
+        }
+        let items = components.queryItems ?? []
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+        guard let code = value("code"),
+              let address = value("origin") ?? value("host").map({ "http://\($0):\(value("port") ?? "8787")" }),
+              let origin = URL(string: address)
+        else { throw Failure("the app link has no address or code: \(link)") }
+
+        var request = URLRequest(url: origin.appendingPathComponent("v1/pair"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "code": code,
+            "deviceName": "iPhone",
+            "deviceKind": "phone",
+            "publicKey": key.publicKey.rawRepresentation.base64EncodedString(),
+        ])
+        let (data, response) = try await session.data(for: request)
+        let body = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        guard (response as? HTTPURLResponse)?.statusCode == 200, let id = body["deviceId"] as? String else {
+            throw Failure("the Mac refused the app: \(String(decoding: data, as: UTF8.self))")
+        }
+        deviceId = id
+        self.origin = origin
+    }
+
+    /// Opens the socket the app keeps while it is in the foreground, and waits
+    /// for the Mac's first message on it.
+    func connect() async throws {
+        guard let deviceId, let origin else { throw Failure("the app is not paired") }
+        var challenge = URLComponents(url: origin.appendingPathComponent("v1/challenge"), resolvingAgainstBaseURL: false)!
+        challenge.queryItems = [URLQueryItem(name: "deviceId", value: deviceId)]
+        let (data, _) = try await session.data(from: challenge.url!)
+        guard let nonce = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["nonce"] as? String,
+              let nonceData = Data(base64Encoded: nonce)
+        else { throw Failure("no challenge from the Mac") }
+
+        var signed = Data("vibewire-auth-v1".utf8)
+        signed.append(nonceData)
+        let signature = try key.signature(for: signed)
+
+        var components = URLComponents(url: origin.appendingPathComponent("v1/socket"), resolvingAgainstBaseURL: false)!
+        components.scheme = origin.scheme == "https" ? "wss" : "ws"
+        var request = URLRequest(url: components.url!)
+        request.setValue(deviceId, forHTTPHeaderField: "X-VibeWire-Device")
+        request.setValue(nonce, forHTTPHeaderField: "X-VibeWire-Nonce")
+        request.setValue(signature.base64EncodedString(), forHTTPHeaderField: "X-VibeWire-Signature")
+        let socket = session.webSocketTask(with: request)
+        self.socket = socket
+        socket.resume()
+        _ = try await socket.receive()
+    }
+
+    func disconnect() {
+        socket?.cancel(with: .goingAway, reason: nil)
+        socket = nil
     }
 }
 
@@ -276,6 +353,14 @@ final class Run {
         return url
     }
 
+    /// The step list, for a pairing that did not happen in a tab.
+    func steps(_ what: String) async -> String? {
+        let reached = await eventually(20) { (await pairing()["step"] as? Int ?? 0) >= 4 }
+        let state = await pairing()
+        check(reached, "\(what): the Mac ticks all four steps", "stopped at \(state["step"] ?? 0)")
+        return state["deviceId"] as? String
+    }
+
     /// Waits for the Mac's step list to reach its last step and returns the
     /// device it names.
     func handshake(_ what: String, on tab: Tab) async -> String? {
@@ -383,6 +468,20 @@ func main(dashboard: String) async -> Int32 {
         run.check(await run.devices().count == before + 2, "the Mac lists both phones")
         otherTab.close()
 
+        print("iPhone app, first scan")
+        let app = AppClient()
+        try await app.pair(link: try await run.scan("app").absoluteString)
+        try await app.connect()
+        let appDevice = await run.steps("app first scan")
+        run.check(appDevice == app.deviceId, "the Mac names the app's device")
+        run.check(await run.devices().count == before + 3, "the Mac lists the app")
+
+        print("iPhone app, second scan with its socket still open")
+        try await app.pair(link: try await run.scan("app").absoluteString)
+        _ = await run.steps("app second scan")
+        run.check(app.deviceId == appDevice, "the Mac keeps the app's device")
+        run.check(await run.devices().count == before + 3, "the Mac still lists the app once")
+        app.disconnect()
         try await host.command(["do": "pair.end"])
     } catch {
         print("  FAIL  \(error)")
