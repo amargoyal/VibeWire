@@ -644,6 +644,7 @@ final class HostRouter: Router, @unchecked Sendable {
         guard let account = await accounts.verify(token: token) else {
             Log.info(.net, "account token was not confirmed by the account server")
             if required {
+                socket.noteAccountRefused()
                 socket.sendJSON(Outbound.error(
                     "account_required",
                     "This computer could not confirm that sign-in. Sign in again, or check that the computer is online.",
