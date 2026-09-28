@@ -222,15 +222,18 @@ second host runs beside the installed one without touching its devices.
 ## Checking pairing without a phone
 
 ```
-host/Tools/pairing-check.sh
+host/Tools/pairing-check.sh             # the Mac host
+host/Tools/pairing-check.sh --windows   # the Windows host, run on this Mac
 ```
 
-Starts a throwaway Mac host on port 8899 with its own folder and file-based
-trust, then plays the phone: it reads the Mac's QR out of the image the way a
-camera does, opens it in WebKit, scans again, reloads, follows an old link,
-scans after a revoke, and pairs the way the iPhone app does. Each check prints
-PASS or FAIL against what the Mac's step list and device list say. The
-installed VibeWire and the login keychain are left alone.
+Starts a throwaway host on port 8899 with its own folder and file-based trust,
+then plays the phone: it reads the Mac's QR out of the image the way a camera
+does, opens it in WebKit, scans again, reloads, follows an old link, scans after
+a revoke, and pairs the way the iPhone app does. With sign-in required, it signs
+in through a reload, with an email code, after the host has given up waiting,
+and as a second account, against a stand-in account server rather than the real
+one. Each check prints PASS or FAIL against what the host's step list and device
+list say. The installed VibeWire and the login keychain are left alone.
 
 ## Packaging a Mac release
 
