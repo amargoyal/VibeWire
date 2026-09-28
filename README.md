@@ -216,6 +216,8 @@ a display, for a machine with no screen to capture.
 Configuration lives in `~/.config/vibewire/` on both platforms
 (`C:\Users\<you>\.config\vibewire\` on Windows): `config.json`, the paired
 devices, and the host's own key — sealed with DPAPI on Windows.
+`VIBEWIRE_CONFIG_DIR` moves that folder on both platforms, which is how a
+second host runs beside the installed one without touching its devices.
 
 ## Packaging a Mac release
 
