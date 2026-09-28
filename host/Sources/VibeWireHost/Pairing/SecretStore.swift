@@ -164,7 +164,11 @@ struct FileStore: SecretStore {
 
     func write(account: String, data: Data) async throws {
         let target = url(for: account)
-        try data.write(to: target, options: [.atomic, .completeFileProtection])
+        // Readable once the Mac has been unlocked after it started, the same
+        // rule as the keychain item this stands in for. Complete protection
+        // refused every write while the screen was locked, and a locked Mac is
+        // the usual state of one being paired with from somewhere else.
+        try data.write(to: target, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o600],
             ofItemAtPath: target.path
