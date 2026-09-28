@@ -110,10 +110,33 @@ enum Camera {
 /// One tab. Tabs made with the same `store` share storage, as tabs in one
 /// browser on one phone do, so a second scan finds what the first one saved.
 @MainActor
-final class Tab: NSObject, WKNavigationDelegate {
+final class Tab: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     let view: WKWebView
     private let window: NSWindow
     private var loaded: CheckedContinuation<Void, Error>?
+    /// What the page wrote to its console, and anything it threw and nobody
+    /// caught. A phone's console is not something its owner ever sees, so
+    /// this is the only place a failure that never reached the screen shows.
+    private(set) var console: [String] = []
+
+    private static let consoleTap = """
+    (() => {
+      const post = (level, parts) => {
+        try {
+          window.webkit.messageHandlers.console.postMessage(
+            level + ' ' + parts.map((part) => part instanceof Error
+              ? `${part.name}: ${part.message} at ${(part.stack || '').split('\\n')[0]}`
+              : String(part)).join(' '))
+        } catch {}
+      }
+      for (const level of ['log', 'warn', 'error']) {
+        const original = console[level].bind(console)
+        console[level] = (...parts) => { post(level, parts); original(...parts) }
+      }
+      addEventListener('error', (event) => post('uncaught', [event.error || event.message]))
+      addEventListener('unhandledrejection', (event) => post('unhandled', [event.reason]))
+    })()
+    """
 
     init(store: WKWebsiteDataStore) {
         let configuration = WKWebViewConfiguration()
@@ -121,6 +144,11 @@ final class Tab: NSObject, WKNavigationDelegate {
         // Without this WebKit throttles a view nobody is looking at, and the page
         // would behave like a phone in a pocket rather than one in a hand.
         configuration.preferences.inactiveSchedulingPolicy = .none
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.consoleTap,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         view = WKWebView(frame: NSRect(x: 0, y: 0, width: 390, height: 844), configuration: configuration)
         window = NSWindow(
             contentRect: NSRect(x: -4000, y: -4000, width: 390, height: 844),
@@ -132,6 +160,17 @@ final class Tab: NSObject, WKNavigationDelegate {
         window.contentView = view
         window.orderBack(nil)
         view.navigationDelegate = self
+        configuration.userContentController.add(self, name: "console")
+    }
+
+    nonisolated func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        MainActor.assumeIsolated {
+            console.append(String(describing: message.body))
+            if console.count > 40 { console.removeFirst(console.count - 40) }
+        }
     }
 
     func open(_ url: URL) async throws {
@@ -156,6 +195,7 @@ final class Tab: NSObject, WKNavigationDelegate {
 
     func close() {
         view.navigationDelegate = nil
+        view.configuration.userContentController.removeScriptMessageHandler(forName: "console")
         view.loadHTMLString("", baseURL: nil)
         window.orderOut(nil)
     }
@@ -247,6 +287,7 @@ final class Run {
             let text = await tab.text().split(whereSeparator: \.isNewline).prefix(12).joined(separator: " | ")
             print("        phone at \(tab.address)")
             print("        phone shows: \(text.isEmpty ? "nothing" : text)")
+            for line in tab.console.suffix(8) { print("        phone console: \(line)") }
         }
         return state["deviceId"] as? String
     }
