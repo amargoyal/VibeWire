@@ -570,6 +570,7 @@ export class HostRouter implements Router {
     if (!account) {
       Log.info('net', 'account token was not confirmed by the account server')
       if (required) {
+        socket.accountRefused = true
         socket.sendJSON(
           Outbound.error(
             'account_required',
