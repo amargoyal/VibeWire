@@ -552,6 +552,58 @@ func main(dashboard: String) async -> Int32 {
         run.check(await run.devices().count == before + 3, "the Mac still lists the app once")
         app.disconnect()
 
+        // Needs a host and a web build pointed at host/Tools/fake-account-server.mjs,
+        // which pairing-check.sh sets up and says so with this variable.
+        if ProcessInfo.processInfo.environment["VIRTUALPHONE_ACCOUNTS"] == "1" {
+            let asksForSignIn = "to know who you are"
+            try await host.command(["do": "setting.set", "key": "requireAccount", "value": true])
+            run.check(await run.settings()["requireAccount"] as? Bool == true, "the Mac requires a signed-in browser")
+
+            print("sign-in required, signing in ends in a reload")
+            let redirected = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await redirected.open(try await run.scan())
+            let redirectedDevice = await run.handshake("pairing before sign-in", on: redirected) ?? ""
+            run.check(await run.eventually(12) { await redirected.text().contains(asksForSignIn) },
+                      "the phone asks who you are")
+            try await redirected.storeSession(token: "test-owner", email: "owner@example.test")
+            try await redirected.reload()
+            run.check(await run.holds(12) {
+                let connected = await run.isConnected(redirectedDevice)
+                let asked = await redirected.text().contains(asksForSignIn)
+                return connected && !asked
+            }, "the phone gets in and stays in")
+            run.check(await run.settings()["accountOwnerEmail"] as? String == "owner@example.test",
+                      "the Mac belongs to that account")
+            redirected.close()
+
+            print("sign-in required, signing in with an email code")
+            let emailed = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await emailed.open(try await run.scan())
+            let emailedDevice = await run.handshake("pairing before sign-in", on: emailed) ?? ""
+            run.check(await run.eventually(12) { await emailed.text().contains(asksForSignIn) },
+                      "the phone asks who you are")
+            try await emailed.signInWithCode(email: "owner@example.test", code: "000001")
+            run.check(await run.holds(12) {
+                let connected = await run.isConnected(emailedDevice)
+                let asked = await emailed.text().contains(asksForSignIn)
+                return connected && !asked
+            }, "the phone gets in and stays in")
+            emailed.close()
+
+            print("sign-in required, a different account")
+            let stranger = Tab(store: WKWebsiteDataStore(forIdentifier: UUID()))
+            try await stranger.open(try await run.scan())
+            let strangerDevice = await run.handshake("pairing before sign-in", on: stranger) ?? ""
+            run.check(await run.eventually(12) { await stranger.text().contains(asksForSignIn) },
+                      "the phone asks who you are")
+            try await stranger.signInWithCode(email: "other@example.test", code: "000002")
+            run.check(await run.eventually(12) { await stranger.text().contains("belongs to a different VibeWire account") },
+                      "the phone is told the Mac belongs to someone else")
+            run.check(await run.holds(4) { !(await run.isConnected(strangerDevice)) }, "the phone is kept out")
+            stranger.close()
+
+            try await host.command(["do": "setting.set", "key": "requireAccount", "value": false])
+        }
         try await host.command(["do": "pair.end"])
     } catch {
         print("  FAIL  \(error)")
