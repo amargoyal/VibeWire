@@ -270,6 +270,58 @@ final class Tab: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
 
     var address: String { view.url?.absoluteString ?? "" }
 
+    /// Runs script in the page and waits for the promise it returns.
+    func run(_ script: String, _ arguments: [String: Any] = [:]) async throws -> Any? {
+        try await view.callAsyncJavaScript(script, arguments: arguments, contentWorld: .page)
+    }
+
+    /// Leaves a signed-in session where the client keeps one, as a sign-in
+    /// that ends in a redirect back to the page would.
+    func storeSession(token: String, email: String) async throws {
+        _ = try await run("""
+        const session = {
+          accessToken: token, refreshToken: 'refresh-' + token,
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          user: { id: token, email, displayName: null },
+        }
+        await new Promise((resolve, reject) => {
+          const open = indexedDB.open('vibewire', 1)
+          open.onupgradeneeded = () => open.result.createObjectStore('identity')
+          open.onerror = () => reject(open.error)
+          open.onsuccess = () => {
+            const write = open.result.transaction('identity', 'readwrite')
+            write.objectStore('identity').put(session, 'account-session')
+            write.oncomplete = () => { open.result.close(); resolve(null) }
+            write.onerror = () => reject(write.error)
+          }
+        })
+        """, ["token": token, "email": email])
+    }
+
+    /// Signs in with an email code through the sign-in screen itself: types the
+    /// address, presses the button, types the code.
+    func signInWithCode(email: String, code: String) async throws {
+        _ = try await run("""
+        const type = (field, value) => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, value)
+          field.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+        const until = async (find) => {
+          for (let tries = 0; tries < 60; tries++) {
+            const found = find()
+            if (found) return found
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+          throw new Error('the sign-in screen did not show what was expected')
+        }
+        type(await until(() => document.querySelector('input[type=email]')), email)
+        const send = await until(() => [...document.querySelectorAll('button')]
+          .find((button) => /send me a code/i.test(button.textContent || '')))
+        send.click()
+        type(await until(() => document.querySelector('input[aria-label="Sign-in code, six digits"]')), code)
+        """, ["email": email, "code": code])
+    }
+
     func close() {
         view.navigationDelegate = nil
         view.configuration.userContentController.removeScriptMessageHandler(forName: "console")
@@ -327,6 +379,23 @@ final class Run {
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
         return await condition()
+    }
+
+    /// Waits for `condition`, then checks it keeps holding for `seconds`. A
+    /// screen that appears and is taken away again passes `eventually` and
+    /// fails this.
+    func holds(_ seconds: Double, _ condition: () async -> Bool) async -> Bool {
+        guard await eventually(10, condition) else { return false }
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if !(await condition()) { return false }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return true
+    }
+
+    func settings() async -> [String: Any] {
+        ((try? await host.state())?["settings"] as? [String: Any]) ?? [:]
     }
 
     func pairing() async -> [String: Any] {
@@ -482,6 +551,7 @@ func main(dashboard: String) async -> Int32 {
         run.check(app.deviceId == appDevice, "the Mac keeps the app's device")
         run.check(await run.devices().count == before + 3, "the Mac still lists the app once")
         app.disconnect()
+
         try await host.command(["do": "pair.end"])
     } catch {
         print("  FAIL  \(error)")
