@@ -536,25 +536,13 @@ final class AppModel {
             return
         }
 
-        // A link to the address this phone is already paired on is a stale one:
-        // a photograph of the QR, a second scan of the one on screen, or a cold
-        // launch from history. Pairing again would tear down a working session
-        // and spend a code that has since rotated, so it is read as the
-        // no-op it is.
-        //
-        // A link to a *different* address is left to pair properly. The link
-        // carries no host id, so this phone cannot tell the Mac that moved from
-        // the second Mac in the house, and trading keys is the answer that is
-        // right either way.
-        if let paired = pairedHost,
-           let scanned = try? Endpoint.parse(address, fallbackPort: offered.port),
-           scanned.origin == paired.origin {
-            if !offered.alternates.isEmpty {
-                await client.learn(alternates: offered.alternates)
-            }
-            return
-        }
-
+        // Paired already or not, a code in the link is paired with. Somebody
+        // pointed a camera at the Mac on purpose, and its step list is waiting
+        // on this phone: reading a second scan as a no-op left the list at
+        // nothing, with the code still live. The Mac keeps one row per key and
+        // ticks its last step for a socket that is already open, so a working
+        // session is not torn down, and a link that fails leaves the pairing
+        // this phone already had exactly as it was.
         if let failure = await completePairing(
             address: address,
             port: offered.port,
